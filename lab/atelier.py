@@ -5,20 +5,22 @@ dépôt public de l'atelier, qui exécute les POC sur ses propres minutes GitHub
 du contenu public et neutre : le sujet (contenu public de la source), le plan technique, les faits vérifiés et les
 modèles à utiliser. Le choix des sujets et leur intérêt pour l'équipe qui les commande restent chez elle.
 
-Déroulé d'une commande (`python -m veille.atelier executer commandes/<jour>/<sujet>.json`) :
-1. écriture : le modèle rédige les cellules ; l'atelier les encadre (en-tête, paramètres, aide commune, bilan) ;
-2. contrôle statique, puis sandbox CPU à échelle réduite (TAILLE « sandbox ») : phase publique, puis phase banque
+Déroulé d'une commande (`python -m lab.atelier executer commandes/<jour>/<sujet>.json` dans l'atelier) :
+1. écriture : le modèle rédige les cellules ; l'atelier les encadre (livrable.py : en-tête, mise en route, paramètres,
+   configuration des données internes, initialisation, titres numérotés, bilan) ; règles de lisibilité vérifiées et
+   corrigées avant toute exécution (controler_lisibilite, deux passes de mise en forme au plus) ;
+2. contrôle statique, puis sandbox CPU à échelle réduite (SCALE « reduced ») : phase publique, puis phase privée
    (données factices, faux service à la convention OpenAI) ; erreurs renvoyées au modèle (`iterations_max`) ;
-3. échelle complète (TAILLE « complete », phase publique), sur le matériel décidé par l'atelier (`materiel_complet`) :
+3. échelle complète (SCALE « full », phase publique), sur le matériel décidé par l'atelier (`materiel_complet`) :
    GPU Colab pour tout entraînement PyTorch ou TensorFlow, ou quand l'analyse le justifie ; CPU du sandbox sinon ;
 4. revue de méthode (fuite, équité, validité) sur les résultats les plus complets ; un problème bloquant repart en
    correction ;
-5. livraison (dossier `livraison/`) ; puis `publier` crée le dépôt daté du POC et y pousse le livrable (le jeton
+5. livraison (dossier `livraison/` : noms anglais, README illustré, figures, contrôle de neutralité bloquant) ; puis `publier` crée le dépôt daté du POC et y pousse le livrable (le jeton
    de publication n'est présent qu'à cette étape, jamais pendant l'exécution du code écrit par le modèle).
 
 Sécurité : le modèle n'a aucun outil. Le code qu'il écrit s'exécute seulement dans un conteneur Docker sans secret,
 sans privilège, aux ressources bornées, ou sur une machine Colab sans secret (voir colab.py). Sans Docker, rien ne
-s'exécute (sauf en développement, VEILLE_POC_SANS_ISOLATION=1, à réserver à du code relu).
+s'exécute (sauf en développement, ATELIER_SANS_ISOLATION=1, à réserver à du code relu).
 """
 from __future__ import annotations
 
@@ -35,7 +37,6 @@ import tempfile
 import time
 import uuid
 import unicodedata
-from datetime import date
 from pathlib import Path
 from string import Template
 
@@ -43,8 +44,11 @@ import nbformat
 import requests
 import yaml
 
-from . import llm
+from . import livrable, llm
 from .colab import Colab
+from .livrable import (NOTEBOOK, SECTIONS, SECTIONS_REQUISES, _nb_md, api_aide, assembler,
+                       bilan_markdown, env_exemple, modeles_par_taille, nombre,
+                       script_telechargement)
 from .store import read_json, write_json
 
 log = logging.getLogger(__name__)
@@ -52,7 +56,6 @@ log = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent
 REPRISES = ROOT / "reprises"   # reprises/<jour>/<sujet>/<étape>.json : étapes rédigées lors d'un run précédent
 OUTILS = ROOT / "tools" / "poc"
-MOIS = ("janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre")
 
 
 def _prompt(nom: str, **valeurs) -> str:
@@ -61,11 +64,6 @@ def _prompt(nom: str, **valeurs) -> str:
 
 def _schema(nom: str) -> dict:
     return json.loads((ROOT / "schemas" / f"{nom}.schema.json").read_text(encoding="utf-8"))
-
-
-def date_courte(jour: str) -> str:
-    d = date.fromisoformat(jour)
-    return f"{d.day} {MOIS[d.month - 1]} {d.year}"
 
 
 def charger_reglages() -> dict:
@@ -77,16 +75,18 @@ def charger_reglages() -> dict:
     return {"poc": s["poc"], "timeouts_secondes": s.get("timeouts_secondes", {})}
 
 
-SECTIONS_REQUISES = ("donnees_publiques", "donnees_banque", "reference", "nouvelle", "evaluation")
-
-
 ROUTES_SERVICE = {"llmaas": "/chat/completions", "sttaas": "/audio/transcriptions", "embeddings": "/embeddings"}
 
 
 _SECRET = re.compile(r"""(sk-[A-Za-z0-9_-]{20,}|hf_[A-Za-z0-9]{30,}|(api[_-]?key|token|secret)\s*=\s*["'][^"']{12,}["'])""", re.I)
 
 
-_ECRIT_ENV = re.compile(r"""os\.environ\s*(\[\s*["'](LLMAAS|STTAAS|BANQUE)_[A-Z_]*["']\s*\]\s*=|\.(update|setdefault)\s*\(.*(LLMAAS|STTAAS|BANQUE)_)""")
+_VARIABLES_ENV = r"(?:LLMAAS_|STTAAS_)[A-Z_]*|PRIVATE_DATA|LOCAL_MODELS_DIR"
+_ECRIT_ENV = re.compile(rf"""os\.environ\s*(\[\s*["']({_VARIABLES_ENV})["']\s*\]\s*=|\.(update|setdefault)\s*\(.*({_VARIABLES_ENV}))""")
+
+
+LIGNES_MAX_CELLULE = 40
+MISES_EN_FORME = 2   # passes de mise en forme par itération, avant exécution
 
 
 _INSTALL = re.compile(r"^\s*[!%]\s*pip\b|pip\s+install|conda\s+install", re.M)
@@ -110,19 +110,6 @@ def materiel_complet(plan: dict, faits: dict, conf: dict) -> tuple[str, str]:
     return "cpu", plan.get("analyse_materiel") or "ni entraînement PyTorch ou TensorFlow, ni modèle ou durée hors du budget CPU"
 
 
-def api_aide() -> str:
-    """Signatures et première ligne de documentation des fonctions de tools/poc/aide.py (source unique)."""
-    arbre = ast.parse((OUTILS / "aide.py").read_text(encoding="utf-8"))
-    lignes = []
-    for n in arbre.body:
-        if isinstance(n, ast.FunctionDef) and not n.name.startswith("_"):
-            sig = ast.unparse(n.args)
-            doc = " ".join((ast.get_docstring(n) or "").split("\n\n")[0].split())
-            lignes.append(f"- `{n.name}({sig})` : {doc}")
-    lignes.append("- `JOURNAL_APPELS` : liste des appels aux services (durée, modèle, succès), résumée dans les résultats.")
-    return "\n".join(lignes)
-
-
 def preinstalles() -> list[str]:
     """Paquets préinstallés dans l'image du sandbox (lus dans le Dockerfile : source unique)."""
     texte = (OUTILS / "Dockerfile").read_text(encoding="utf-8").replace("\\\n", " ")  # lignes de continuation jointes
@@ -135,211 +122,103 @@ def preinstalles() -> list[str]:
     return sorted(set(paquets))
 
 
-def _nb_code(source: str, **meta):
-    return nbformat.v4.new_code_cell(source, metadata=meta)
+# Mots français fréquents dans des noms de variables ou de fonctions : le code publié est écrit en anglais.
+_MOTS_FRANCAIS = set("""donnee donnees resultat resultats modele modeles entrainement entrainer entraine etiquette etiquettes
+classe jeu jeux taille graine chemin chemins fichier fichiers sortie sorties appel appels liste nombre valeur valeurs seuil
+seuils lot lots exemple exemples approche approches metrique metriques reponse reponses texte textes colonne colonnes ligne
+lignes calcul calculer charger chargement evaluer nouvelle nouveau probabilite probabilites apprentissage motif motifs
+niveau niveaux erreur erreurs mesure mesures duree debut moyenne ecart tirage melange melanger choisir sens vrai faux oui
+non tache taches rappel appareil lire ecrire afficher tableau courbe locuteur locuteurs enregistrer telecharger verifier
+construire preparer normaliser transcrire decouper decoupage echantillon echantillons poids couche couches jeton jetons
+consigne pli plis bloc blocs confiance vraie vraies predite predites predit""".split())
 
 
-def _nb_md(source: str, **meta):
-    return nbformat.v4.new_markdown_cell(source, metadata=meta)
+def _identifiants(source: str) -> set[str]:
+    """Noms définis par le code : fonctions, classes, arguments, variables affectées."""
+    src = "\n".join("pass  # magique" if l.lstrip().startswith(("%", "!")) else l for l in source.splitlines())
+    try:
+        arbre = ast.parse(src)
+    except SyntaxError:
+        return set()
+    noms = set()
+    for n in ast.walk(arbre):
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            noms.add(n.name)
+        elif isinstance(n, ast.arg):
+            noms.add(n.arg)
+        elif isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store):
+            noms.add(n.id)
+    return noms
 
 
-def services_du_plan(plan: dict) -> list[str]:
-    return sorted({plan[r]["service_phase2"] for r in ("reference", "nouvelle")} - {"aucun"})
+def _nom_francais(nom: str) -> bool:
+    if not nom.isascii():
+        return True
+    morceaux = re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])", nom)
+    return any(m.lower() in _MOTS_FRANCAIS for m in morceaux)
 
 
-def modeles_par_taille(plan: dict) -> dict[str, list[str]]:
-    """Modèles chargés à chaque échelle : substituts du sandbox (sinon les mêmes) et modèles de l'échelle complète."""
-    sandbox, complete = [], []
-    for r in ("reference", "nouvelle"):
-        complete += plan[r]["modeles_hf"]
-        sandbox += plan[r].get("modeles_hf_sandbox") or plan[r]["modeles_hf"]
-    return {"sandbox": sorted(set(sandbox)), "complete": sorted(set(complete))}
+def controler_neutralite(code: dict) -> list[str]:
+    """Termes qui rattacheraient le dépôt public à un secteur ou à son origine (contrôle bloquant)."""
+    erreurs = []
+    for i, c in enumerate(code["cellules"]):
+        for terme in livrable.termes_interdits(c["source"]):
+            erreurs.append(f"cellule {i} ({c['section']}) : terme « {terme} » interdit dans un dépôt public (dire « données "
+                           "internes », « services financiers », « expérience »)")
+    textes = [code.get("protocole"), code.get("ecarts_sandbox"), code.get("resume_simple"), *(code.get("limites") or []),
+              *[f"{g.get('terme')} {g.get('definition')}" for g in code.get("glossaire") or []],
+              *[f"{m.get('libelle')} {m.get('explication')}" for m in code.get("lecture_des_metriques") or []]]
+    for terme in sorted({x for s in textes for x in livrable.termes_interdits(s or "")}):
+        erreurs.append(f"champs du livrable (protocole, limites, glossaire, métriques) : terme « {terme} » interdit")
+    return erreurs
 
 
-def colonnes_chemins(plan: dict) -> list[str]:
-    return [c["colonne"] for c in plan["phase2"]["donnees"]
-            if re.search(r"chemin|path|fichier|audio|wav|image", f"{c['type']} {c['colonne']}", re.I)]
-
-
-def cellule_config_banque(plan: dict) -> str:
-    """Seule cellule à adapter dans l'environnement de la banque : générée depuis le plan (colonnes attendues,
-    colonnes de chemins, modèles, services), valeurs par défaut lues dans l'environnement, aucune clé."""
-    services = services_du_plan(plan)
-    colonnes = {c["colonne"]: c["colonne"] for c in plan["phase2"]["donnees"]}
-    l = ["# Configuration de l'environnement bancaire : seule cellule à adapter pour la phase banque (PHASE = \"banque\").",
-         "# Valeurs par défaut lues dans l'environnement (modèle : banque.env.exemple). Aucune clé ici : elle vient de",
-         "# <SERVICE>_API_KEY, d'un fichier de secret monté (<SERVICE>_API_KEY_FILE) ou d'une saisie masquée.",
-         "import os",
-         "",
-         "CONFIG_BANQUE = {",
-         "    # Jeu bancaire : fichier (csv, tsv, parquet, jsonl, json, xlsx) ou dossier de fichiers de même structure.",
-         '    "donnees": os.environ.get("BANQUE_DONNEES", ""),',
-         "    # Colonne attendue par le notebook -> nom de la colonne dans votre jeu (à modifier à droite seulement).",
-         f'    "colonnes": {colonnes!r},',
-         "    # Colonnes de chemins de fichiers (relatifs au fichier de données qui les cite, ou absolus).",
-         f'    "chemins": {colonnes_chemins(plan)!r},',
-         '    "max_lignes": None,                      # plafond facultatif (échantillon aléatoire reproductible)',
-         '    "csv": {"sep": None, "encodage": None},  # None : séparateur et encodage devinés (« ; », Windows-1252…)',
-         "    # Poids copiés localement (org--nom/, script telecharger_modeles.py) pour travailler sans Internet ; vide sinon.",
-         '    "modeles_dir": os.environ.get("BANQUE_MODELES_DIR", ""),',
-         f'    "modeles": {modeles_par_taille(plan)!r},',
-         "    # Autorité de certification d'entreprise (fichier PEM) pour les appels HTTPS internes ; vide sinon.",
-         '    "certificats": os.environ.get("SSL_CERT_FILE", ""),']
-    if "llmaas" in services or "embeddings" in services:
-        l += ['    "llmaas": {"base_url": os.environ.get("LLMAAS_BASE_URL", ""), "model": os.environ.get("LLMAAS_MODEL", ""),']
-        if "embeddings" in services:
-            l += ['               "embeddings_model": os.environ.get("LLMAAS_EMBEDDINGS_MODEL", ""),']
-        l += ['               "cle_fichier": os.environ.get("LLMAAS_API_KEY_FILE", ""),',
-              '               "en_tetes": {}},  # en-têtes propres à votre passerelle, si elle en exige']
-    if "sttaas" in services:
-        l += ['    "sttaas": {"base_url": os.environ.get("STTAAS_BASE_URL", ""), "model": os.environ.get("STTAAS_MODEL", ""),',
-              '               "cle_fichier": os.environ.get("STTAAS_API_KEY_FILE", ""),',
-              '               "en_tetes": {}},']
-    return "\n".join(l + ["}"])
-
-
-def env_exemple(plan: dict) -> str:
-    services = services_du_plan(plan)
-    l = ["# Phase banque : variables à définir dans l'environnement du notebook (projet, job ou fichier .env non versionné),",
-         "# ou directement dans la cellule CONFIG_BANQUE. Jamais de clé dans le notebook ni dans un dépôt.",
-         "BANQUE_DONNEES=/chemin/vers/le_jeu_ou_son_dossier",
-         "BANQUE_MODELES_DIR=/chemin/vers/les_modeles      # facultatif : sans accès à Internet (telecharger_modeles.py)"]
-    if "llmaas" in services or "embeddings" in services:
-        l += ["LLMAAS_BASE_URL=https://llmaas.example.internal/v1",
-              "LLMAAS_MODEL=nom-du-modele",
-              "LLMAAS_API_KEY_FILE=/chemin/du/secret/monte     # ou LLMAAS_API_KEY"]
-        if "embeddings" in services:
-            l += ["LLMAAS_EMBEDDINGS_MODEL=nom-du-modele-d-embeddings"]
-        l += ['# LLMAAS_EN_TETES={"X-Tenant": "..."}            # facultatif : en-têtes exigés par la passerelle']
-    if "sttaas" in services:
-        l += ["STTAAS_BASE_URL=https://sttaas.example.internal/v1",
-              "STTAAS_MODEL=nom-du-modele",
-              "STTAAS_API_KEY_FILE=/chemin/du/secret/monte     # ou STTAAS_API_KEY"]
-    l += ["# HTTPS_PROXY=http://proxy.example.internal:8080",
-          "# SSL_CERT_FILE=/chemin/autorite-entreprise.pem",
-          "# PIP_INDEX_URL=https://miroir-pypi.example.internal/simple",
-          "# POC_TIMEOUT_SECONDES=120 et POC_TENTATIVES=3 : délai et tentatives par appel de service"]
-    return "\n".join(l) + "\n"
-
-
-def script_telechargement(plan: dict, faits: dict) -> str:
-    """Script livré avec le POC : poids des modèles, aux révisions vérifiées, à copier dans l'environnement de la banque."""
-    modeles = modeles_par_taille(plan)
-    revisions = {m: (faits.get("modeles", {}).get(m) or {}).get("sha") for m in modeles["sandbox"] + modeles["complete"]}
-    return f'''"""Télécharge les poids des modèles du POC, aux révisions vérifiées lors de sa validation, dans un dossier à
-copier dans l'environnement de la banque (BANQUE_MODELES_DIR), pour l'exécuter sans accès à Internet.
-
-Usage : python telecharger_modeles.py DOSSIER [--taille sandbox|complete]   (pip install huggingface_hub)
-"""
-import argparse
-from pathlib import Path
-
-MODELES = {modeles!r}
-REVISIONS = {revisions!r}
-
-
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("dossier")
-    ap.add_argument("--taille", choices=sorted(MODELES), default="complete")
-    a = ap.parse_args()
-    from huggingface_hub import snapshot_download
-    for m in MODELES[a.taille]:
-        cible = Path(a.dossier) / m.replace("/", "--")
-        snapshot_download(m, revision=REVISIONS.get(m), local_dir=cible)
-        print(f"{{m}} -> {{cible}}")
-
-
-if __name__ == "__main__":
-    main()
-'''
-
-
-def entete(fiche: dict, plan: dict, faits: dict, jour: str) -> str:
-    sources = "\n".join(f"- [{s['titre']}]({s['url']})" for s in fiche.get("sources", [])[:6])
-    services = services_du_plan(plan)
-    variables = ["| `BANQUE_DONNEES` | jeu bancaire : fichier (csv, tsv, parquet, jsonl, json, xlsx) ou dossier de fichiers ; `factice` pour tester le code |",
-                 "| `BANQUE_MODELES_DIR` | (facultatif) dossier des poids copiés localement (`org--nom/`), sans accès à Internet |"]
-    if "llmaas" in services or "embeddings" in services:
-        variables += ["| `LLMAAS_BASE_URL`, `LLMAAS_MODEL`, `LLMAAS_API_KEY` ou `LLMAAS_API_KEY_FILE` | service LLM à la convention OpenAI (clé par variable ou fichier de secret monté) |"]
-    if "embeddings" in services:
-        variables += ["| `LLMAAS_EMBEDDINGS_MODEL` | modèle d'embeddings du service |"]
-    if "sttaas" in services:
-        variables += ["| `STTAAS_BASE_URL`, `STTAAS_MODEL`, `STTAAS_API_KEY` ou `STTAAS_API_KEY_FILE` | service de transcription à la convention OpenAI |"]
-    if services:
-        variables += ["| `<SERVICE>_EN_TETES` | (facultatif) en-têtes HTTP exigés par la passerelle, objet JSON |"]
-    modeles = modeles_par_taille(plan)
-    colonnes = "\n".join(f"| `{c['colonne']}` | {c['type']} | {c['description']} |" for c in plan["phase2"]["donnees"])
-    licences = "; ".join(f"{m} : {f.get('licence', 'inconnue')}" for m, f in faits.get("modeles", {}).items() if f)
-    return f"""# POC — {plan['titre']}
-
-*Preuve de concept du {date_courte(jour)} · sujet : « {fiche['titre']} » · niveau sandbox : {plan['niveau_sandbox']}*
-
-**Hypothèse.** {plan['hypothese']}
-
-| | Approche | Mise en œuvre |
-|---|---|---|
-| Référence | {plan['reference']['nom']} — {plan['reference']['description']} | {plan['reference']['implementation']} |
-| Nouvelle | {plan['nouvelle']['nom']} — {plan['nouvelle']['description']} | {plan['nouvelle']['implementation']} |
-
-**Données publiques.** `{plan['jeu_public']['hub_id']}` ({plan['jeu_public']['config'] or 'configuration par défaut'}) — {plan['jeu_public']['representativite']} Écarts avec les données de la banque : {plan['jeu_public']['ecarts_banque']}
-
-**Métriques.** {', '.join(plan['metriques'])} (principale : {plan['metrique_principale']}, {'à maximiser' if plan['sens'] == 'max' else 'à minimiser'}).
-
-**Sources.**
-{sources}
-
-## Mode d'emploi
-1. **Phase publique** (`PHASE = "publique"`) : rejoue la comparaison sur le jeu public. `TAILLE = "sandbox"` reprend l'échelle réduite validée par l'atelier sur CPU ; `TAILLE = "complete"` utilise tout le jeu et les modèles de l'échelle complète (GPU nécessaire dès qu'un modèle est entraîné avec PyTorch ou TensorFlow).
-2. **Phase banque** (`PHASE = "banque"`) : même protocole sur un jeu de données bancaire, dans l'environnement de la banque. Validée dans le sandbox de l'atelier sur un jeu factice écrit comme un vrai export (dossier de fichiers, CSV « ; » en Windows-1252, colonnes à faire correspondre), contre un faux service à la convention OpenAI (clé lue dans un fichier de secret), modèles servis hors ligne. Pour l'adapter :
-   1. **Modèles** : sans accès à Internet, `python telecharger_modeles.py <dossier> --taille complete` sur un poste connecté (révisions vérifiées : {', '.join(f'`{m}`' for m in modeles['complete']) or 'aucun modèle local'}), puis copier le dossier et le désigner par `BANQUE_MODELES_DIR` ;
-   2. **Variables** : renseigner l'environnement du notebook à partir de `banque.env.exemple` (ou directement la cellule `CONFIG_BANQUE`, juste après les paramètres). **Jamais de clé dans le notebook** : `<SERVICE>_API_KEY`, un fichier de secret monté (`<SERVICE>_API_KEY_FILE`) ou la saisie masquée ;
-   3. **Colonnes** : dans `CONFIG_BANQUE["colonnes"]`, faire correspondre chaque colonne attendue (ci-dessous) au nom de la colonne de votre jeu ;
-   4. **Lancer** avec `PHASE = "banque"` (et `TAILLE` voulue) : la cellule d'initialisation affiche une liste de contrôle (jeu, colonnes, modèles, services) et s'arrête sur ce qui manque, avant tout calcul.
-
-| Variable | Rôle |
-|---|---|
-{chr(10).join(variables)}
-
-Jeu bancaire attendu ({plan['phase2']['volume_conseille']}) :
-
-| Colonne | Type | Description |
-|---|---|---|
-{colonnes}
-
-Métriques métier : {plan['phase2']['metriques_metier']}
-
-Garde-fous : {plan['phase2']['garde_fous']} En phase banque, le notebook refuse les services publics (OpenAI, Anthropic, Mistral, Hugging Face…) et le HTTP non chiffré, n'affiche aucune donnée brute et désactive la télémétrie ; avec `BANQUE_MODELES_DIR`, il travaille sans accès à Internet.
-
-3. **Dépendances** : `pip install -r requirements.txt` (versions exactes du sandbox), ou `POC_INSTALLER=1` pour installer depuis le notebook. Proxy et certificats d'entreprise : `HTTPS_PROXY`, `SSL_CERT_FILE`, `PIP_INDEX_URL`.
-
-Licences des modèles : {licences or 'voir les cartes des modèles'}. Les résultats (`resultats_<phase>.json`) consignent versions, machine, graine et empreinte des données, pour la traçabilité.
-"""
-
-
-def assembler(fiche: dict, plan: dict, faits: dict, code: dict, jour: str):
-    nb = nbformat.v4.new_notebook()
-    nb.metadata.update({"kernelspec": {"name": "python3", "display_name": "Python 3", "language": "python"},
-                        "language_info": {"name": "python"}, "poc": {"sujet_id": fiche["sujet_id"], "jour": jour}})
-    deps = sorted(set(code["dependances"]))
-    cellules = [
-        _nb_md(entete(fiche, plan, faits, jour), section="entete"),
-        _nb_code('PHASE = "publique"     # "publique" : jeu public ; "banque" : jeu bancaire\n'
-                 'TAILLE = "sandbox"     # "sandbox" : échelle réduite (CPU) ; "complete" : tout le jeu, modèles complets\n'
-                 'GRAINE = 42\nPOC_SORTIE = "."      # dossier des résultats', tags=["parameters"], section="parametres"),
-        _nb_code(cellule_config_banque(plan), section="config_banque"),
-        _nb_code("# Dépendances (en plus de requirements.txt). Installées par le notebook seulement si POC_INSTALLER=1.\n"
-                 f"DEPENDANCES = {deps!r}\nimport os, subprocess, sys\n"
-                 'if DEPENDANCES and os.environ.get("POC_INSTALLER") == "1":\n'
-                 '    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", *DEPENDANCES])', section="installation"),
-        _nb_code((OUTILS / "aide.py").read_text(encoding="utf-8"), section="aide", jupyter={"source_hidden": True}),
-        _nb_code("appliquer_config_banque(CONFIG_BANQUE)  # phase banque : liste de contrôle, arrêt si quelque chose manque\n"
-                 "preparer_environnement()\nfixer_graine(GRAINE)\nafficher_configuration()", section="initialisation"),
-    ]
-    for c in code["cellules"]:
-        cellules.append((_nb_md if c["type"] == "markdown" else _nb_code)(c["source"], section=c["section"]))
-    nb.cells = cellules
-    return nb
+def controler_lisibilite(code: dict, plan: dict | None = None) -> list[str]:
+    """Règles de lisibilité du notebook publié : cellules courtes, chacune introduite par une explication, fonctions
+    documentées, noms en anglais, sections dans l'ordre, figures, métriques et glossaire expliqués."""
+    erreurs, cellules = [], code["cellules"]
+    ordre = list(dict.fromkeys(SECTIONS.values()))
+    rang_max, francais = -1, set()
+    for i, c in enumerate(cellules):
+        rang = ordre.index(SECTIONS[c["section"]]) if c["section"] in SECTIONS else -1
+        if rang < rang_max:
+            erreurs.append(f"cellule {i} ({c['section']}) : section hors de l'ordre {list(SECTIONS)}")
+        rang_max = max(rang_max, rang)
+        if c["type"] != "code":
+            continue
+        n = len(c["source"].strip().splitlines())
+        if n > LIGNES_MAX_CELLULE:
+            erreurs.append(f"cellule {i} ({c['section']}) : {n} lignes (au plus {LIGNES_MAX_CELLULE}) : découpe-la, chaque "
+                           "morceau introduit par une cellule Markdown")
+        if i == 0 or cellules[i - 1]["type"] != "markdown":
+            erreurs.append(f"cellule {i} ({c['section']}) : cellule de code sans cellule Markdown juste avant pour dire ce "
+                           "qu'elle fait et pourquoi")
+        try:
+            arbre = ast.parse("\n".join("pass" if l.lstrip().startswith(("%", "!")) else l for l in c["source"].splitlines()))
+            sans_doc = [n.name for n in ast.walk(arbre) if isinstance(n, (ast.FunctionDef, ast.ClassDef)) and not ast.get_docstring(n)]
+            erreurs += [f"cellule {i} ({c['section']}) : `{nom}` sans docstring" for nom in sans_doc]
+        except SyntaxError:
+            pass
+        francais |= {nom for nom in _identifiants(c["source"]) if _nom_francais(nom)}
+    if francais:
+        erreurs.append("noms de variables ou de fonctions en français (le code publié est en anglais ; docstrings et "
+                       f"commentaires restent en français) : {', '.join(sorted(francais)[:15])}")
+    sources = lambda *s: "\n".join(c["source"] for c in cellules if c["type"] == "code" and c["section"] in s)
+    if not any(c["section"] == "context" and c["type"] == "markdown" for c in cellules):
+        erreurs.append("section « context » absente : explique la question et l'idée de la nouvelle approche en Markdown")
+    if "save_figure(" not in sources("public_data", "private_data"):
+        erreurs.append("aucune figure sur les données (save_figure dans public_data) : répartition des classes, longueurs, durées…")
+    if "plot_comparison(" not in sources("evaluation"):
+        erreurs.append("évaluation : appelle plot_comparison(results) après save_results")
+    if "save_figure(" not in sources("analysis"):
+        erreurs.append("aucune figure d'analyse (save_figure dans analysis) : erreurs par classe, matrice de confusion, fiabilité…")
+    if plan and not code.get("lecture_des_metriques"):
+        erreurs.append("lecture_des_metriques vide : chaque métrique doit avoir un libellé et une explication")
+    if len(code.get("glossaire") or []) < 3:
+        erreurs.append("glossaire : au moins 3 termes techniques expliqués simplement")
+    if not (code.get("resume_simple") or "").strip():
+        erreurs.append("resume_simple vide : 3 à 5 phrases sur la question et l'idée, pour un lecteur non spécialiste")
+    return erreurs
 
 
 def controler_cellules(code: dict, faits: dict, plan: dict | None = None) -> list[str]:
@@ -348,6 +227,7 @@ def controler_cellules(code: dict, faits: dict, plan: dict | None = None) -> lis
     erreurs = []
     codes = [c for c in code["cellules"] if c["type"] == "code"]
     presentes = {c["section"] for c in codes}
+    erreurs += [f"section inconnue « {c['section']} »" for c in code["cellules"] if c["section"] not in SECTIONS]
     erreurs += [f"section de code « {s} » absente" for s in SECTIONS_REQUISES if s not in presentes]
     tout = "\n".join(c["source"] for c in codes)
     for i, c in enumerate(code["cellules"]):
@@ -361,42 +241,44 @@ def controler_cellules(code: dict, faits: dict, plan: dict | None = None) -> lis
         if _SECRET.search(c["source"]):
             erreurs.append(f"cellule {i} ({c['section']}) : secret écrit en dur (clé, jeton)")
         if _ECRIT_ENV.search(c["source"]):
-            erreurs.append(f"cellule {i} ({c['section']}) : écrit une variable LLMAAS_/STTAAS_/BANQUE_ (elles viennent de l'environnement)")
+            erreurs.append(f"cellule {i} ({c['section']}) : écrit une variable LLMAAS_/STTAAS_/PRIVATE_DATA/LOCAL_MODELS_DIR (elles viennent de l'environnement)")
         if _INSTALL.search(c["source"]):
             erreurs.append(f"cellule {i} ({c['section']}) : installation de paquets dans le code (utilise `dependances`)")
-        if re.search(r"def\s+(enregistrer_resultats|llm_chat|donnees_banque|ic_bootstrap|wer)\s*\(", c["source"]):
+        if re.search(r"def\s+(save_results|llm_chat|load_private_data|bootstrap_ci|wer|save_figure|plot_comparison|model_path|configure)\s*\(", c["source"]):
             erreurs.append(f"cellule {i} ({c['section']}) : redéfinit une fonction de l'aide commune")
-        if re.search(r"CONFIG_BANQUE\s*(\[[^\]]*\]\s*)*=(?!=)|CONFIG_BANQUE\.(update|setdefault|pop)\(", c["source"]):
-            erreurs.append(f"cellule {i} ({c['section']}) : modifie CONFIG_BANQUE (cellule de configuration générée, laissée à l'utilisateur)")
-        if re.search(r"BANQUE_DONNEES|BANQUE_MODELES_DIR", c["source"]):
-            erreurs.append(f"cellule {i} ({c['section']}) : lit la configuration bancaire directement (passe par donnees_banque et chemin_modele)")
+        if re.search(r"PRIVATE_CONFIG\s*(\[[^\]]*\]\s*)*=(?!=)|PRIVATE_CONFIG\.(update|setdefault|pop)\(", c["source"]):
+            erreurs.append(f"cellule {i} ({c['section']}) : modifie PRIVATE_CONFIG (cellule de configuration générée, laissée à l'utilisateur)")
+        if re.search(r"PRIVATE_DATA|LOCAL_MODELS_DIR", c["source"]):
+            erreurs.append(f"cellule {i} ({c['section']}) : lit la configuration des données internes directement (passe par load_private_data et model_path)")
+        if re.search(r"^\s*(from\s+helpers\s+import|import\s+helpers)", c["source"], re.M):
+            erreurs.append(f"cellule {i} ({c['section']}) : réimporte helpers (déjà importé par la cellule d'initialisation)")
         if re.search(r"google\.colab|drive\.mount|authenticate_user|google\.auth", c["source"]):
             erreurs.append(f"cellule {i} ({c['section']}) : accès au compte Google interdit (google.colab, Drive, authentification)")
         if "trust_remote_code=True" in c["source"].replace(" ", "") and "revision=" not in c["source"]:
             erreurs.append(f"cellule {i} ({c['section']}) : trust_remote_code=True sans revision épinglée")
-    if "enregistrer_resultats(" not in tout:
-        erreurs.append("aucun appel à enregistrer_resultats")
+    if "save_results(" not in tout:
+        erreurs.append("aucun appel à save_results")
     if "PHASE" not in tout:
         erreurs.append("le code ne distingue pas les phases (variable PHASE)")
-    if "donnees_banque(" not in tout:
-        erreurs.append("la phase banque ne charge pas ses données par donnees_banque(...)")
+    if "load_private_data(" not in tout:
+        erreurs.append("la phase private ne charge pas ses données par load_private_data(...)")
     for role in ("reference", "nouvelle") if plan else ():
         substituts = plan[role].get("modeles_hf_sandbox") or []
         erreurs += [f"modèle {m} du plan ({ROLES[role]}) absent du code" for m in [*plan[role]["modeles_hf"], *substituts] if m not in tout]
-        if substituts and "selon_taille(" not in tout:
-            erreurs.append(f"substituts du sandbox ({', '.join(substituts)}) non choisis par selon_taille(sandbox=..., complete=...)")
-    return erreurs
+        if substituts and "by_scale(" not in tout:
+            erreurs.append(f"substituts de l'échelle réduite ({', '.join(substituts)}) non choisis par by_scale(reduced=..., full=...)")
+    return erreurs + controler_neutralite(code)
 
 
 class Sandbox:
     """Exécute un notebook dans un conteneur Docker sans secret (ou localement en développement, sur demande explicite)."""
 
     def __init__(self, conf: dict):
-        self.image = os.environ.get("VEILLE_POC_IMAGE", conf.get("image", "veille-poc:latest"))
+        self.image = os.environ.get("ATELIER_IMAGE", conf.get("image", "atelier-sandbox:latest"))
         self.mode = None
         if shutil.which("docker") and subprocess.run(["docker", "image", "inspect", self.image], capture_output=True).returncode == 0:
             self.mode = "docker"
-        elif os.environ.get("VEILLE_POC_SANS_ISOLATION") == "1":
+        elif os.environ.get("ATELIER_SANS_ISOLATION") == "1":
             self.mode = "local"
         cpus, ram = os.cpu_count() or 2, None
         try:
@@ -411,10 +293,10 @@ class Sandbox:
         t = conf["timeouts"]
         return (f"Sandbox de validation : Linux, CPU seul ({self.cpus} cœurs, {self.ram_go} Go de RAM), aucun GPU. Accès à "
                 f"Internet pour pip et Hugging Face, sans jeton (rien d'accès restreint). Python 3.12 ; ffmpeg et libsndfile "
-                f"présents. Le notebook y est exécuté en TAILLE « sandbox » (échelle réduite), de la première à la dernière "
+                f"présents. Le notebook y est exécuté en SCALE = « reduced » (échelle réduite), de la première à la dernière "
                 f"cellule, sans intervention : phase publique en {t['publique'] // 60} min au plus, téléchargements compris "
-                f"({t['cellule'] // 60} min par cellule), puis phase banque (données factices) en {t['banque'] // 60} min au plus.\n"
-                f"Échelle complète (TAILLE « complete », phase publique seulement), exécutée une fois le code validé, sur le "
+                f"({t['cellule'] // 60} min par cellule), puis phase private (données factices) en {t['privee'] // 60} min au plus.\n"
+                f"Échelle complète (SCALE = « full », phase public seulement), exécutée une fois le code validé, sur le "
                 f"matériel choisi par l'atelier : GPU NVIDIA T4 (16 Go, CUDA, Google Colab, {conf['colab']['timeout'] // 60} min "
                 f"au plus) pour tout entraînement PyTorch ou TensorFlow, pour un modèle de plus de {conf['params_max_milliards']} Md "
                 f"de paramètres ou pour une durée CPU estimée au-delà de {t['complete_cpu'] // 60} min ; sinon ce même CPU, "
@@ -440,7 +322,7 @@ class Sandbox:
                 "--phase", phase, "--taille", taille, "--timeout-cellule", str(min(delai_cellule, delai))]
         if phase == "publique" and taille == "sandbox":
             args += ["--freeze", "requirements_sandbox.txt"]
-        if phase == "banque" and modeles:  # servis hors ligne, comme dans un environnement bancaire sans Internet
+        if phase == "privee" and modeles:  # servis hors ligne, comme dans un environnement cible sans Internet
             args += ["--modeles", ",".join(modeles)]
         rapport_chemin = dossier / f"rapport_{nom_sortie}.json"
         rapport_chemin.unlink(missing_ok=True)
@@ -463,10 +345,10 @@ class Sandbox:
                    "-e", "PIP_CACHE_DIR=/travail/.cache/pip", "-v", f"{dossier}:/travail", "-v", f"{OUTILS}:/outils:ro",
                    "-w", "/travail", self.image, "sh", "-c", script]
         elif self.mode == "local":
-            env = {k: v for k, v in os.environ.items() if not re.search(r"TOKEN|KEY|SECRET|PASSWORD|AUTH|LLMAAS|STTAAS|BANQUE", k, re.I)}
+            env = {k: v for k, v in os.environ.items() if not re.search(r"TOKEN|KEY|SECRET|PASSWORD|AUTH|LLMAAS|STTAAS|PRIVATE_DATA|LOCAL_MODELS_DIR", k, re.I)}
             nom, cmd = None, [sys.executable, str(OUTILS / "executer.py"), *args]
         else:
-            raise RuntimeError("aucun sandbox : Docker et l'image du sandbox sont requis (VEILLE_POC_SANS_ISOLATION=1 en développement)")
+            raise RuntimeError("aucun sandbox : Docker et l'image du sandbox sont requis (ATELIER_SANS_ISOLATION=1 en développement)")
         try:
             proc = subprocess.run(cmd, cwd=dossier, capture_output=True, timeout=delai + 300,
                                   env=env if self.mode == "local" else None)
@@ -545,24 +427,24 @@ def valider_execution(pub: dict, ban: dict | None, plan: dict, min_exemples: int
     if not pub.get("ok"):
         return ["la phase publique a échoué"]
     if not r:
-        return ["la phase publique n'a pas enregistré de résultats (enregistrer_resultats)"]
-    if r["jeu"]["n_exemples"] < min_exemples:
-        erreurs.append(f"évaluation sur {r['jeu']['n_exemples']} exemples seulement (au moins {min_exemples} en sandbox)")
-    if not meme_metrique(r["metrique_principale"], plan["metrique_principale"]):
-        erreurs.append(f"métrique principale {r['metrique_principale']!r} au lieu de {plan['metrique_principale']!r} (plan)")
+        return ["la phase publique n'a pas enregistré de résultats (save_results)"]
+    if r["dataset"]["n_examples"] < min_exemples:
+        erreurs.append(f"évaluation sur {r['dataset']['n_examples']} exemples seulement (au moins {min_exemples} à l'échelle réduite)")
+    if not meme_metrique(r["primary_metric"], plan["metrique_principale"]):
+        erreurs.append(f"métrique principale {r['primary_metric']!r} au lieu de {plan['metrique_principale']!r} (plan)")
     if ban is None:
         return erreurs
     if not ban.get("ok"):
-        return erreurs + ["la phase banque (données factices, faux service) a échoué"]
+        return erreurs + ["la phase private (données factices, faux service) a échoué"]
     if not ban.get("resultats"):
-        erreurs.append("la phase banque n'a pas enregistré de résultats")
+        erreurs.append("la phase private n'a pas enregistré de résultats")
     appels = ban.get("appels_service") or {}
     for role in ("reference", "nouvelle"):
         service = plan[role]["service_phase2"]
         if service != "aucun" and not any(rt.endswith(ROUTES_SERVICE[service]) for rt in appels.get("routes", [])):
-            erreurs.append(f"phase banque : l'approche {role} devait appeler le service {service} ({ROUTES_SERVICE[service]}), aucun appel reçu")
+            erreurs.append(f"phase private : l'approche {role} devait appeler le service {service} ({ROUTES_SERVICE[service]}), aucun appel reçu")
     if appels.get("refus"):
-        erreurs.append(f"phase banque : {appels['refus']} appel(s) refusé(s) par le faux service (authentification, format)")
+        erreurs.append(f"phase private : {appels['refus']} appel(s) refusé(s) par le faux service (authentification, format)")
     return erreurs
 
 
@@ -575,86 +457,34 @@ def valider_complete(complet: dict, reduit: dict, plan: dict) -> list[str]:
     if not r:
         return ["aucun résultat enregistré"]
     erreurs = []
-    if not meme_metrique(r["metrique_principale"], plan["metrique_principale"]):
-        erreurs.append(f"métrique principale {r['metrique_principale']!r} au lieu de {plan['metrique_principale']!r}")
-    cles = lambda res: sorted((a["role"], tuple(sorted(a["metriques"]))) for a in res["approches"])
+    if not meme_metrique(r["primary_metric"], plan["metrique_principale"]):
+        erreurs.append(f"métrique principale {r['primary_metric']!r} au lieu de {plan['metrique_principale']!r}")
+    cles = lambda res: sorted((a["role"], tuple(sorted(a["metrics"]))) for a in res["approaches"])
     if cles(r) != cles(ref):
         erreurs.append("approches ou métriques différentes de celles de l'échelle réduite")
-    if r["jeu"]["n_exemples"] < ref["jeu"]["n_exemples"]:
-        erreurs.append(f"{r['jeu']['n_exemples']} exemples d'évaluation, moins qu'à l'échelle réduite ({ref['jeu']['n_exemples']})")
+    if r["dataset"]["n_examples"] < ref["dataset"]["n_examples"]:
+        erreurs.append(f"{r['dataset']['n_examples']} exemples d'évaluation, moins qu'à l'échelle réduite ({ref['dataset']['n_examples']})")
     return erreurs
-
-
-def nombre(v, chiffres: int = 3) -> str:
-    """Nombre à la française (virgule décimale)."""
-    return f"{v:.{chiffres}g}".replace(".", ",") if isinstance(v, (int, float)) and not isinstance(v, bool) else "—"
-
-
-def _valeur(a: dict, m: str) -> str:
-    ic = (a.get("ic95") or {}).get(m)
-    return nombre(a["metriques"].get(m), 4) + (f" [{nombre(ic[0])} ; {nombre(ic[1])}]" if ic else "")
 
 
 ROLES = {"reference": "référence", "nouvelle": "nouvelle"}
 
 
-def bilan_markdown(plan: dict, etat: dict, res: dict, revue: dict) -> str:
-    mets = list(res["approches"][0]["metriques"])
-    tete = "| Approche | Rôle | " + " | ".join(mets) + " | Latence p50 (ms) |"
-    lignes = [tete, "|" + "---|" * (len(mets) + 3)]
-    for a in res["approches"]:
-        lignes.append(f"| {a['nom']} | {ROLES.get(a['role'], a['role'])} | " + " | ".join(_valeur(a, m) for m in mets)
-                      + f" | {nombre((a.get('latence_ms') or {}).get('p50'))} |")
-    pb = [x for x in revue["problemes"] if x["gravite"] == "majeur"]
-    mineurs = [x for x in revue["problemes"] if x["gravite"] == "mineur"]
-    code = etat.get("code") or {}
-    services = sorted({plan[r]["service_phase2"] for r in ("reference", "nouvelle")} - {"aucun"})
-    banque = ("Phase banque exécutée sur données factices, contre un faux service à la convention OpenAI "
-              f"({', '.join(services)}) : le code de la phase 2 est validé, pas ses résultats." if services else
-              "Phase banque exécutée sur données factices : le code de la phase 2 est validé, pas ses résultats.")
-    complet, reduit = etat.get("complete") or {}, etat["publique"]["resultats"]
-    jeu = f"{res['jeu']['n_exemples']} exemples d'évaluation de `{res['jeu']['nom']}` ({res['jeu'].get('split')})"
-    if etat.get("resultats_complets"):
-        mp = reduit["metrique_principale"]
-        rappel = " ; ".join(f"{a['nom']} {nombre(a['metriques'].get(mp))}" for a in reduit["approches"])
-        intro = (f"*Échelle complète exécutée sur {complet.get('materiel')} ({complet.get('raison_materiel')}), graine "
-                 f"{res.get('graine')} : {jeu}. Le code a d'abord été validé de bout en bout dans le sandbox de l'atelier (CPU, "
-                 f"échelle réduite : {reduit['jeu']['n_exemples']} exemples, {mp} : {rappel}). {banque} "
-                 f"{len(etat['iterations'])} itération(s) d'écriture et de correction.*")
-    else:
-        statut = {"echec": "en échec", "non_execute": "non exécutée"}.get(complet.get("statut"), "non exécutée")
-        intro = (f"*Exécuté de bout en bout dans le sandbox de l'atelier (CPU, échelle réduite, graine {res.get('graine')}) : {jeu}. "
-                 f"{banque} {len(etat['iterations'])} itération(s) d'écriture et de correction.*\n\n"
-                 f"**Échelle complète {statut}** : {complet.get('raison') or '—'}. Les chiffres ci-dessous sont ceux de "
-                 f"l'échelle réduite : indicatifs, à confirmer en `TAILLE = \"complete\"`.")
-    textes = ["## Bilan", "", intro, "",
-              "\n".join(lignes), "", f"**Conclusion de la revue de méthode** (confiance {revue['confiance']}) : {revue['conclusion']}", ""]
-    if pb:
-        textes += ["**Réserves majeures :**"] + [f"- {x['description']}" for x in pb] + [""]
-    if code.get("ecarts_sandbox") or plan.get("adaptation_sandbox"):
-        textes += [f"**Échelle réduite du sandbox (écarts avec l'échelle complète) :** {code.get('ecarts_sandbox') or plan['adaptation_sandbox']}", ""]
-    if code.get("limites"):
-        textes += ["**Limites :**"] + [f"- {x}" for x in code["limites"]] + [""]
-    if mineurs:
-        textes += ["**Améliorations possibles :**"] + [f"- {x['description']}" for x in mineurs[:5]] + [""]
-    textes += ["Pour conclure pour la banque : rejouer en `PHASE = \"banque\"`, `TAILLE = \"complete\"` (voir le mode d'emploi en tête)."]
-    return "\n".join(textes)
-
-
 def resume_poc(plan: dict, etat: dict, res: dict, revue: dict) -> dict:
-    mp = res["metrique_principale"]
-    vals = {a["role"]: a["metriques"][mp] for a in res["approches"]}
+    mp = res["primary_metric"]
+    vals = {a["role"]: a["metrics"][mp] for a in res["approaches"]}
     complet = etat.get("complete") or {}
     echelle = "complete" if etat.get("resultats_complets") else "reduite"
     ou = complet.get("materiel") if echelle == "complete" else "échelle réduite, CPU du sandbox"
-    synthese = (f"{mp} : {plan['nouvelle']['nom']} {nombre(vals.get('nouvelle'))} contre "
-                f"{nombre(vals.get('reference'))} pour {plan['reference']['nom']} ({res['jeu']['n_exemples']} exemples, {ou}).")
+    synthese = (f"{mp} : {plan['nouvelle']['nom']} {nombre(vals.get('new'))} contre "
+                f"{nombre(vals.get('reference'))} pour {plan['reference']['nom']} ({res['dataset']['n_examples']} exemples, {ou}).")
     return {"sujet_id": etat["sujet_id"], "titre": plan["titre"], "statut": "valide", "niveau_sandbox": plan["niveau_sandbox"],
             "echelle": echelle, "materiel": complet.get("materiel") if echelle == "complete" else "CPU du sandbox",
             "echelle_complete": {c: complet.get(c) for c in ("statut", "materiel_requis", "raison_materiel", "raison")},
-            "iterations": len(etat["iterations"]), "metrique_principale": mp, "sens": res["sens"],
-            "approches": [{"nom": a["nom"], "role": a["role"], "valeur": a["metriques"][mp], "ic95": (a.get("ic95") or {}).get(mp)} for a in res["approches"]],
-            "n_exemples": res["jeu"]["n_exemples"], "jeu": res["jeu"]["nom"], "synthese": synthese,
+            "iterations": len(etat["iterations"]), "metrique_principale": mp, "sens": res["direction"],
+            "approches": [{"nom": a["name"], "role": "nouvelle" if a["role"] == "new" else a["role"], "valeur": a["metrics"][mp],
+                           "ic95": (a.get("ci95") or {}).get(mp)} for a in res["approaches"]],
+            "n_exemples": res["dataset"]["n_examples"], "jeu": res["dataset"]["name"], "synthese": synthese,
             "conclusion": revue["conclusion"], "confiance": revue["confiance"], "reproduit_la_source": revue["reproduit_la_source"],
             "reserves": [x["description"] for x in revue["problemes"] if x["gravite"] == "majeur"]}
 
@@ -676,6 +506,10 @@ def raison_echec(etat: dict) -> str:
 
 
 # --------------------------------------------------------------------------- exécution d'une commande
+
+class LivrableNonNeutre(Exception):
+    """Le livrable contient un terme interdit dans un dépôt public (livrable.TERMES_INTERDITS)."""
+
 
 class Redaction:
     """Appels aux modèles de l'atelier : SDK, modèle et effort fixés par la commande, par rôle. Chaque résultat est
@@ -731,9 +565,18 @@ class Atelier:
         self.t0 = time.time()
         self.duree_complete: float | None = None   # durée mesurée d'une échelle complète réussie de ce POC
         self.regles = _prompt("poc_regles", api_aide=api_aide(), preinstalles=", ".join(preinstalles()))
+        # Termes interdits dans le dépôt publié : empreintes reçues de config/atelier.yaml (ou calculées dans le dépôt privé).
+        livrable.configurer_empreintes(self.conf.get("empreintes_interdites")
+                                       or [livrable.empreinte_terme(x) for x in self.conf.get("termes_livrable", [])])
 
     def note(self, msg: str):
         self.r.note(msg)
+
+    def min_exemples(self) -> int:
+        """Taille minimale de l'évaluation : en exemples courts, ou en enregistrements longs (appels, réunions, documents)."""
+        if self.plan.get("type_exemples") == "enregistrements_longs":
+            return self.conf.get("min_enregistrements_evaluation", 20)
+        return self.conf["min_exemples_evaluation"]
 
     def temps_restant(self) -> float:
         return self.conf["duree_max_minutes"] * 60 - (time.time() - self.t0)
@@ -759,6 +602,13 @@ class Atelier:
                          sandbox=self.sandbox_txt(), cellules=self._json(code["cellules"]), compte_rendu=compte, regles=self.regles)
         return self.r.rediger(prompt, _schema("poc_code"), etape=f"poc_reparation:{self.sid}", role="poc_reparation")
 
+    def mettre_en_forme(self, code: dict, defauts: list[str]) -> dict:
+        motif = ("il n'est pas encore assez lisible pour être publié : un lecteur doit pouvoir le suivre comme un tutoriel. "
+                 "Corrige seulement la présentation (découpage des cellules, explications, noms, docstrings, figures, "
+                 "glossaire, lecture des métriques), sans changer ce que calcule le code.")
+        compte = "Règles de lisibilité non respectées :\n" + "\n".join(f"- {d}" for d in defauts)
+        return self.reparer(code, motif, compte)
+
     def revoir(self, code: dict, pub: dict, ban: dict | None, reduit: dict | None = None, echelle: str = "complete",
                raison: str = "") -> dict:
         """`echelle` : « complete » (pub est l'échelle complète), « prealable » (échelle réduite, l'échelle complète suivra
@@ -766,10 +616,10 @@ class Atelier:
         publique = compte_rendu(pub) + "\nRésultats enregistrés :\n" + json.dumps(pub.get("resultats"), ensure_ascii=False, indent=1)[:6000]
         if reduit:  # pub est l'échelle complète : l'échelle réduite du sandbox en regard
             r = reduit["resultats"]
-            publique += (f"\n\nPour mémoire, échelle réduite validée dans le sandbox (CPU, {r['jeu']['n_exemples']} exemples) :\n"
-                         + json.dumps({a["nom"]: a["metriques"] for a in r["approches"]}, ensure_ascii=False))
+            publique += (f"\n\nPour mémoire, échelle réduite validée dans le sandbox (CPU, {r['dataset']['n_examples']} exemples) :\n"
+                         + json.dumps({a["name"]: a["metrics"] for a in r["approaches"]}, ensure_ascii=False))
         prompt = _prompt("poc_revue", fiche=self._json(self.fiche), plan=self._json(self.plan), echelle=ECHELLES_REVUE[echelle].format(raison=raison),
-                         cellules=self._json(code["cellules"]), publique=publique, banque=compte_rendu(ban))
+                         cellules=self._json(code["cellules"]), publique=publique, privee=compte_rendu(ban))
         return self.r.rediger(prompt, _schema("poc_revue"), etape=f"poc_revue:{self.sid}", role="poc_revue")
 
     # ---------------------------------------------------------------- échelle complète
@@ -807,7 +657,7 @@ class Atelier:
         else:
             budget = min(self.conf["timeouts"]["complete_cpu"], delai)
             rapport = self.sandbox.executer(self.dir, "publique", budget, budget, taille="complete")
-            rapport.setdefault("materiel", f"CPU du sandbox ({self.sandbox.cpus} cœurs)")
+            rapport.setdefault("materiel", f"CPU, {self.sandbox.cpus} cœurs")
             notebook = self.dir / "execute_complete.ipynb"
         erreurs = valider_complete(rapport, reduit, self.plan)
         if not erreurs and rapport.get("secondes"):
@@ -828,9 +678,18 @@ class Atelier:
             it = {"numero": k, "diagnostic": code.get("diagnostic", "")}
             etat["iterations"].append(it)
             motif, compte, pub, ban = None, "", {}, None
+            # Lisibilité d'abord (deux passes au plus, sans exécution) : le notebook publié doit se lire comme un tutoriel.
+            for j in range(1, MISES_EN_FORME + 1):
+                defauts = controler_lisibilite(code, plan)
+                if not defauts or controler_cellules(code, faits, plan):
+                    break
+                self.note(f"[poc] {sid} itération {k} : mise en forme {j} ({len(defauts)} défaut(s) de lisibilité)")
+                code = self.r.etape(f"mise_en_forme_{k}_{j}", lambda: self.mettre_en_forme(code, defauts))
+            it["lisibilite"] = controler_lisibilite(code, plan)
             statiques = controler_cellules(code, faits, plan)
             nb = assembler(self.fiche, plan, faits, code, self.jour)
             nbformat.write(nb, travail / "poc.ipynb")
+            shutil.copyfile(OUTILS / "helpers.py", travail / "helpers.py")
             (travail / "dependances.txt").write_text("\n".join(sorted(set(code["dependances"]))) + "\n", encoding="utf-8")
             if statiques:
                 it["controle"] = statiques
@@ -844,13 +703,13 @@ class Atelier:
                 pub = self.sandbox.executer(travail, "publique", t["publique"], t["cellule"])
                 it["publique"] = {"ok": pub.get("ok"), "secondes": pub.get("secondes"), "erreur": (pub.get("erreur") or {}).get("nature")}
                 self.note(f"[poc] {sid} itération {k} : phase publique {'réussie' if pub.get('ok') else 'en échec'} ({pub.get('secondes')} s)")
-                erreurs = valider_execution(pub, None, plan, self.conf["min_exemples_evaluation"])
+                erreurs = valider_execution(pub, None, plan, self.min_exemples())
                 if not erreurs:
-                    ban = self.sandbox.executer(travail, "banque", t["banque"], t["cellule"], modeles=modeles_par_taille(plan)["sandbox"])
-                    it["banque"] = {"ok": ban.get("ok"), "secondes": ban.get("secondes"), "erreur": (ban.get("erreur") or {}).get("nature"),
+                    ban = self.sandbox.executer(travail, "privee", t["privee"], t["cellule"], modeles=modeles_par_taille(plan)["reduced"])
+                    it["privee"] = {"ok": ban.get("ok"), "secondes": ban.get("secondes"), "erreur": (ban.get("erreur") or {}).get("nature"),
                                     "appels": ban.get("appels_service")}
-                    self.note(f"[poc] {sid} itération {k} : phase banque {'réussie' if ban.get('ok') else 'en échec'} ({ban.get('secondes')} s)")
-                    erreurs = valider_execution(pub, ban, plan, self.conf["min_exemples_evaluation"])
+                    self.note(f"[poc] {sid} itération {k} : phase privée {'réussie' if ban.get('ok') else 'en échec'} ({ban.get('secondes')} s)")
+                    erreurs = valider_execution(pub, ban, plan, self.min_exemples())
                 panne = panne_infrastructure(pub) or panne_infrastructure(ban)
                 if panne:  # le réseau du sandbox, pas le notebook : inutile (et trompeur) de demander une correction
                     it["infrastructure"] = panne
@@ -883,7 +742,7 @@ class Atelier:
                     else:
                         bloquants = prealables
                     if not bloquants:
-                        etat.update(statut="valide", code=code, publique=pub, banque=ban, revue=revue,
+                        etat.update(statut="valide", code=code, publique=pub, privee=ban, revue=revue,
                                     complete={c: v for c, v in complet.items() if c != "rapport"},
                                     resultats_complets=complet["rapport"]["resultats"] if complet["statut"] == "valide" else None)
                         break
@@ -896,9 +755,12 @@ class Atelier:
             etat["dernier_compte_rendu"] = compte[-4000:]
             if k == self.conf["iterations_max"]:
                 break
-            if self.temps_restant() < self.conf["timeouts"]["publique"] + self.conf["timeouts"]["banque"] + 600:
+            if self.temps_restant() < self.conf["timeouts"]["publique"] + self.conf["timeouts"]["privee"] + 600:
                 etat["dernier_compte_rendu"] = "budget de temps épuisé. " + etat["dernier_compte_rendu"]
                 break
+            if it["lisibilite"]:  # la correction traite aussi ce que la mise en forme n'a pas réglé
+                compte += ("\n\nRègles de lisibilité encore non respectées (à corriger aussi) :\n"
+                           + "\n".join(f"- {d}" for d in it["lisibilite"]))
             code = self.r.etape(f"code_{k + 1}", lambda: self.reparer(code, motif, compte))
         etat["code_final"] = code
         write_json(travail / "etat.json", {k: v for k, v in etat.items() if k not in ("code", "code_final")})
@@ -907,7 +769,7 @@ class Atelier:
     # ---------------------------------------------------------------- livraison
 
     def livrer(self, etat: dict) -> dict:
-        """Dossier livraison/ : ce qui sera publié tel quel dans le dépôt du POC."""
+        """Dossier livraison/ : ce qui sera publié tel quel dans le dépôt (noms anglais, aucun terme interdit)."""
         dest = self.dir / "livraison"
         shutil.rmtree(dest, ignore_errors=True)
         dest.mkdir(parents=True)
@@ -915,38 +777,53 @@ class Atelier:
         source = Path(etat["complete"]["notebook"]) if complet else self.dir / "execute_publique.ipynb"
         nb = nbformat.read(source, as_version=4)
         nb.cells = [c for c in nb.cells if "injected-parameters" not in c.get("metadata", {}).get("tags", [])]
-        res, revue = complet or etat["publique"]["resultats"], etat["revue"]
-        bilan = bilan_markdown(self.plan, etat, res, revue)
-        nb.cells.append(_nb_md(bilan, section="bilan"))
-        for c in nb.cells:  # sorties volumineuses retirées (dépôt git)
-            for o in c.get("outputs", []):
+        nb.metadata.pop("poc", None)
+        res, revue, code = complet or etat["publique"]["resultats"], etat["revue"], etat["code"]
+        figures = livrable.extraire_figures(nb, dest)
+        for c in nb.cells:
+            if c.get("metadata", {}).get("section") == "header":
+                lisibles = livrable.metriques_lisibles(code, res)
+                c.source = livrable.entete_notebook(self.plan, livrable.en_bref(self.plan, res, revue, bool(complet), lisibles), bool(complet),
+                                                    lisibles.get(res["primary_metric"], {}).get("libelle", ""))
+            for o in c.get("outputs", []):  # sorties volumineuses retirées (dépôt git)
                 for k in [k for k in (o.get("data") or {}) if k.startswith("image/") and len(str(o["data"][k])) > 400_000]:
                     del o["data"][k]
                 if o.get("output_type") == "stream" and len(o.get("text", "")) > 20_000:
                     o["text"] = "[…]\n" + o["text"][-20_000:]
-        with open(dest / "poc.ipynb", "w", encoding="utf-8", newline="\n") as f:
+        nb.cells.append(_nb_md(bilan_markdown(self.plan, etat, res, revue, code, figures), section="summary"))
+        with open(dest / NOTEBOOK, "w", encoding="utf-8", newline="\n") as f:
             nbformat.write(nb, f)
-        write_json(dest / "resultats.json", res)
+        shutil.copyfile(OUTILS / "helpers.py", dest / "helpers.py")
+        (dest / "results").mkdir()
+        write_json(dest / "results" / "results.json", res)
         if complet:
-            write_json(dest / "resultats_sandbox.json", etat["publique"]["resultats"])
+            write_json(dest / "results" / "results_reduced_scale.json", etat["publique"]["resultats"])
         gel = self.dir / "requirements_sandbox.txt"
         (dest / "requirements.txt").write_text(gel.read_text(encoding="utf-8") if gel.exists() else "", encoding="utf-8", newline="\n")
-        (dest / "banque.env.exemple").write_text(env_exemple(self.plan), encoding="utf-8", newline="\n")
-        (dest / "telecharger_modeles.py").write_text(script_telechargement(self.plan, self.faits), encoding="utf-8", newline="\n")
-        fichiers = ("Notebook : `poc.ipynb` · résultats : `resultats.json`"
-                    + (" (échelle complète) · échelle réduite du sandbox : `resultats_sandbox.json`" if complet else "")
-                    + " · dépendances exactes du sandbox : `requirements.txt` · environnement bancaire : `banque.env.exemple`, "
-                    "`telecharger_modeles.py` (poids à copier pour travailler sans Internet).")
-        (dest / "README.md").write_text(
-            entete(self.fiche, self.plan, self.faits, self.jour) + "\n" + bilan + f"\n\n---\n\n{fichiers}\n\n"
-            "*Notebook écrit par un modèle de langage, exécuté de bout en bout dans un sandbox (puis à l'échelle complète), "
-            "relu pour sa méthode par un second passage. À relire avant toute décision.*\n", encoding="utf-8", newline="\n")
+        (dest / "private.env.example").write_text(env_exemple(self.plan), encoding="utf-8", newline="\n")
+        (dest / "download_models.py").write_text(script_telechargement(self.plan, self.faits), encoding="utf-8", newline="\n")
+        fichiers = [(NOTEBOOK, "le notebook : question, données, deux approches, évaluation, analyse, bilan (sorties incluses)"),
+                    ("helpers.py", "fonctions communes : phases et échelles, services internes, lecture des données, mesures, figures"),
+                    ("results/results.json", "résultats publiés" + (" (échelle complète)" if complet else " (échelle réduite)")
+                     + " : métriques, intervalles, latences, versions et machine")]
+        if complet:
+            fichiers.append(("results/results_reduced_scale.json", "résultats de l'échelle réduite (validation de la mécanique, CPU)"))
+        if figures:
+            fichiers.append(("figures/", "figures du notebook reprises dans ce README"))
+        fichiers += [("requirements.txt", "versions exactes des bibliothèques utilisées"),
+                     ("private.env.example", "variables d'environnement pour exécuter le notebook sur vos données"),
+                     ("download_models.py", "téléchargement des poids des modèles, pour un environnement sans Internet")]
+        (dest / "README.md").write_text(livrable.readme(self.fiche, self.plan, self.faits, etat, res, revue, code, figures, fichiers),
+                                        encoding="utf-8", newline="\n")
+        fuites = livrable.verifier_neutralite(dest)
+        if fuites:
+            raise LivrableNonNeutre("; ".join(fuites[:8]))
         return resume_poc(self.plan, etat, res, revue)
 
     def executer(self, sans_execution: bool = False) -> dict:
         if not sans_execution:
             if self.sandbox.mode is None:
-                raise SystemExit("aucun sandbox disponible : construire l'image (docker build -t veille-poc tools/poc) ; "
+                raise SystemExit("aucun sandbox disponible : construire l'image (docker build -t atelier-sandbox tools/poc) ; "
                                  "aucun code produit par un modèle n'est exécuté hors sandbox")
             self.note(f"[poc] sandbox : {self.sandbox.mode}, {self.sandbox.cpus} cœurs, {self.sandbox.ram_go} Go")
             panne = self.sandbox.verifier_reseau()
@@ -963,6 +840,9 @@ class Atelier:
                 resultat = {**base, **self.livrer(etat)}
             else:
                 resultat = {**base, "statut": etat["statut"], "iterations": len(etat["iterations"]), "raison": raison_echec(etat)}
+        except LivrableNonNeutre as e:  # garde-fou : jamais publié avec un terme qui rattacherait le dépôt à son origine
+            self.note(f"[poc] livrable non publiable : {e}")
+            resultat = {**base, "statut": "echec", "raison": f"livrable non neutre : {str(e)[:220]}"}
         except llm.QuotaError as e:
             self.note(f"[poc] quota du modèle atteint : {e}")
             resultat = {**base, "statut": "non_traite", "raison": "quota du modèle atteint : à relancer"}
@@ -996,17 +876,20 @@ def publier(travail: Path, token: str) -> dict:
     moi.raise_for_status()
     proprietaire = moi.json()["login"]
     r = requests.post(f"{API}/user/repos", headers=h, timeout=30, json={
-        "name": res["depot"], "description": f"Preuve de concept : {res['titre']}"[:340], "private": False,
+        "name": res["depot"], "description": res["titre"][:340], "private": False,
         "has_issues": False, "has_projects": False, "has_wiki": False})
     if r.status_code != 201 and not (r.status_code == 422 and "already exists" in r.text):
         raise RuntimeError(f"création du dépôt {res['depot']} impossible : HTTP {r.status_code} {r.text[:200]}")
+    if r.status_code == 422:  # dépôt existant : sa description suit le livrable
+        requests.patch(f"{API}/repos/{proprietaire}/{res['depot']}", headers=h, timeout=30,
+                       json={"description": res["titre"][:340]})
     with tempfile.TemporaryDirectory() as tmp:
         depot = Path(tmp)
         shutil.copytree(travail / "livraison", depot, dirs_exist_ok=True)
         _git("init", "-q", "-b", "main", cwd=depot)
         _git("add", "-A", cwd=depot)
-        _git("-c", "user.name=atelier-poc", "-c", f"user.email={proprietaire}@users.noreply.github.com",
-             "commit", "-q", "-m", f"Preuve de concept du {date_courte(res['jour'])} : {res['titre']}", cwd=depot)
+        _git("-c", f"user.name={proprietaire}", "-c", f"user.email={proprietaire}@users.noreply.github.com",
+             "commit", "-q", "-m", res["titre"][:200], cwd=depot)
         # Le livrable est régénéré à chaque exécution de la commande : il remplace le précédent.
         _git("push", "-q", "--force", f"https://x-access-token:{token}@github.com/{proprietaire}/{res['depot']}.git", "main", cwd=depot)
     res["url"] = f"https://github.com/{proprietaire}/{res['depot']}"
@@ -1041,7 +924,7 @@ def _travail(commande: dict) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    ap = argparse.ArgumentParser(prog="python -m veille.atelier")
+    ap = argparse.ArgumentParser(prog=f"python -m {__package__}.atelier")
     sous = ap.add_subparsers(dest="action", required=True)
     sous.add_parser("lister", help="commandes en attente (JSON)")
     for nom in ("executer", "publier"):

@@ -56,7 +56,7 @@
   ],
   "limites": [
    "Selon l'auteur lui-même, la comparaison avec les LLM frontière repose sur 56 commentaires : elle montre une absence d'écart détectable, pas une équivalence. Les LLM frontière donnent une probabilité écrite en texte, le modèle audité une probabilité native.",
-   "La tâche est de la modération en anglais, sur un corpus public peut-être vu à l'entraînement (risque reconnu par l'auteur). Rien sur le français, la banque ni 300 classes. Hors distribution, le gain de la dispersion disparaît (AUROC 0,52).",
+   "La tâche est de la modération en anglais, sur un corpus public peut-être vu à l'entraînement (risque reconnu par l'auteur). Rien sur le français, l'entreprise ni 300 classes. Hors distribution, le gain de la dispersion disparaît (AUROC 0,52).",
    "Un seul produit est audité, anonymisé, à une date donnée. L'auteur est affilié à Google, éditeur de Perspective et de ShieldGemma, tous deux comparés. Code et résultats sont seulement annoncés comme à publier.",
    "d3-ultra : scores auto-déclarés sur des jeux de test privés, aucune langue documentée. Une autre étude (Tencent) montre que mélanger l'ordre des options augmente de 27 à 29 % les questions ratées par Jev."
   ],
@@ -180,12 +180,12 @@
   }
  },
  "plan": {
-  "titre": "Une décision typée par petit LLM (distribution sur options, zéro-shot) rivalise-t-elle avec un encodeur français fine-tuné sur 60 intentions hiérarchisées ?",
-  "hypothese": "Un SLM de 1,7 Md utilisé comme modèle de décision typée (choix d'une option, probabilités lues sur les logits, descente hiérarchique scénario puis intention) reste à plus de 5 points de macro-F1 sous un CamemBERT-base fine-tuné sur MASSIVE fr, mais, après recalibration isotonique, atteint une ECE < 0,10 et ≥ 90 % de réponses identiques quand l'ordre des options est mélangé ; la couverture à erreur fixée par abstention est à mesurer.",
+  "titre": "Un petit LLM en décision typée (distribution sur options) rivalise-t-il avec CamemBERT fine-tuné sur des intentions françaises hiérarchisées ?",
+  "hypothese": "En zéro-shot hiérarchique avec recalibration, un LLM ≤ 3 Md atteint un macro-F1 à moins de 10 points de CamemBERT-base fine-tuné sur 60 intentions MASSIVE fr, avec une ECE < 0,10 après recalibration et ≥ 95 % de décisions identiques quand l'ordre des options est mélangé.",
   "reference": {
    "nom": "CamemBERT-base fine-tuné",
-   "description": "Classifieur à plat fine-tuné sur les 60 classes scénario_intention avec une tête linéaire, entraînement supervisé complet.",
-   "implementation": "transformers AutoModelForSequenceClassification sur almanach/camembert-base, 3 époques (1 en sandbox), lr 3e-5, batch 32, longueur max 64, graine 0 ; probabilités softmax brutes, puis calibration par température sur une partie de validation.",
+   "description": "Classifieur plat à 60 classes, encodeur français fine-tuné avec entropie croisée.",
+   "implementation": "transformers AutoModelForSequenceClassification, almanach/camembert-base, 3 époques, lr 3e-5, batch 32, longueur max 64, graine 0 ; probabilités softmax brutes puis mise à l'échelle par température ajustée sur validation.",
    "modeles_hf": [
     "almanach/camembert-base"
    ],
@@ -194,16 +194,16 @@
    "service_phase2": "aucun"
   },
   "nouvelle": {
-   "nom": "Décision typée par SLM en zéro-shot hiérarchique",
-   "description": "Le LLM ne génère pas de texte : on lui présente la liste d'options étiquetées par des lettres ou numéros et on lit la distribution de probabilité sur le jeton de choix. Décision en deux niveaux (18 scénarios puis intentions du scénario), probabilités composées, recalibration isotonique sur un petit jeu de validation.",
-   "implementation": "transformers AutoModelForCausalLM, prompt avec définitions des options (nom du scénario/intention), softmax restreint aux jetons d'options en un seul passage avant, sans mode réflexion ; fp16 sur GPU. Robustesse : 3 permutations aléatoires de l'ordre des options, moyenne des probabilités et taux d'accord du top-1 entre permutations. Recalibration : isotonic regression (scikit-learn) sur 500 exemples de validation, sans réentraînement du LLM. Équivalent ouvert de l'idée seulement, pas d3-ultra lui-même.",
+   "nom": "Décision typée hiérarchique par LLM",
+   "description": "Le LLM ne génère pas de texte : on lit la distribution de probabilité sur des codes d'options à un caractère, d'abord pour le scénario (18) puis pour l'intention parmi celles du scénario, et on multiplie les probabilités.",
+   "implementation": "transformers AutoModelForCausalLM ; prompt avec liste d'options codées (A-Z, a-z, 0-9), logits restreints aux codes d'options au dernier jeton, softmax ; deux niveaux hiérarchiques ; recalibration par température ajustée sur validation ; test d'ordre avec 3 permutations aléatoires des options ; mesure de latence.",
    "modeles_hf": [
-    "Qwen/Qwen3-1.7B"
+    "Qwen/Qwen2.5-3B-Instruct"
    ],
    "modeles_hf_sandbox": [
-    "Qwen/Qwen3-0.6B"
+    "Qwen/Qwen2.5-0.5B-Instruct"
    ],
-   "entrainement": "autre",
+   "entrainement": "aucun",
    "service_phase2": "llmaas"
   },
   "jeu_public": {
@@ -211,59 +211,121 @@
    "config": "fr",
    "split_evaluation": "test",
    "split_entrainement": "train",
-   "colonnes_utiles": "text, label (scénario_intention) ; scénario dérivé du préfixe de label_text",
-   "representativite": "Intentions en français, 60 classes proches organisées en arbre à 2 niveaux (18 scénarios), proxy du routage motif → sous-motif.",
-   "ecarts_banque": "Énoncés courts d'assistant vocal, 60 classes au lieu de ~300, classes peu déséquilibrées, pas d'e-mails ni de pièces jointes."
+   "colonnes_utiles": "text, label, label_text",
+   "representativite": "Intentions en français à 60 classes « scénario_intention » dont l'arbre à deux niveaux (18 scénarios) donne un proxy de motif → sous-motif avec classes voisines.",
+   "ecarts_donnees_reelles": "Énoncés courts d'assistant virtuel, 60 classes au lieu de ~300, domaine généraliste, pas d'e-mails ni de pièces jointes, classes peu déséquilibrées ; protocole à valider ensuite sur des données internes.",
+   "jeux_explores": [
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "60 intentions en 18 scénarios, français, apache-2.0.",
+     "decision": "retenu",
+     "raison": "Seule hiérarchie à deux niveaux chargeable en français."
+    },
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "77 intentions de services financiers proches, plat.",
+     "decision": "ecarte",
+     "raison": "Pas d'arbre, licence non déclarée ; options trop nombreuses pour un code à un caractère."
+    },
+    {
+     "nom": "DeepPavlov/clinc150_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/clinc150_fr",
+     "acces": "hub_libre",
+     "adequation": "150 intentions en français.",
+     "decision": "ecarte",
+     "raison": "Domaines non fournis, licence non déclarée."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "~113 intentions déséquilibrées, domaines dans un jeu séparé.",
+     "decision": "ecarte",
+     "raison": "Licence inconnue, alignement des deux jeux à vérifier ; piste pour les classes rares."
+    },
+    {
+     "nom": "Horizon-Labs/civil-comments-multilingual",
+     "url": "https://huggingface.co/datasets/Horizon-Labs/civil-comments-multilingual",
+     "acces": "hub_libre",
+     "adequation": "Étiquettes fractionnaires reproduisant l'audit, traduction automatique.",
+     "decision": "ecarte",
+     "raison": "Tâche de modération, hors routage ; comptage des lignes françaises impossible."
+    },
+    {
+     "nom": "RATP-DECODA",
+     "url": "https://gitlab.lis-lab.fr/decoda/decoda-public",
+     "acces": "restreint",
+     "adequation": "Appels réels avec thèmes annotés.",
+     "decision": "ecarte",
+     "raison": "Non commercial, non chargeable ; à explorer ensuite."
+    }
+   ]
   },
   "metriques": [
-   "macro-F1",
-   "exactitude",
-   "ECE (15 intervalles)",
-   "score de Brier",
-   "cohérence scénario/intention",
-   "taux d'accord du top-1 entre permutations des options",
-   "couverture à 95 % de précision par abstention"
+   "macro_f1",
+   "accuracy",
+   "parent_accuracy",
+   "parent_child_consistency",
+   "expected_calibration_error",
+   "brier_score",
+   "option_order_agreement",
+   "latency_ms_per_example"
   ],
-  "metrique_principale": "macro-F1",
+  "metrique_principale": "macro_f1",
   "sens": "max",
-  "protocole": "Jeu mteb/amazon_massive_intent fr. Complet : entraînement CamemBERT sur train, 500 exemples de validation pour calibration (température ; isotonique), évaluation sur tout le test. Le LLM n'utilise que les définitions des classes et la validation pour la recalibration. 3 graines pour CamemBERT, 3 permutations pour le LLM. Intervalles de confiance par bootstrap (1000 rééchantillonnages) sur macro-F1 et ECE. Sandbox : 300 exemples d'entraînement, 1 époque, 200 de test, 100 de validation, 1 graine.",
+  "protocole": "Graine 0. CamemBERT fine-tuné sur le split train (11 514 énoncés), évalué sur le split test (2 974 énoncés ; échantillon de 1 500 à l'échelle complète). Le split validation (2 033) sert à ajuster la température de recalibration, ensuite appliquée au test (ECE avant/après, 10 bacs). Le LLM est zéro-shot. Ordre des options : 3 permutations, accord avec l'ordre d'origine. IC par bootstrap 1 000 tirages. Réduit : 300 exemples de train, 1 époque, 200 de test, 100 de validation.",
   "niveau_sandbox": "reduit",
-  "adaptation_sandbox": "Qwen/Qwen3-0.6B remplace Qwen/Qwen3-1.7B (plus rapide sur CPU, même famille) ; échantillons réduits ; seule la validité du code et du format de sortie est visée, pas les chiffres.",
+  "adaptation_sandbox": "Qwen2.5-0.5B-Instruct remplace Qwen2.5-3B-Instruct (même famille) pour tenir sur CPU ; entraînement de CamemBERT réduit à 300 exemples, 1 époque ; les chiffres réduits valident le code, pas la conclusion.",
   "dependances": [],
   "phase2": {
    "donnees": [
     {
-     "colonne": "texte",
+     "colonne": "text",
      "type": "string",
-     "description": "Texte du message ou de l'e-mail, anonymisé"
+     "description": "Texte du message ou e-mail (anonymisé)"
     },
     {
-     "colonne": "motif",
+     "colonne": "reason",
      "type": "string",
-     "description": "Étiquette de niveau 1"
+     "description": "Motif de premier niveau"
     },
     {
-     "colonne": "sous_motif",
+     "colonne": "sub_reason",
      "type": "string",
-     "description": "Étiquette de niveau 2"
+     "description": "Sous-motif"
     },
     {
-     "colonne": "libelle_description_classe",
-     "type": "string",
-     "description": "Libellé et description de chaque classe de la taxonomie"
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception"
     },
     {
-     "colonne": "split",
+     "colonne": "customer_group",
      "type": "string",
-     "description": "train / validation / test"
+     "description": "Identifiant pseudonymisé pour découpage par client"
     }
    ],
-   "volume_conseille": "Au moins 5 000 exemples étiquetés, dont 1 000 de test, avec classes rares présentes.",
-   "metriques_metier": "macro-F1 sur classes rares, taux de routage correct automatique à erreur fixée, ECE, latence par message, coût par 1 000 messages.",
-   "garde_fous": "Données anonymisées, LLM via le service interne uniquement, journalisation des prompts, aucune décision de crédit, revue humaine des abstentions."
+   "volume_conseille": "≥ 10 000 messages étiquetés, ≥ 30 par sous-motif, dont ≥ 1 000 pour évaluation",
+   "metriques_metier": "Macro-F1 par motif et sous-motif, taux d'escalade à précision cible 95 %, coût et latence par message.",
+   "garde_fous": "Pas de données personnelles ni de pièces jointes brutes ; LLM via service interne uniquement ; recalibration jamais ajustée sur le test.",
+   "prescriptions": [
+    "≥ 30 exemples par sous-motif, ≥ 1 000 messages d'évaluation incluant les classes rares",
+    "Étiquettes issues de la qualification humaine, accord inter-annotateurs mesuré sur un échantillon",
+    "Taxonomie figée à la date d'extraction avec libellés et descriptions des classes",
+    "Découpage temporel et par client pour éviter les fuites",
+    "Période couvrant au moins 6 mois",
+    "Anonymiser noms, IBAN, numéros de carte",
+    "Exclure messages sans motif validé"
+   ],
+   "preparation": "Extraire les contacts qualifiés avec texte et motif/sous-motif saisis, joindre la taxonomie, dédoublonner, échantillonner par sous-motif en conservant la distribution naturelle pour l'évaluation, pseudonymiser."
   },
-  "duree_estimee_minutes": 40,
-  "analyse_materiel": ""
+  "duree_estimee_minutes": 90,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
  },
  "faits": {
   "modeles": {
@@ -279,25 +341,29 @@
      "fr"
     ]
    },
-   "Qwen/Qwen3-1.7B": {
-    "id": "Qwen/Qwen3-1.7B",
-    "sha": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+   "Qwen/Qwen2.5-3B-Instruct": {
+    "id": "Qwen/Qwen2.5-3B-Instruct",
+    "sha": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
     "tache": "text-generation",
     "bibliotheque": "transformers",
-    "parametres": 2031739904,
-    "licence": "apache-2.0",
+    "parametres": 3085938688,
+    "licence": "other",
     "code_distant": false,
-    "langues": []
+    "langues": [
+     "en"
+    ]
    },
-   "Qwen/Qwen3-0.6B": {
-    "id": "Qwen/Qwen3-0.6B",
-    "sha": "c1899de289a04d12100db370d81485cdf75e47ca",
+   "Qwen/Qwen2.5-0.5B-Instruct": {
+    "id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "sha": "7ae557604adf67be50417f59c2c2f167def9a775",
     "tache": "text-generation",
     "bibliotheque": "transformers",
-    "parametres": 751632384,
+    "parametres": 494032768,
     "licence": "apache-2.0",
     "code_distant": false,
-    "langues": []
+    "langues": [
+     "en"
+    ]
    }
   },
   "jeu": {

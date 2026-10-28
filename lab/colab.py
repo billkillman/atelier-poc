@@ -1,6 +1,6 @@
 """Échelle complète d'un POC sur un GPU Google Colab (CLI officiel google-colab-cli, compte Colab Pro de l'utilisateur).
 
-- Seulement pour un notebook déjà validé dans le sandbox (exécuté de bout en bout sur CPU, phases publique et banque) :
+- Seulement pour un notebook déjà validé dans le sandbox (exécuté de bout en bout sur CPU, phases publique et privée) :
   phase publique, TAILLE « complete ». Un échec ici ne demande aucune correction au modèle : le POC est publié à
   l'échelle réduite du sandbox, avec la raison.
 - Aucun secret sur la machine Colab : le jeton OAuth reste sur le runner (~/.config/colab-cli/token.json, écrit par le
@@ -90,8 +90,8 @@ class Colab:
     def __init__(self, conf: dict, journal_sessions: Path):
         self.conf = conf
         self.gpu = str(conf.get("gpu", "T4")).upper()
-        self.cli = [*shlex.split(os.environ.get("VEILLE_COLAB_CLI", "colab")), "--auth", "oauth2"]
-        self.racine = conf.get("racine", "/content/poc")
+        self.cli = [*shlex.split(os.environ.get("ATELIER_COLAB_CLI", "colab")), "--auth", "oauth2"]
+        self.racine = conf.get("racine", "/content/experiment")
         self.journal_sessions = journal_sessions
         self.solde: float | None = None
         self.raison = self._diagnostic()  # None : prêt
@@ -121,7 +121,7 @@ class Colab:
             return "désactivée (settings.yaml, poc.colab.actif)"
         if self.gpu not in GPUS:
             return f"GPU {self.gpu!r} non autorisé (autorisés : {', '.join(GPUS)})"
-        if not Path(os.environ.get("VEILLE_COLAB_JETON", JETON)).expanduser().exists():
+        if not Path(os.environ.get("ATELIER_COLAB_JETON", JETON)).expanduser().exists():
             return "jeton Colab absent (secret COLAB_TOKEN)"
         if not shutil.which(self.cli[0]):
             return "CLI Colab absent (pipx install google-colab-cli)"
@@ -159,7 +159,7 @@ class Colab:
             p = self._exec(nom, f"import os; os.makedirs({self.racine!r}, exist_ok=True); print('POC_PRET')")
             if "POC_PRET" not in p.stdout:
                 return echec("machine Colab inutilisable", p.stderr + p.stdout)
-            for f in (dossier / "poc.ipynb", dossier / "dependances.txt", outils / "executer.py"):
+            for f in (dossier / "poc.ipynb", dossier / "dependances.txt", dossier / "helpers.py", outils / "executer.py"):
                 p = self._cmd("upload", "-s", nom, str(f), f"{self.racine}/{f.name}", delai=300)
                 if p.returncode:
                     return echec(f"envoi de {f.name} vers Colab impossible", p.stderr + p.stdout)

@@ -1,9 +1,11 @@
 """Exécute un notebook de POC dans le sandbox et rend compte (lancé dans le conteneur, sans aucun secret).
 
-- Paramètres injectés après la cellule marquée « parameters » (comme papermill) : PHASE, TAILLE, GRAINE, POC_SORTIE.
-- Phase « banque » : démarre le faux service à la convention OpenAI (faux_service.py) et pointe les variables
-  LLMAAS_* / STTAAS_* dessus (clé par fichier de secret), avec BANQUE_DONNEES=factice : le code de la phase 2 est
-  réellement exécuté, modèles servis hors ligne depuis BANQUE_MODELES_DIR (--modeles).
+- Paramètres injectés après la cellule marquée « parameters » (comme papermill), sous leurs noms du notebook :
+  PHASE (« public » | « private »), SCALE (« reduced » | « full »), SEED, OUTPUT_DIR.
+- Phase « privee » (PHASE = « private ») : démarre le faux service à la convention OpenAI (faux_service.py) et pointe
+  les variables LLMAAS_* / STTAAS_* dessus (clé par fichier de secret), avec PRIVATE_DATA=fake : le code de la phase 2
+  est réellement exécuté, modèles servis hors ligne depuis LOCAL_MODELS_DIR (--modeles).
+- Le module helpers.py doit se trouver à côté du notebook.
 - Rapport JSON : succès, durée, cellule en erreur (section, exception, trace), fin des sorties des dernières cellules.
 
 Usage : python executer.py --entree poc.ipynb --sortie execute.ipynb --phase publique --rapport rapport.json
@@ -24,6 +26,9 @@ from nbclient import NotebookClient
 from nbclient.exceptions import CellExecutionError, CellTimeoutError, DeadKernelError
 
 ICI = Path(__file__).resolve().parent
+# Noms des phases et des échelles dans le notebook (anglais) ; le moteur garde les siens.
+PHASES_NOTEBOOK = {"publique": "public", "privee": "private"}
+TAILLES_NOTEBOOK = {"sandbox": "reduced", "complete": "full"}
 _ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
@@ -42,19 +47,19 @@ def _texte_sorties(cellule, limite: int = 1500) -> str:
 
 def injecter_parametres(nb, valeurs: dict) -> None:
     idx = next((i for i, c in enumerate(nb.cells) if "parameters" in c.get("metadata", {}).get("tags", [])), None)
-    source = "# Paramètres injectés par le sandbox\n" + "\n".join(f"{k} = {v!r}" for k, v in valeurs.items())
+    source = "# Paramètres de cette exécution\n" + "\n".join(f"{k} = {v!r}" for k, v in valeurs.items())
     cellule = nbformat.v4.new_code_cell(source, metadata={"tags": ["injected-parameters"]})
     nb.cells.insert(0 if idx is None else idx + 1, cellule)
 
 
 def modeles_hors_ligne(modeles: list[str], dossier: Path) -> dict:
-    """Phase banque comme dans un environnement sans Internet : les modèles de la phase publique sont copiés de son
-    cache vers BANQUE_MODELES_DIR (org--nom), puis le noyau démarre hors ligne avec un cache Hugging Face vide. Un
-    modèle chargé autrement que par chemin_modele(...) échoue alors ici comme il échouerait à la banque. Si un
+    """Phase privée comme dans un environnement sans Internet : les modèles de la phase publique sont copiés de son
+    cache vers LOCAL_MODELS_DIR (org--nom), puis le noyau démarre hors ligne avec un cache Hugging Face vide. Un
+    modèle chargé autrement que par model_path(...) échoue alors ici comme il échouerait dans l'environnement cible. Si un
     modèle manque au cache (jamais chargé en phase publique), le test hors ligne n'est pas appliqué, et le rapport le dit."""
     import shutil
     from huggingface_hub import snapshot_download
-    racine, copies, absents = dossier / "modeles_banque", [], []
+    racine, copies, absents = dossier / "modeles_prives", [], []
     for m in modeles:
         try:
             instantane = snapshot_download(m, local_files_only=True)  # dossier du cache (liens vers les blobs)
@@ -64,8 +69,8 @@ def modeles_hors_ligne(modeles: list[str], dossier: Path) -> dict:
             absents.append(m)
     if absents:
         return {"applique": False, "copies": copies, "absents": absents}
-    os.environ.update({"BANQUE_MODELES_DIR": str(racine), "HF_HUB_OFFLINE": "1", "HF_DATASETS_OFFLINE": "1",
-                       "TRANSFORMERS_OFFLINE": "1", "HF_HOME": str(dossier / ".cache" / "hf_banque_vide")})
+    os.environ.update({"LOCAL_MODELS_DIR": str(racine), "HF_HUB_OFFLINE": "1", "HF_DATASETS_OFFLINE": "1",
+                       "TRANSFORMERS_OFFLINE": "1", "HF_HOME": str(dossier / ".cache" / "hf_prive_vide")})
     os.environ.pop("HF_HUB_CACHE", None)
     return {"applique": True, "copies": copies, "absents": []}
 
@@ -75,21 +80,22 @@ def main() -> int:
     ap.add_argument("--entree", required=True)
     ap.add_argument("--sortie", required=True)
     ap.add_argument("--rapport", required=True)
-    ap.add_argument("--phase", choices=["publique", "banque"], default="publique")
+    ap.add_argument("--phase", choices=["publique", "privee"], default="publique")
     ap.add_argument("--taille", choices=["sandbox", "complete"], default="sandbox")
     ap.add_argument("--graine", type=int, default=42)
     ap.add_argument("--timeout-cellule", type=int, default=1800)
     ap.add_argument("--freeze", help="fichier où écrire `pip freeze` après l'exécution")
-    ap.add_argument("--modeles", default="", help="phase banque : modèles (org/nom, séparés par des virgules) à servir hors ligne")
+    ap.add_argument("--modeles", default="", help="phase privée : modèles (org/nom, séparés par des virgules) à servir hors ligne")
     a = ap.parse_args()
 
     entree = Path(a.entree).resolve()
     dossier = entree.parent
     nb = nbformat.read(entree, as_version=4)
-    injecter_parametres(nb, {"PHASE": a.phase, "TAILLE": a.taille, "GRAINE": a.graine, "POC_SORTIE": str(dossier)})
+    phase_nb = PHASES_NOTEBOOK[a.phase]
+    injecter_parametres(nb, {"PHASE": phase_nb, "SCALE": TAILLES_NOTEBOOK[a.taille], "SEED": a.graine, "OUTPUT_DIR": str(dossier)})
     journal = dossier / f"appels_service_{a.phase}.jsonl"
     hors_ligne = None
-    if a.phase == "banque":
+    if a.phase == "privee":
         sys.path.insert(0, str(ICI))
         import faux_service
         journal.unlink(missing_ok=True)
@@ -102,10 +108,10 @@ def main() -> int:
             os.environ.pop(f"{p}_API_KEY", None)
             os.environ.update({f"{p}_BASE_URL": url, f"{p}_API_KEY_FILE": str(secrets / "cle_service"), f"{p}_MODEL": "modele-factice"})
         os.environ["LLMAAS_EMBEDDINGS_MODEL"] = "embeddings-factice"
-        os.environ["BANQUE_DONNEES"] = "factice"
+        os.environ["PRIVATE_DATA"] = "fake"
         if a.modeles:
             hors_ligne = modeles_hors_ligne([m for m in a.modeles.split(",") if m], dossier)
-    os.environ.update({"POC_PHASE": a.phase, "POC_TAILLE": a.taille, "POC_SORTIE": str(dossier), "MPLBACKEND": "Agg"})
+    os.environ["MPLBACKEND"] = "Agg"
 
     rapport = {"phase": a.phase, "taille": a.taille, "ok": False, "erreur": None, "hors_ligne": hors_ligne}
     t0 = time.time()
@@ -140,7 +146,7 @@ def main() -> int:
     rapport["secondes"] = round(time.time() - t0, 1)
     executees = [(i, c) for i, c in enumerate(nb.cells) if c.get("cell_type") == "code" and c.get("outputs")]
     rapport["sorties"] = [{"cellule": i, "section": c.get("metadata", {}).get("section"), "texte": _texte_sorties(c)} for i, c in executees[-12:]]
-    resultats = dossier / f"resultats_{a.phase}.json"
+    resultats = dossier / f"results_{phase_nb}.json"
     rapport["resultats"] = json.loads(resultats.read_text(encoding="utf-8")) if rapport["ok"] and resultats.exists() else None
     if journal.exists():
         appels = [json.loads(l) for l in journal.read_text(encoding="utf-8").splitlines() if l.strip()]

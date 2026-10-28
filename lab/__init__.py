@@ -1,0 +1,1 @@
+"""Atelier d'expériences IA."""

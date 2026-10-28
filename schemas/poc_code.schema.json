@@ -20,13 +20,13 @@
      "section": {
       "type": "string",
       "enum": [
-       "contexte",
-       "donnees_publiques",
-       "donnees_banque",
+       "context",
+       "public_data",
+       "private_data",
        "reference",
-       "nouvelle",
+       "new_approach",
        "evaluation",
-       "comparaison"
+       "analysis"
       ]
      },
      "type": {
@@ -48,6 +48,66 @@
     "additionalProperties": false
    }
   },
+  "resume_simple": {
+   "type": "string",
+   "description": "3 à 5 phrases pour un lecteur non spécialiste : la question, l'idée de la nouvelle approche, ce que la comparaison permet de décider (repris en tête du README)."
+  },
+  "lecture_des_metriques": {
+   "type": "array",
+   "description": "Une entrée par clé de métrique rapportée par save_results.",
+   "items": {
+    "type": "object",
+    "properties": {
+     "cle": {
+      "type": "string",
+      "description": "Clé exacte dans les résultats (ex. macro_f1)."
+     },
+     "libelle": {
+      "type": "string",
+      "description": "Nom lisible (ex. « macro-F1 »)."
+     },
+     "explication": {
+      "type": "string",
+      "description": "Ce qu'elle mesure, en une phrase simple."
+     },
+     "sens": {
+      "type": "string",
+      "enum": [
+       "max",
+       "min",
+       "aucun"
+      ]
+     }
+    },
+    "required": [
+     "cle",
+     "libelle",
+     "explication",
+     "sens"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "glossaire": {
+   "type": "array",
+   "description": "Termes techniques du notebook, expliqués simplement (3 à 10).",
+   "items": {
+    "type": "object",
+    "properties": {
+     "terme": {
+      "type": "string"
+     },
+     "definition": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "terme",
+     "definition"
+    ],
+    "additionalProperties": false
+   }
+  },
   "protocole": {
    "type": "string"
   },
@@ -65,6 +125,9 @@
   "diagnostic",
   "dependances",
   "cellules",
+  "resume_simple",
+  "lecture_des_metriques",
+  "glossaire",
   "protocole",
   "ecarts_sandbox",
   "limites"

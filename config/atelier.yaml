@@ -1,14 +1,15 @@
-# Écrit par le dépôt qui commande les POC à chaque envoi : ne pas modifier ici.
+# Écrit à chaque envoi de commandes : ne pas modifier ici.
 poc:
   iterations_max: 3
   params_max_milliards: 1
   params_max_gpu_milliards: 4
   min_exemples_evaluation: 100
+  min_enregistrements_evaluation: 20
   duree_max_minutes: 105
-  image: veille-poc:latest
+  image: atelier-sandbox:latest
   timeouts:
     publique: 900
-    banque: 600
+    privee: 600
     cellule: 600
     complete_cpu: 1200
   sandbox:
@@ -22,6 +23,24 @@ poc:
     timeout: 2700
     timeout_cellule: 1800
     intervalle: 60
+  empreintes_interdites:
+  - 18889a721a537ee1
+  - 3c9b9f288d3c5b09
+  - 416abaa5b24846fa
+  - 4381dc2ab1428516
+  - 47944637b32facc9
+  - 575130c033b13a4d
+  - 5f3e5dfd52146b1a
+  - 68ba9b33ad38d5d4
+  - 6db21223c0a61a77
+  - 8e390a1753df11fc
+  - 9972dbdff6581e7b
+  - 9a75b639379cd432
+  - 9c622443585b66a0
+  - b9a1602551834723
+  - c2242e2c12190bab
+  - d1ba2d4b0bb06873
+  - f4d65b2483b34a8d
 timeouts_secondes:
   poc_code: 1800
   poc_reparation: 1500

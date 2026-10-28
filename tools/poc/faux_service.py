@@ -1,4 +1,4 @@
-"""Faux service LLMaaS / STTaaS à la convention OpenAI, pour exécuter la phase « banque » d'un notebook dans le sandbox.
+"""Faux service LLMaaS / STTaaS à la convention OpenAI, pour exécuter la phase « privee » d'un notebook dans le sandbox.
 
 Il ne juge rien : il vérifie que le code appelle le service comme le ferait un vrai (authentification Bearer, routes
 /v1/chat/completions, /v1/embeddings, /v1/audio/transcriptions, /v1/models) et renvoie des réponses factices mais
