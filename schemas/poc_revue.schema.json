@@ -1,0 +1,64 @@
+{
+ "type": "object",
+ "properties": {
+  "problemes": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "gravite": {
+      "type": "string",
+      "enum": [
+       "bloquant",
+       "majeur",
+       "mineur"
+      ]
+     },
+     "description": {
+      "type": "string"
+     },
+     "correction": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "gravite",
+     "description",
+     "correction"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "comparaison_equitable": {
+   "type": "boolean"
+  },
+  "reproduit_la_source": {
+   "type": "string",
+   "enum": [
+    "oui",
+    "partiellement",
+    "non",
+    "non_comparable"
+   ]
+  },
+  "confiance": {
+   "type": "string",
+   "enum": [
+    "elevee",
+    "moyenne",
+    "faible"
+   ]
+  },
+  "conclusion": {
+   "type": "string"
+  }
+ },
+ "required": [
+  "problemes",
+  "comparaison_equitable",
+  "reproduit_la_source",
+  "confiance",
+  "conclusion"
+ ],
+ "additionalProperties": false
+}

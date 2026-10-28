@@ -1,0 +1,134 @@
+# Atelier des preuves de concept : exécute chaque commande poussée dans commandes/<jour>/, puis publie le POC validé
+# dans un dépôt public daté. Fichier synchronisé depuis le dépôt qui commande les POC : ne pas modifier ici.
+#
+# Sécurité : aucun déclencheur sur les pull requests (les secrets restent inaccessibles aux forks). Le code écrit par
+# le modèle s'exécute seulement dans le conteneur du sandbox (sans secret, sans privilège, sans accès aux services de
+# métadonnées) ou sur une machine Colab sans secret. Le jeton de publication n'existe qu'à l'étape de publication.
+name: Atelier des POC
+
+on:
+  push:
+    branches: [main]
+    paths: ["commandes/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atelier
+  cancel-in-progress: false
+
+jobs:
+  liste:
+    runs-on: ubuntu-latest
+    outputs:
+      commandes: ${{ steps.liste.outputs.commandes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - id: liste
+        run: echo "commandes=$(python -m veille.atelier lister)" >> "$GITHUB_OUTPUT"
+
+  poc:
+    needs: liste
+    if: needs.liste.outputs.commandes != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      matrix:
+        commande: ${{ fromJSON(needs.liste.outputs.commandes) }}
+      max-parallel: 1   # une machine Colab à la fois, un index sans conflit
+      fail-fast: false
+    env:
+      COMMANDE: ${{ matrix.commande }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Dépendances Python
+        run: pip install -r requirements.txt
+
+      - name: Claude Code
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Sandbox
+        run: |
+          docker build --quiet -t veille-poc:latest tools/poc
+          # Aucun accès des conteneurs aux services de métadonnées et d'agent de la machine hôte. 168.63.129.16 est
+          # aussi le DNS des machines Azure : seul le port 53 y reste ouvert (sinon, plus aucune résolution de nom).
+          sudo iptables -I DOCKER-USER -d 169.254.169.254 -j DROP
+          sudo iptables -I DOCKER-USER -d 168.63.129.16 -j DROP
+          sudo iptables -I DOCKER-USER -d 168.63.129.16 -p udp --dport 53 -j RETURN
+          sudo iptables -I DOCKER-USER -d 168.63.129.16 -p tcp --dport 53 -j RETURN
+
+      # GPU pour l'échelle complète (entraînement PyTorch/TensorFlow, ou modèle trop gros pour le CPU). Sans le
+      # secret COLAB_TOKEN (contenu de ~/.config/colab-cli/token.json), les POC restent à l'échelle du sandbox.
+      - name: Colab (facultatif)
+        env:
+          COLAB_TOKEN: ${{ secrets.COLAB_TOKEN }}
+        run: |
+          if [ -z "$COLAB_TOKEN" ]; then echo "Pas de secret COLAB_TOKEN : pas de GPU"; exit 0; fi
+          pipx install --quiet google-colab-cli==0.7.5   # version figée : l'atelier dépend de son comportement
+          mkdir -p ~/.config/colab-cli && chmod 700 ~/.config/colab-cli
+          (umask 077 && printf '%s' "$COLAB_TOKEN" > ~/.config/colab-cli/token.json)
+
+      - name: Exécuter le POC
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: python -m veille.atelier executer "$COMMANDE"
+
+      # Filet de sécurité si l'exécution s'est arrêtée brutalement : aucune machine Colab ne reste allouée (unités).
+      - name: Libérer le GPU Colab
+        if: always()
+        run: |
+          if [ -f ~/.config/colab-cli/token.json ]; then
+            cat travail/*/*/colab_sessions.txt 2>/dev/null | sort -u | while read -r s; do
+              [ -n "$s" ] && colab --auth oauth2 stop -s "$s" || true
+            done
+          fi
+          rm -rf ~/.config/colab-cli
+
+      - name: Publier
+        if: always()
+        env:
+          POC_PUBLICATION_TOKEN: ${{ secrets.POC_PUBLICATION_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python -m veille.atelier publier "$COMMANDE"
+          git config user.name "atelier-poc"
+          git config user.email "atelier-poc@users.noreply.github.com"
+          git add index.json
+          git commit -m "Résultat : $COMMANDE" || exit 0
+          url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          for essai in 1 2 3; do
+            git pull --rebase "$url" main && git push "$url" HEAD:main && exit 0
+            sleep $((essai * 20))
+          done
+          exit 1
+
+      - name: Conserver le dossier de travail (diagnostic)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: poc-${{ github.run_id }}-${{ strategy.job-index }}
+          path: |
+            travail/
+            !travail/*/*/.cache/
+            !travail/*/*/.local/
+            !travail/*/*/.maison/
+          retention-days: 7

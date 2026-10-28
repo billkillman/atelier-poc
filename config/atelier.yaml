@@ -1,0 +1,28 @@
+# Écrit par le dépôt qui commande les POC à chaque envoi : ne pas modifier ici.
+poc:
+  iterations_max: 2
+  params_max_milliards: 1
+  params_max_gpu_milliards: 4
+  min_exemples_evaluation: 100
+  duree_max_minutes: 105
+  image: veille-poc:latest
+  timeouts:
+    publique: 900
+    banque: 600
+    cellule: 600
+    complete_cpu: 1200
+  sandbox:
+    cpus_max: 4
+    ram_go_max: 12
+    ram_go: 6
+  colab:
+    actif: true
+    gpu: T4
+    solde_min_unites: 5
+    timeout: 2700
+    timeout_cellule: 1800
+    intervalle: 60
+timeouts_secondes:
+  poc_code: 1800
+  poc_reparation: 1500
+  poc_revue: 900

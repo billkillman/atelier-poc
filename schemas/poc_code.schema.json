@@ -1,0 +1,73 @@
+{
+ "type": "object",
+ "properties": {
+  "diagnostic": {
+   "type": "string",
+   "description": "Réparation : cause racine de l'échec (2 à 4 phrases). Écriture : chaîne vide."
+  },
+  "dependances": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   },
+   "description": "Paquets à installer en plus des préinstallés."
+  },
+  "cellules": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "section": {
+      "type": "string",
+      "enum": [
+       "contexte",
+       "donnees_publiques",
+       "donnees_banque",
+       "reference",
+       "nouvelle",
+       "evaluation",
+       "comparaison"
+      ]
+     },
+     "type": {
+      "type": "string",
+      "enum": [
+       "markdown",
+       "code"
+      ]
+     },
+     "source": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "section",
+     "type",
+     "source"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "protocole": {
+   "type": "string"
+  },
+  "ecarts_sandbox": {
+   "type": "string"
+  },
+  "limites": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  }
+ },
+ "required": [
+  "diagnostic",
+  "dependances",
+  "cellules",
+  "protocole",
+  "ecarts_sandbox",
+  "limites"
+ ],
+ "additionalProperties": false
+}
