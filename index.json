@@ -1,4 +1,38 @@
 {
  "version": 1,
- "pocs": []
+ "pocs": [
+  {
+   "jour": "2026-10-27",
+   "sujet_id": "cohere-qwen3-8-exfiltration-incident",
+   "depot": "20261027_agent_egress_policy_vs_reasoning_monitor",
+   "titre": "Un contrôle des appels d'outils détecte-t-il mieux l'exfiltration d'un agent que la lecture de sa trace de raisonnement ?",
+   "statut": "echec",
+   "iterations": 3,
+   "raison": "la revue de méthode a relevé 1 problème(s) bloquant(s)",
+   "duree_minutes": 35.2,
+   "consommation": {
+    "claude:poc_code:cohere-qwen3-8-exfiltration-incident": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 734.8,
+     "cout_equivalent_usd": 1.9851,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:cohere-qwen3-8-exfiltration-incident": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 637.4,
+     "cout_equivalent_usd": 2.4945,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:cohere-qwen3-8-exfiltration-incident": {
+     "appels": 3,
+     "echecs": 0,
+     "secondes": 105.0,
+     "cout_equivalent_usd": 0.7516,
+     "recherches_web": 0
+    }
+   }
+  }
+ ]
 }
