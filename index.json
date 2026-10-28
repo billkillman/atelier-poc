@@ -1,38 +1,4 @@
 {
  "version": 1,
- "pocs": [
-  {
-   "jour": "2026-10-27",
-   "sujet_id": "modeles-decision-typees-audit-independant-d3-ultra",
-   "depot": "20261027_typed_decision_slm_camembert_intents",
-   "titre": "Une décision typée par petit LLM (distribution sur options, zéro-shot) rivalise-t-elle avec un encodeur français fine-tuné sur 60 intentions hiérarchisées ?",
-   "statut": "echec",
-   "iterations": 3,
-   "raison": "la revue de méthode a relevé 2 problème(s) bloquant(s)",
-   "duree_minutes": 54.1,
-   "consommation": {
-    "claude:poc_code:modeles-decision-typees-audit-independant-d3-ultra": {
-     "appels": 1,
-     "echecs": 0,
-     "secondes": 554.1,
-     "cout_equivalent_usd": 1.321,
-     "recherches_web": 0
-    },
-    "claude:poc_reparation:modeles-decision-typees-audit-independant-d3-ultra": {
-     "appels": 2,
-     "echecs": 0,
-     "secondes": 354.3,
-     "cout_equivalent_usd": 1.5769,
-     "recherches_web": 0
-    },
-    "claude:poc_revue:modeles-decision-typees-audit-independant-d3-ultra": {
-     "appels": 2,
-     "echecs": 0,
-     "secondes": 79.1,
-     "cout_equivalent_usd": 0.4164,
-     "recherches_web": 0
-    }
-   }
-  }
- ]
+ "pocs": []
 }

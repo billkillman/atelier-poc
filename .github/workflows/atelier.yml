@@ -121,6 +121,7 @@ jobs:
           done
           exit 1
 
+      # Sans les poids des modèles (copies hors ligne de la phase banque, points de contrôle) : 1,44 Go le 2026-10-28.
       - name: Conserver le dossier de travail (diagnostic)
         if: always()
         uses: actions/upload-artifact@v4
@@ -131,4 +132,11 @@ jobs:
             !travail/*/*/.cache/
             !travail/*/*/.local/
             !travail/*/*/.maison/
+            !travail/*/*/modeles_banque/
+            !travail/**/*.safetensors
+            !travail/**/*.bin
+            !travail/**/*.pt
+            !travail/**/*.pth
+            !travail/**/*.ckpt
+            !travail/**/*.onnx
           retention-days: 7

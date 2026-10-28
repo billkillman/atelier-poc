@@ -515,6 +515,23 @@ def panne_infrastructure(rapport: dict | None) -> str | None:
     return f"réseau du sandbox indisponible : {m.group(0)}" if m else None
 
 
+ECHELLES_REVUE = {
+    "complete": "Les résultats de la phase publique viennent de l'échelle complète (tout le jeu, réglages complets) : juge-les "
+                "pleinement, chiffres compris.",
+    "prealable": "Revue préalable : seule l'échelle réduite a tourné (sous-échantillon, entraînement écourté, parfois un modèle "
+                 "substitut). L'échelle complète tournera ensuite si tu ne relèves rien de bloquant, et sera revue à son tour. "
+                 "Les chiffres de l'échelle réduite testent la mécanique : un niveau faible, même proche du hasard, est attendu et "
+                 "n'est jamais bloquant en soi. Est bloquant ce qui fausserait aussi l'échelle complète : bug de calcul ou de mesure "
+                 "(probabilités qui ne somment pas à 1, métrique hors de ses bornes, statistique exactement nulle ou constante qui "
+                 "trahit un bogue), fuite de données, comparaison inéquitable par construction, approche qui n'est pas celle de la fiche.",
+    "reduite": "Seule l'échelle réduite a tourné, et l'échelle complète ne tournera pas ({raison}) : le POC sera publié à cette "
+               "échelle, avec ses réserves. Un niveau faible, même proche du hasard, est attendu à cette échelle et n'est jamais "
+               "bloquant en soi. Est bloquant ce qui fausserait aussi l'échelle complète (bug de calcul ou de mesure, fuite, "
+               "comparaison inéquitable par construction, approche qui n'est pas celle de la fiche) ; la conclusion doit dire que "
+               "les chiffres ne permettent pas de trancher, sans les prendre pour un résultat.",
+}
+
+
 def meme_metrique(a: str, b: str) -> bool:
     """Même métrique, à la graphie près (« macro_f1 » et « macro-F1 ») : la forme ne doit pas coûter une itération."""
     norme = lambda s: re.sub(r"[^0-9a-z]", "", unicodedata.normalize("NFKD", str(s)).lower())
@@ -706,6 +723,7 @@ class Atelier:
         self.sandbox = Sandbox(self.conf)
         self.colab = colab
         self.t0 = time.time()
+        self.duree_complete: float | None = None   # durée mesurée d'une échelle complète réussie de ce POC
         self.regles = _prompt("poc_regles", api_aide=api_aide(), preinstalles=", ".join(preinstalles()))
 
     def note(self, msg: str):
@@ -735,38 +753,59 @@ class Atelier:
                          sandbox=self.sandbox_txt(), cellules=self._json(code["cellules"]), compte_rendu=compte, regles=self.regles)
         return self.r.rediger(prompt, _schema("poc_code"), etape=f"poc_reparation:{self.sid}", role="poc_reparation")
 
-    def revoir(self, code: dict, pub: dict, ban: dict | None, reduit: dict | None = None) -> dict:
+    def revoir(self, code: dict, pub: dict, ban: dict | None, reduit: dict | None = None, echelle: str = "complete",
+               raison: str = "") -> dict:
+        """`echelle` : « complete » (pub est l'échelle complète), « prealable » (échelle réduite, l'échelle complète suivra
+        si rien n'est bloquant) ou « reduite » (le POC sera publié à l'échelle réduite, pour `raison`)."""
         publique = compte_rendu(pub) + "\nRésultats enregistrés :\n" + json.dumps(pub.get("resultats"), ensure_ascii=False, indent=1)[:6000]
         if reduit:  # pub est l'échelle complète : l'échelle réduite du sandbox en regard
             r = reduit["resultats"]
             publique += (f"\n\nPour mémoire, échelle réduite validée dans le sandbox (CPU, {r['jeu']['n_exemples']} exemples) :\n"
                          + json.dumps({a["nom"]: a["metriques"] for a in r["approches"]}, ensure_ascii=False))
-        prompt = _prompt("poc_revue", fiche=self._json(self.fiche), plan=self._json(self.plan),
+        prompt = _prompt("poc_revue", fiche=self._json(self.fiche), plan=self._json(self.plan), echelle=ECHELLES_REVUE[echelle].format(raison=raison),
                          cellules=self._json(code["cellules"]), publique=publique, banque=compte_rendu(ban))
         return self.r.rediger(prompt, _schema("poc_revue"), etape=f"poc_revue:{self.sid}", role="poc_revue")
 
     # ---------------------------------------------------------------- échelle complète
 
-    def echelle_complete(self, reduit: dict) -> dict:
-        """Phase publique à l'échelle complète, une fois l'échelle réduite validée, sur le matériel décidé par l'atelier.
-        Un échec ne repart pas en correction : le POC reste publiable à l'échelle réduite, avec la raison."""
+    def budget_complete(self, materiel: str) -> int:
+        """Temps à réserver pour l'échelle complète : la durée déjà mesurée sur ce POC (+30 %, +5 min), sinon le délai
+        maximal du réglage (le 2026-10-28, 45 min réservées pour un run de 25 min ont empêché de relancer la version corrigée)."""
+        plafond = self.conf["colab"]["timeout"] if materiel == "gpu" else self.conf["timeouts"]["complete_cpu"]
+        return min(plafond, int(1.3 * self.duree_complete) + 300) if self.duree_complete else plafond
+
+    def empechement_complete(self) -> tuple[dict, str | None]:
+        """Matériel de l'échelle complète, et ce qui empêcherait de l'exécuter maintenant (None : exécutable)."""
         materiel, raison = materiel_complet(self.plan, self.faits, self.conf)
         info = {"materiel_requis": materiel, "raison_materiel": raison}
         if materiel == "gpu" and not (self.colab and self.colab.pret):
             pourquoi = self.colab.raison if self.colab else "non configuré"
-            return {**info, "statut": "non_execute", "raison": f"GPU nécessaire ({raison}) mais indisponible : {pourquoi}"}
-        budget = self.conf["colab"]["timeout"] if materiel == "gpu" else self.conf["timeouts"]["complete_cpu"]
-        if self.temps_restant() < budget + 600:
-            return {**info, "statut": "non_execute", "raison": "budget de temps épuisé"}
+            return info, f"GPU nécessaire ({raison}) mais indisponible : {pourquoi}"
+        if self.temps_restant() < self.budget_complete(materiel) + 600:
+            return info, "budget de temps épuisé"
+        return info, None
+
+    def echelle_complete(self, reduit: dict) -> dict:
+        """Phase publique à l'échelle complète, une fois l'échelle réduite validée, sur le matériel décidé par l'atelier.
+        Un échec ne repart pas en correction : le POC reste publiable à l'échelle réduite, avec la raison."""
+        info, empechement = self.empechement_complete()
+        if empechement:
+            return {**info, "statut": "non_execute", "raison": empechement}
+        materiel, raison = info["materiel_requis"], info["raison_materiel"]
+        # Délai réel : tout le temps restant du job (moins la marge de publication), jamais au-delà du réglage.
+        delai = int(self.temps_restant() - 600)
         self.note(f"[poc] {self.sid} : échelle complète sur {'GPU' if materiel == 'gpu' else 'CPU du sandbox'} ({raison})")
         if materiel == "gpu":
-            rapport = self.colab.executer(self.dir, OUTILS)
+            rapport = self.colab.executer(self.dir, OUTILS, delai=delai)
             notebook = self.dir / "complete" / "execute_complete.ipynb"
         else:
+            budget = min(self.conf["timeouts"]["complete_cpu"], delai)
             rapport = self.sandbox.executer(self.dir, "publique", budget, budget, taille="complete")
             rapport.setdefault("materiel", f"CPU du sandbox ({self.sandbox.cpus} cœurs)")
             notebook = self.dir / "execute_complete.ipynb"
         erreurs = valider_complete(rapport, reduit, self.plan)
+        if not erreurs and rapport.get("secondes"):
+            self.duree_complete = float(rapport["secondes"])
         self.note(f"[poc] {self.sid} : échelle complète {'validée' if not erreurs else 'en échec (' + '; '.join(erreurs) + ')'} "
                   f"en {rapport.get('secondes')} s")
         return {**info, "statut": "echec" if erreurs else "valide", "raison": "; ".join(erreurs)[:300], "materiel": rapport.get("materiel"),
@@ -817,21 +856,37 @@ class Atelier:
                     motif = "son exécution dans le sandbox a échoué ou ne remplit pas les conditions de validation."
                     compte = "\n".join(f"- {e}" for e in erreurs) + "\n\n" + compte_rendu(pub) + ("\n\n" + compte_rendu(ban) if ban else "")
                 else:
-                    complet = self.echelle_complete(pub)
-                    it["complete"] = {c: complet.get(c) for c in ("statut", "materiel_requis", "materiel", "secondes", "raison")}
-                    revue_sur = complet["rapport"] if complet["statut"] == "valide" else pub
-                    revue = self.r.etape(f"revue_{k}", lambda: self.revoir(code, revue_sur, ban, reduit=pub if revue_sur is not pub else None))
-                    bloquants = [x for x in revue["problemes"] if x["gravite"] == "bloquant"]
-                    it["revue"] = {"bloquants": len(bloquants), "confiance": revue["confiance"]}
+                    # Revue préalable, à l'échelle réduite, avant d'engager l'échelle complète (GPU) : un défaut de code ou de
+                    # protocole se corrige sans brûler l'échelle complète (le 2026-10-28, un Brier de 672 découvert après 25 min de GPU).
+                    prealables = []
+                    if self.empechement_complete()[1] is None:
+                        pre = self.r.etape(f"revue_prealable_{k}", lambda: self.revoir(code, pub, ban, echelle="prealable"))
+                        prealables = [x for x in pre["problemes"] if x["gravite"] == "bloquant"]
+                        it["revue_prealable"] = {"bloquants": len(prealables), "confiance": pre["confiance"]}
+                        if prealables:
+                            etat["revue"] = pre
+                    complet = self.echelle_complete(pub) if not prealables else None
+                    if complet:
+                        it["complete"] = {c: complet.get(c) for c in ("statut", "materiel_requis", "materiel", "secondes", "raison")}
+                        revue_sur = complet["rapport"] if complet["statut"] == "valide" else pub
+                        revue = self.r.etape(f"revue_{k}", lambda: self.revoir(
+                            code, revue_sur, ban, reduit=pub if revue_sur is not pub else None,
+                            echelle="complete" if revue_sur is not pub else "reduite", raison=complet.get("raison") or ""))
+                        bloquants = [x for x in revue["problemes"] if x["gravite"] == "bloquant"]
+                        it["revue"] = {"bloquants": len(bloquants), "confiance": revue["confiance"]}
+                    else:
+                        bloquants = prealables
                     if not bloquants:
                         etat.update(statut="valide", code=code, publique=pub, banque=ban, revue=revue,
                                     complete={c: v for c, v in complet.items() if c != "rapport"},
                                     resultats_complets=complet["rapport"]["resultats"] if complet["statut"] == "valide" else None)
                         break
-                    motif = "la revue de méthode a relevé des problèmes bloquants : la conclusion serait trompeuse."
+                    motif = ("la revue de méthode a relevé des problèmes bloquants : la conclusion serait trompeuse."
+                             + (" (Revue préalable à l'échelle réduite : l'échelle complète n'a pas été lancée.)" if not complet else ""))
                     compte = "Problèmes bloquants relevés par la revue :\n" + "\n".join(
                         f"- {x['description']} — correction attendue : {x['correction']}" for x in bloquants)
-                    etat["revue"] = revue
+                    if complet:
+                        etat["revue"] = revue
             etat["dernier_compte_rendu"] = compte[-4000:]
             if k == self.conf["iterations_max"]:
                 break

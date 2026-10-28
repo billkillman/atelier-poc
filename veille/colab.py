@@ -119,12 +119,13 @@ class Colab:
             return f"solde Colab insuffisant ({self.solde} unités, minimum {seuil}) : jamais sur le palier gratuit"
         return None
 
-    def executer(self, dossier: Path, outils: Path) -> dict:
-        """Phase publique, TAILLE « complete », sur GPU. Rapport au format de l'exécuteur, plus « materiel »."""
+    def executer(self, dossier: Path, outils: Path, delai: int | None = None) -> dict:
+        """Phase publique, TAILLE « complete », sur GPU. Rapport au format de l'exécuteur, plus « materiel ».
+        `delai` : délai global imposé par l'atelier (temps restant du job), jamais au-delà du réglage."""
         sortie = dossier / "complete"
         shutil.rmtree(sortie, ignore_errors=True)
         sortie.mkdir(parents=True)
-        delai, intervalle = self.conf.get("timeout", 2700), self.conf.get("intervalle", 60)
+        delai, intervalle = min(self.conf.get("timeout", 2700), delai or 10**9), self.conf.get("intervalle", 60)
         t0, nom = time.time(), f"poc-{uuid.uuid4().hex[:8]}"
         base = {"phase": "publique", "taille": "complete", "ok": False, "materiel": self.materiel, "resultats": None}
 
