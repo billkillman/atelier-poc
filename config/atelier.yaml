@@ -1,6 +1,6 @@
 # Écrit par le dépôt qui commande les POC à chaque envoi : ne pas modifier ici.
 poc:
-  iterations_max: 2
+  iterations_max: 3
   params_max_milliards: 1
   params_max_gpu_milliards: 4
   min_exemples_evaluation: 100

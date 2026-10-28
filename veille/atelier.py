@@ -34,6 +34,7 @@ import sys
 import tempfile
 import time
 import uuid
+import unicodedata
 from datetime import date
 from pathlib import Path
 from string import Template
@@ -514,6 +515,12 @@ def panne_infrastructure(rapport: dict | None) -> str | None:
     return f"réseau du sandbox indisponible : {m.group(0)}" if m else None
 
 
+def meme_metrique(a: str, b: str) -> bool:
+    """Même métrique, à la graphie près (« macro_f1 » et « macro-F1 ») : la forme ne doit pas coûter une itération."""
+    norme = lambda s: re.sub(r"[^0-9a-z]", "", unicodedata.normalize("NFKD", str(s)).lower())
+    return norme(a) == norme(b)
+
+
 def valider_execution(pub: dict, ban: dict | None, plan: dict, min_exemples: int) -> list[str]:
     erreurs = []
     r = pub.get("resultats")
@@ -523,7 +530,7 @@ def valider_execution(pub: dict, ban: dict | None, plan: dict, min_exemples: int
         return ["la phase publique n'a pas enregistré de résultats (enregistrer_resultats)"]
     if r["jeu"]["n_exemples"] < min_exemples:
         erreurs.append(f"évaluation sur {r['jeu']['n_exemples']} exemples seulement (au moins {min_exemples} en sandbox)")
-    if r["metrique_principale"] != plan["metrique_principale"]:
+    if not meme_metrique(r["metrique_principale"], plan["metrique_principale"]):
         erreurs.append(f"métrique principale {r['metrique_principale']!r} au lieu de {plan['metrique_principale']!r} (plan)")
     if ban is None:
         return erreurs
@@ -550,7 +557,7 @@ def valider_complete(complet: dict, reduit: dict, plan: dict) -> list[str]:
     if not r:
         return ["aucun résultat enregistré"]
     erreurs = []
-    if r["metrique_principale"] != plan["metrique_principale"]:
+    if not meme_metrique(r["metrique_principale"], plan["metrique_principale"]):
         erreurs.append(f"métrique principale {r['metrique_principale']!r} au lieu de {plan['metrique_principale']!r}")
     cles = lambda res: sorted((a["role"], tuple(sorted(a["metriques"]))) for a in res["approches"])
     if cles(r) != cles(ref):
