@@ -13,6 +13,7 @@
 """
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -24,6 +25,21 @@ import uuid
 from pathlib import Path
 
 from .store import read_json
+
+def notebook_json(chemin: Path) -> None:
+    """Le CLI télécharge un .ipynb comme le dictionnaire Python que renvoie l'API Jupyter (`{'cells': ...}`, constaté le
+    2026-10-28 : la livraison d'un POC validé a échoué dessus), pas en JSON. Réécrit en JSON ; `literal_eval` n'évalue
+    que des littéraux (aucun code)."""
+    if not chemin.exists():
+        return
+    texte = chemin.read_text(encoding="utf-8")
+    try:
+        json.loads(texte)
+        return
+    except ValueError:
+        pass
+    chemin.write_text(json.dumps(ast.literal_eval(texte), ensure_ascii=False, indent=1), encoding="utf-8")
+
 
 # Le CLI remplace un nom de GPU inconnu par une A100 (la plus chère) : liste fermée.
 GPUS = ("T4", "L4")
@@ -174,6 +190,7 @@ class Colab:
             if fin == "97":
                 journal = (sortie / "installation.log").read_text(encoding="utf-8", errors="replace") if (sortie / "installation.log").exists() else ""
                 return echec("installation des dépendances impossible sur Colab", journal)
+            notebook_json(sortie / "execute_complete.ipynb")
             rapport = read_json(sortie / "rapport.json", None)
             if not isinstance(rapport, dict):
                 journal = (sortie / "execution.log").read_text(encoding="utf-8", errors="replace") if (sortie / "execution.log").exists() else ""

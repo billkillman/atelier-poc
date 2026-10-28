@@ -1,0 +1,28 @@
+{
+ "comparaison_equitable": true,
+ "reproduit_la_source": "non_comparable",
+ "confiance": "moyenne",
+ "problemes": [
+  {
+   "gravite": "majeur",
+   "description": "À l'échelle réduite, le LLM (Qwen3-0.6B) est quasi au hasard : exactitude 0,035, exactitude de scénario 0,085 (hasard ≈ 0,056), accord entre permutations exactement 0,0. Presque toutes les erreurs « sûres » vont vers email_sendemail avec une confiance ≈ 0,42, ce qui évoque un biais de position ou de lettre. Un niveau aussi bas est attendu à cette échelle et n'est pas bloquant en soi. Mais un accord de 0,0 exact et un scénario unique prédit partout ne permettent pas d'exclure un défaut de lecture des logits (lettre mal alignée, préfixe tokenisé séparément du message). Le code relu (mapping P[i, permutation], recadrage du cache, lignes de sortie des lettres) paraît cohérent.",
+   "correction": "Avant ou pendant l'échelle complète, ajouter un contrôle de cohérence sur 20 messages. Comparer les logits du cache recadré à ceux d'un passage complet sans cache sur le prompt entier. Tracer la distribution des lettres choisies avant dé-permutation. Contrôler que le top-1 change bien avec le contenu du message. Si Qwen3-1.7B reste près du hasard en scénario, conclure à un bogue de lecture et non à une limite du modèle."
+  },
+  {
+   "gravite": "mineur",
+   "description": "Seuil d'abstention asymétrique. Pour la référence, la température est ajustée sur la validation puis le seuil de 95 % est choisi sur la même validation, donc en échantillon. Pour le LLM, les confiances sont hors pli. L'asymétrie est faible (un seul paramètre) mais favorise légèrement la référence en couverture. À 100 exemples de validation, couverture_95 = 0,025 et précision 1,0 reposent sur 5 messages, donc ne signifient rien.",
+   "correction": "Calibrer la température de la référence hors pli (5 plis) comme pour le LLM, pour choisir le seuil. Rapporter l'effectif des cas acceptés à côté de la couverture et de la précision. Prévoir un IC sur la couverture à 95 %."
+  },
+  {
+   "gravite": "mineur",
+   "description": "Latences peu comparables. Le LLM somme jusqu'à 6 passages hors préfixe partagé, alors que l'encodeur fait un seul passage en lot de 1. Les résultats de l'échelle complète pourront aussi mélanger GPU et CPU. Les écarts de macro-F1 entre les deux approches à cette échelle (0,0031 contre 0,0035, IC qui se recouvrent) ne signifient rien.",
+   "correction": "Indiquer dans le tableau l'appareil et le nombre de passages utilisés pour chaque latence. Inclure le coût amorti du préfixe, ou le signaler explicitement. Ne tirer aucune conclusion de classement à l'échelle réduite."
+  },
+  {
+   "gravite": "mineur",
+   "description": "L'ECE du LLM après isotonique (0,013) est trivialement basse parce que la recalibration écrase la confiance vers l'exactitude quasi nulle (0,028 contre 0,035). Cela ne démontre pas une bonne calibration utile. À l'échelle réduite, le bootstrap de macro-F1 produit des IC dont le point est au bord (0,0035 [0,0026 ; 0,0058]).",
+   "correction": "À l'échelle complète, rapporter l'ECE avec la netteté (part de messages au-dessus de 0,5) ou le Brier. Interpréter l'ECE seulement à côté de l'exactitude."
+  }
+ ],
+ "conclusion": "À l'échelle réduite (CPU, 200 exemples de test, CamemBERT 1 époque sur 300 exemples, Qwen3-0.6B en substitut), les deux approches sont au niveau du hasard : macro-F1 0,0035 pour CamemBERT et 0,0031 pour le LLM, avec des IC qui se recouvrent. Ces chiffres valident la mécanique, pas la comparaison. Le protocole est équitable par construction : mêmes exemples de test, mêmes métriques, calibration sur la validation seule, pas de fuite visible. Je ne relève rien de bloquant, mais le LLM est suspect (accord entre permutations de 0,0, scénario unique prédit presque partout) et doit être contrôlé à l'échelle complète. La phase banque tourne et le code est prêt (colonnes, service par variables d'environnement, aucun texte affiché). Les chiffres de la source (AUROC, ECE de 0,25, surconfiance 0,97 contre 0,49) portent sur un autre modèle, une autre tâche et un autre protocole : ils ne sont pas comparables."
+}

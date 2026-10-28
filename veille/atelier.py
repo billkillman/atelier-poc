@@ -50,6 +50,7 @@ from .store import read_json, write_json
 log = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
+REPRISES = ROOT / "reprises"   # reprises/<jour>/<sujet>/<étape>.json : étapes rédigées lors d'un run précédent
 OUTILS = ROOT / "tools" / "poc"
 MOIS = ("janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre")
 
@@ -719,6 +720,11 @@ class Atelier:
         self.fiche, self.plan, self.faits = commande["fiche"], commande["plan"], commande["faits"]
         self.dir = travail
         self.dir.mkdir(parents=True, exist_ok=True)
+        # Reprise : étapes rédigées lors d'un run précédent (code, revues), déposées par le dépôt qui commande ; relues du
+        # cache au lieu d'être redemandées aux modèles, les exécutions sont rejouées (2026-10-28 : POC validé, livraison en échec).
+        reprise = REPRISES / self.jour / self.sid
+        if reprise.is_dir():
+            shutil.copytree(reprise, self.dir / "etapes", dirs_exist_ok=True)
         self.r = Redaction(commande["moteurs"], reglages.get("timeouts_secondes", {}), travail)
         self.sandbox = Sandbox(self.conf)
         self.colab = colab

@@ -1,13 +1,4 @@
 {
  "version": 1,
- "pocs": [
-  {
-   "jour": "2026-10-27",
-   "sujet_id": "modeles-decision-typees-audit-independant-d3-ultra",
-   "depot": "20261027_typed_decision_slm_camembert_intents",
-   "titre": "Une décision typée par petit LLM (distribution sur options, zéro-shot) rivalise-t-elle avec un encodeur français fine-tuné sur 60 intentions hiérarchisées ?",
-   "statut": "non_traite",
-   "raison": "exécution interrompue avant son terme (délai du job ou panne) : à relancer"
-  }
- ]
+ "pocs": []
 }
