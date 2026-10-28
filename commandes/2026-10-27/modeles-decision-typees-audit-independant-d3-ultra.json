@@ -1,0 +1,348 @@
+{
+ "version": 1,
+ "jour": "2026-10-27",
+ "sujet_id": "modeles-decision-typees-audit-independant-d3-ultra",
+ "depot": "20261027_typed_decision_slm_camembert_intents",
+ "fiche": {
+  "sujet_id": "modeles-decision-typees-audit-independant-d3-ultra",
+  "titre": "Modèles de décision typés : un audit indépendant les juge quasi au niveau des LLM frontière pour un coût infime, mais leur confiance est trompeuse",
+  "en_une_phrase": "Premier audit indépendant d'un modèle de décision typé : précision proche des LLM frontière pour 20 à 300 fois moins cher, mais probabilités mal calibrées et battu par un classifieur entraîné. Anglais uniquement.",
+  "probleme": "Beaucoup de décisions répétitives (modérer, router, filtrer) se ramènent à un choix binaire ou à un choix parmi quelques options, à très grand volume. Appeler un LLM frontière sur chaque élément coûte trop cher et prend trop de temps. Une nouvelle classe de modèles de « décision typée » promet une probabilité *calibrée* (qui reflète la vraie chance d'avoir raison) pour quelques millièmes de centime. Le logiciel pourrait alors décider seul quand le modèle est sûr, et escalader vers un humain sinon. Jusqu'ici, aucune évaluation indépendante n'avait vérifié cette promesse.",
+  "comment_ca_marche": "Un modèle « System One » (par référence au « système 1 » rapide et automatique décrit par Kahneman) est un modèle figé qui ne rédige pas de texte. Il renvoie une décision *typée* : une probabilité oui/non, une distribution sur des options ou un score. Le produit audité est commercial et anonymisé par l'auteur. Il coûte environ 0,000025 $ par commentaire.\n\n1. **Une requête, dix questions.** Chaque commentaire est envoyé une seule fois, accompagné de dix questions oui/non :\n   - la question principale (« toxique ? ») ;\n   - six sous-attributs fournis par le jeu de données (insulte, menace, obscénité…) ;\n   - trois indices de jugement (sarcasme, langage codé, personne visée).\n   La réponse n'étant pas facturée, dix questions coûtent à peu près autant qu'une seule.\n2. **Deux signaux d'incertitude lus dans la même réponse.**\n   - La *confiance native* : la probabilité principale est-elle proche de 0,5 ?\n   - La *dispersion de décomposition* : l'hésitation moyenne sur les six sous-attributs, mesurée par l'entropie (maximale quand une probabilité vaut 0,5). Elle est élevée quand plusieurs facettes du jugement restent indécises.\n3. **Une politique de tri.** Pour chaque commentaire, le système le laisse, le retire ou l'escalade vers un humain. Les coûts sont asymétriques : laisser passer un contenu toxique coûte 5, retirer à tort coûte 1, escalader coûte 0,5. Un des deux signaux classe les commentaires à escalader. On mesure ensuite le coût moyen selon la part décidée automatiquement.\n\n**Ce qui est nouveau** : l'audit sépare deux incertitudes que le mot « confiance » confond. Le *désaccord humain* : les annotateurs se divisent, par exemple sur la satire. Le *risque de décision* : l'action automatique coûterait cher si elle était fausse. Ces deux objectifs appellent des signaux opposés.\n\nLe modèle ouvert d3-ultra applique le même principe : lire l'entrée une seule fois et répondre à toutes les questions. Selon l'éditeur, 255 questions sur une même photo prennent 2,16 s.",
+  "demarche_experimentale": "L'auteur, affilié à Google, utilise **Civil Comments**, un corpus public de commentaires en anglais. Pour chaque commentaire, l'étiquette est la part d'annotateurs qui l'ont jugé toxique. L'échantillon compte 142 658 commentaires : 119 442 tirés en suréchantillonnant les cas contestés, plus 24 965 tirés au hasard, comme le trafic réel.\n\nRéférences comparées :\n- une liste de mots toxiques ;\n- une régression logistique TF-IDF, entraînée sur les mots et paires de mots ;\n- gpt-oss-120b ;\n- l'API Perspective (Google) ;\n- Detoxify et HateBERT fine-tuné ;\n- cinq LLM gardiens ouverts, conçus pour filtrer les contenus dangereux.\n\nQuatorze LLM frontière, en mode raisonnement élevé, sont testés sur 56 commentaires partagés. Métriques : AUROC, ECE (calibration), Brier, AURC (coût du tri). Les écarts sont testés par bootstrap apparié. Un jeu hors distribution de 7 599 commentaires sert de contrôle.",
+  "resultats": [
+   {
+    "metrique": "AUROC (classement, plus haut = mieux)",
+    "valeur": "0,794 (zéro-shot)",
+    "comparaison": "Liste de mots 0,713 ; régression logistique entraînée 0,905",
+    "conditions": "142 658 commentaires anglais, étiquette majoritaire",
+    "citation": "As a classifier against the majority label, the model reaches AUROC 0.79 zero-shot—above the lexical baseline (0.71) but below a TF-IDF logistic regression trained on 142k in-domain labels (0.91) (Table 1)."
+   },
+   {
+    "metrique": "AUROC face aux LLM frontière",
+    "valeur": "0,829",
+    "comparaison": "LLM frontière de 0,840 à 0,905 ; parité non rejetée pour 13 sur 14",
+    "conditions": "56 commentaires, bootstrap apparié, puissance statistique faible",
+    "citation": "With n=56, this is a low-power non-separation, not a claim of true equivalence."
+   },
+   {
+    "metrique": "ECE, écart probabilité annoncée / fréquence réelle (plus bas = mieux)",
+    "valeur": "0,25 global ; 0,33 sur trafic naturel",
+    "comparaison": "0,13 après recalibration isotonique",
+    "conditions": "Validation croisée à 5 plis, sans fuite du test",
+    "citation": "Expected Calibration Error is 0.25 overall and 0.33 on natural traffic."
+   },
+   {
+    "metrique": "Détection des cas où les humains se divisent (AUROC, 0,5 = hasard)",
+    "valeur": "0,457 (confiance native)",
+    "comparaison": "0,750 avec la dispersion des sous-questions",
+    "conditions": "Quart des commentaires les plus contestés",
+    "citation": "The model's native confidence is essentially uncorrelated with human disagreement (Spearman −0.04; AUROC 0.46, no better than chance)"
+   },
+   {
+    "metrique": "AURC, coût du tri vers l'humain (plus bas = mieux)",
+    "valeur": "0,504 (confiance native)",
+    "comparaison": "Oracle 0,417 ; dispersion 0,542 ; hasard 0,546",
+    "conditions": "Coûts : faux négatif 5, faux positif 1, escalade 0,5",
+    "citation": "Escalating by native confidence gives the best deployable AURC (0.504), close to the oracle (0.417); escalating by decomposition-spread (0.542) is no better than random (0.546)."
+   },
+   {
+    "metrique": "AUROC face aux spécialistes",
+    "valeur": "0,785",
+    "comparaison": "HateBERT fine-tuné 0,947 ; Perspective 0,954 ; LLM gardiens 0,57 à 0,83",
+    "conditions": "435 commentaires ; spécialistes entraînés sur ce corpus",
+    "citation": "a fine-tuned HateBERT encoder is close behind (0.95, Brier 0.10), and even the cross-domain Detoxify-original (0.88) beats both general models"
+   }
+  ],
+  "limites": [
+   "Selon l'auteur lui-même, la comparaison avec les LLM frontière repose sur 56 commentaires : elle montre une absence d'écart détectable, pas une équivalence. Les LLM frontière donnent une probabilité écrite en texte, le modèle audité une probabilité native.",
+   "La tâche est de la modération en anglais, sur un corpus public peut-être vu à l'entraînement (risque reconnu par l'auteur). Rien sur le français, la banque ni 300 classes. Hors distribution, le gain de la dispersion disparaît (AUROC 0,52).",
+   "Un seul produit est audité, anonymisé, à une date donnée. L'auteur est affilié à Google, éditeur de Perspective et de ShieldGemma, tous deux comparés. Code et résultats sont seulement annoncés comme à publier.",
+   "d3-ultra : scores auto-déclarés sur des jeux de test privés, aucune langue documentée. Une autre étude (Tencent) montre que mélanger l'ordre des options augmente de 27 à 29 % les questions ratées par Jev."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "13 / 14",
+    "libelle": "LLM frontière dont la précision n'est pas statistiquement distinguable (56 commentaires)"
+   },
+   {
+    "valeur": "0,000025 $",
+    "libelle": "coût mesuré par commentaire pour le modèle de décision typé audité"
+   },
+   {
+    "valeur": "0,97 → 0,49",
+    "libelle": "toxicité annoncée par le modèle vs part réelle d'annotateurs d'accord"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "L'audit porte sur 142 658 commentaires étiquetés par des humains et compare le modèle à 14 LLM frontière.",
+    "citation": "We run the first independent audit of one such model on 142,658 human-labeled comments, and benchmark it against 14 frontier reasoning models (the GPT-5.x, Claude, Gemini 3, and Grok families) on a shared probe set."
+   },
+   {
+    "affirmation": "En zéro-shot, le modèle typé est battu par une régression logistique entraînée sur les étiquettes du domaine.",
+    "citation": "As a classifier against the majority label, the model reaches AUROC 0.79 zero-shot—above the lexical baseline (0.71) but below a TF-IDF logistic regression trained on 142k in-domain labels (0.91) (Table 1)."
+   },
+   {
+    "affirmation": "Le modèle est fortement surconfiant : quand il annonce 97 % de toxicité, les annotateurs ne sont en moyenne que 49 % à juger le commentaire toxique.",
+    "citation": "when the model reports 0.97 toxic, humans average only 0.49."
+   },
+   {
+    "affirmation": "La confiance native ne détecte pas les cas où les humains se divisent, alors que la dispersion des sous-questions les détecte.",
+    "citation": "But decomposition-spread across the atomic sub-questions is the best disagreement detector we measure (Spearman +0.60, AUROC 0.75), beating the trained baseline."
+   },
+   {
+    "affirmation": "L'avantage de la confiance native pour réduire le coût vient surtout d'un effet de la mauvaise calibration, pas d'une vraie mesure du risque.",
+    "citation": "This edge is largely a miscalibration artifact, not evidence that raw confidence measures decision-risk."
+   },
+   {
+    "affirmation": "Coût et débit mesurés : 0,000025 $ par commentaire et 117 à 124 appels par seconde.",
+    "citation": "Across ∼150k calls we observed 117–124 calls/s from a single client, zero errors (one timeout), $0.000025 per comment, and per-item repeat standard deviation 0.009."
+   },
+   {
+    "affirmation": "d3-ultra est un modèle de décision multimodal de 27 Md de paramètres sous licence Apache-2.0, dont les scores sont auto-déclarés sur des jeux privés.",
+    "citation": "The vLLM Semantic Router team has released d3-ultra, a 27B multimodal decision model under Apache-2.0. [...] All benchmark numbers are self-reported on private test sets."
+   },
+   {
+    "affirmation": "Mélanger l'ordre des options augmente de 27 à 29 % l'ensemble des questions ratées par Jev, à précision quasi stable.",
+    "citation": "On our primary collection of 1,700 questions from two benchmarks, Jev's accuracy varies by less than two percentage points, yet its cumulative failure set expands by 27–29% relative to the original order"
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision typé",
+    "definition": "Modèle qui ne génère pas de texte mais renvoie directement une réponse structurée : probabilité oui/non, choix parmi des options ou score."
+   },
+   {
+    "terme": "Zéro-shot",
+    "definition": "Utilisation d'un modèle sur une tâche sans aucun exemple étiqueté de cette tâche ni réentraînement."
+   },
+   {
+    "terme": "AUROC",
+    "definition": "Probabilité qu'un cas positif soit classé au-dessus d'un cas négatif. 0,5 = hasard, 1 = parfait."
+   },
+   {
+    "terme": "ECE",
+    "definition": "Erreur de calibration attendue : écart moyen entre la probabilité annoncée par le modèle et la fréquence réellement observée. Plus bas = mieux."
+   },
+   {
+    "terme": "Recalibration isotonique",
+    "definition": "Correction a posteriori qui réajuste les probabilités d'un modèle sur des données étiquetées, sans changer l'ordre de ses prédictions."
+   },
+   {
+    "terme": "AURC",
+    "definition": "Aire sous la courbe risque–couverture : coût ou erreur moyenne selon la part de cas décidés automatiquement. Plus bas = mieux."
+   },
+   {
+    "terme": "Bootstrap apparié",
+    "definition": "Test statistique qui rééchantillonne les mêmes exemples pour deux modèles et vérifie si leur écart de score dépasse le bruit."
+   },
+   {
+    "terme": "Biais de sélection",
+    "definition": "Tendance d'un modèle à changer de réponse quand on modifie seulement l'ordre de présentation des options."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Two Uncertainties Are Not One: Disagreement versus Decision-Risk in Cheap Structured Content Moderation",
+    "url": "https://arxiv.org/abs/2610.33258",
+    "type": "primaire",
+    "date": "2026-10-23"
+   },
+   {
+    "titre": "Fiche du modèle vllm-sr/d3-ultra (Hugging Face)",
+    "url": "https://huggingface.co/vllm-sr/d3-ultra",
+    "type": "primaire",
+    "date": "2026-10"
+   },
+   {
+    "titre": "vLLM Semantic Router Releases d3-ultra: A 27B Open Multimodal Decision Model (MarkTechPost)",
+    "url": "https://www.marktechpost.com/2026/10/26/vllm-semantic-router-d3-ultra-27b-multimodal-decision-model/",
+    "type": "secondaire",
+    "date": "2026-10-26"
+   },
+   {
+    "titre": "Understanding Jev-Style System One Models: Does Structure Reduce Selection Bias?",
+    "url": "https://arxiv.org/abs/2610.35826",
+    "type": "primaire",
+    "date": "2026-10-26"
+   },
+   {
+    "titre": "SHIFT-JEV: Certified Abstention and Gain-Gated Continual Adaptation for LLM-Based Decision Models under Distribution Shift",
+    "url": "https://arxiv.org/abs/2610.34329",
+    "type": "primaire",
+    "date": "2026-10-25"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-10-23",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Une décision typée par petit LLM (distribution sur options, zéro-shot) rivalise-t-elle avec un encodeur français fine-tuné sur 60 intentions hiérarchisées ?",
+  "hypothese": "Un SLM de 1,7 Md utilisé comme modèle de décision typée (choix d'une option, probabilités lues sur les logits, descente hiérarchique scénario puis intention) reste à plus de 5 points de macro-F1 sous un CamemBERT-base fine-tuné sur MASSIVE fr, mais, après recalibration isotonique, atteint une ECE < 0,10 et ≥ 90 % de réponses identiques quand l'ordre des options est mélangé ; la couverture à erreur fixée par abstention est à mesurer.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné",
+   "description": "Classifieur à plat fine-tuné sur les 60 classes scénario_intention avec une tête linéaire, entraînement supervisé complet.",
+   "implementation": "transformers AutoModelForSequenceClassification sur almanach/camembert-base, 3 époques (1 en sandbox), lr 3e-5, batch 32, longueur max 64, graine 0 ; probabilités softmax brutes, puis calibration par température sur une partie de validation.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Décision typée par SLM en zéro-shot hiérarchique",
+   "description": "Le LLM ne génère pas de texte : on lui présente la liste d'options étiquetées par des lettres ou numéros et on lit la distribution de probabilité sur le jeton de choix. Décision en deux niveaux (18 scénarios puis intentions du scénario), probabilités composées, recalibration isotonique sur un petit jeu de validation.",
+   "implementation": "transformers AutoModelForCausalLM, prompt avec définitions des options (nom du scénario/intention), softmax restreint aux jetons d'options en un seul passage avant, sans mode réflexion ; fp16 sur GPU. Robustesse : 3 permutations aléatoires de l'ordre des options, moyenne des probabilités et taux d'accord du top-1 entre permutations. Recalibration : isotonic regression (scikit-learn) sur 500 exemples de validation, sans réentraînement du LLM. Équivalent ouvert de l'idée seulement, pas d3-ultra lui-même.",
+   "modeles_hf": [
+    "Qwen/Qwen3-1.7B"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen3-0.6B"
+   ],
+   "entrainement": "autre",
+   "service_phase2": "llmaas"
+  },
+  "jeu_public": {
+   "hub_id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "text, label (scénario_intention) ; scénario dérivé du préfixe de label_text",
+   "representativite": "Intentions en français, 60 classes proches organisées en arbre à 2 niveaux (18 scénarios), proxy du routage motif → sous-motif.",
+   "ecarts_banque": "Énoncés courts d'assistant vocal, 60 classes au lieu de ~300, classes peu déséquilibrées, pas d'e-mails ni de pièces jointes."
+  },
+  "metriques": [
+   "macro-F1",
+   "exactitude",
+   "ECE (15 intervalles)",
+   "score de Brier",
+   "cohérence scénario/intention",
+   "taux d'accord du top-1 entre permutations des options",
+   "couverture à 95 % de précision par abstention"
+  ],
+  "metrique_principale": "macro-F1",
+  "sens": "max",
+  "protocole": "Jeu mteb/amazon_massive_intent fr. Complet : entraînement CamemBERT sur train, 500 exemples de validation pour calibration (température ; isotonique), évaluation sur tout le test. Le LLM n'utilise que les définitions des classes et la validation pour la recalibration. 3 graines pour CamemBERT, 3 permutations pour le LLM. Intervalles de confiance par bootstrap (1000 rééchantillonnages) sur macro-F1 et ECE. Sandbox : 300 exemples d'entraînement, 1 époque, 200 de test, 100 de validation, 1 graine.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Qwen/Qwen3-0.6B remplace Qwen/Qwen3-1.7B (plus rapide sur CPU, même famille) ; échantillons réduits ; seule la validité du code et du format de sortie est visée, pas les chiffres.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "texte",
+     "type": "string",
+     "description": "Texte du message ou de l'e-mail, anonymisé"
+    },
+    {
+     "colonne": "motif",
+     "type": "string",
+     "description": "Étiquette de niveau 1"
+    },
+    {
+     "colonne": "sous_motif",
+     "type": "string",
+     "description": "Étiquette de niveau 2"
+    },
+    {
+     "colonne": "libelle_description_classe",
+     "type": "string",
+     "description": "Libellé et description de chaque classe de la taxonomie"
+    },
+    {
+     "colonne": "split",
+     "type": "string",
+     "description": "train / validation / test"
+    }
+   ],
+   "volume_conseille": "Au moins 5 000 exemples étiquetés, dont 1 000 de test, avec classes rares présentes.",
+   "metriques_metier": "macro-F1 sur classes rares, taux de routage correct automatique à erreur fixée, ECE, latence par message, coût par 1 000 messages.",
+   "garde_fous": "Données anonymisées, LLM via le service interne uniquement, journalisation des prompts, aucune décision de crédit, revue humaine des abstentions."
+  },
+  "duree_estimee_minutes": 40,
+  "analyse_materiel": ""
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "Qwen/Qwen3-1.7B": {
+    "id": "Qwen/Qwen3-1.7B",
+    "sha": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 2031739904,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "Qwen/Qwen3-0.6B": {
+    "id": "Qwen/Qwen3-0.6B",
+    "sha": "c1899de289a04d12100db370d81485cdf75e47ca",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 751632384,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "splits": [
+    "train",
+    "test",
+    "validation"
+   ],
+   "licence": "apache-2.0",
+   "colonnes": {
+    "id": "Value",
+    "label": "Value",
+    "label_text": "Value",
+    "text": "Value",
+    "lang": "Value"
+   },
+   "exemple": {
+    "id": "1",
+    "label": "alarm_set",
+    "label_text": "alarm_set",
+    "text": "réveille-moi à neuf heures du matin le vendredi",
+    "lang": "fr"
+   },
+   "lignes": {
+    "train": 11514,
+    "test": 2974,
+    "validation": 2033
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
