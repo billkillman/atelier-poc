@@ -19,12 +19,16 @@
      },
      "correction": {
       "type": "string"
+     },
+     "pour_le_lecteur": {
+      "type": "string"
      }
     },
     "required": [
      "gravite",
      "description",
-     "correction"
+     "correction",
+     "pour_le_lecteur"
     ],
     "additionalProperties": false
    }
@@ -51,6 +55,9 @@
   },
   "conclusion": {
    "type": "string"
+  },
+  "en_bref": {
+   "type": "string"
   }
  },
  "required": [
@@ -58,7 +65,8 @@
   "comparaison_equitable",
   "reproduit_la_source",
   "confiance",
-  "conclusion"
+  "conclusion",
+  "en_bref"
  ],
  "additionalProperties": false
 }

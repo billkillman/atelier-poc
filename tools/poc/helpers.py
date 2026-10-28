@@ -185,6 +185,10 @@ def prepare_environment() -> None:
         os.environ.setdefault(name, "1")
     os.environ.setdefault("WANDB_DISABLED", "true")
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+    import logging
+    import warnings
+    warnings.filterwarnings("ignore", message=r"(?s).*(HF_TOKEN|unauthenticated requests)")
+    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
     if current_phase() == "private" and os.environ.get("LOCAL_MODELS_DIR"):
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
         os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
@@ -687,7 +691,8 @@ def save_results(results: dict) -> dict:
     {"primary_metric": str, "direction": "max" | "min",
      "metric_labels": {clé: libellé lisible} (facultatif),
      "dataset": {"name", "config", "split", "n_examples"},
-     "approaches": [{"name", "role": "reference" | "new", "metrics": {clé: nombre},
+     "approaches": [{"name", "role": "reference" | "new", "metrics": {clé: nombre, ou None si la métrique est sans objet
+                                                                     pour cette approche (jamais une valeur « par construction »)},
                      "ci95": {clé: [bas, haut]} (facultatif), "latency_ms": {"p50", "p95"} (facultatif), "notes": str}]}"""
     errors = []
     primary = results.get("primary_metric")
@@ -702,9 +707,10 @@ def save_results(results: dict) -> dict:
         errors.append("il faut au moins une approche « reference » et une « new »")
     for a in approaches:
         metrics = a.get("metrics") or {}
-        if primary not in metrics:
-            errors.append(f"{a.get('name')} : métrique principale {primary!r} absente")
-        errors += [f"{a.get('name')} : {k} = {v!r} n'est pas un nombre fini" for k, v in metrics.items() if not _is_number(v)]
+        if not _is_number(metrics.get(primary)):
+            errors.append(f"{a.get('name')} : métrique principale {primary!r} absente ou non numérique")
+        errors += [f"{a.get('name')} : {k} = {v!r} n'est pas un nombre fini" for k, v in metrics.items()
+                   if v is not None and not _is_number(v)]
         for k, ci in (a.get("ci95") or {}).items():
             if not (isinstance(ci, (list, tuple)) and len(ci) == 2 and all(_is_number(x) for x in ci) and ci[0] <= ci[1]):
                 errors.append(f"{a.get('name')} : ci95[{k}] invalide")
@@ -719,12 +725,20 @@ def save_results(results: dict) -> dict:
                                 "seconds": round(sum(c["seconds"] for c in SERVICE_CALLS), 1)}}
     path = _RUN["output_dir"] / f"results_{current_phase()}.json"
     path.write_text(json.dumps(output, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
-    print(f"résultats enregistrés : {path}")
+    print(f"résultats enregistrés : {_shown_path(path)}")
     return output
 
 
 def _label(results: dict, key: str) -> str:
     return (results.get("metric_labels") or {}).get(key) or key
+
+
+def _shown_path(path: Path) -> str:
+    """Chemin affiché dans les sorties : relatif au dossier courant quand c'est possible."""
+    try:
+        return str(Path(path).resolve().relative_to(Path.cwd().resolve()))
+    except ValueError:
+        return str(path)
 
 
 def results_table(results: dict):
@@ -734,7 +748,7 @@ def results_table(results: dict):
         row = {"approche": a["name"], "rôle": "référence" if a["role"] == "reference" else "nouvelle"}
         for key, value in a["metrics"].items():
             ci = (a.get("ci95") or {}).get(key)
-            row[_label(results, key)] = f"{value:.4g}" + (f" [{ci[0]:.4g} ; {ci[1]:.4g}]" if ci else "")
+            row[_label(results, key)] = ("—" if value is None else f"{value:.4g}") + (f" [{ci[0]:.4g} ; {ci[1]:.4g}]" if ci else "")
         if a.get("latency_ms"):
             row["latence p50 (ms)"] = a["latency_ms"].get("p50")
         rows.append(row)
@@ -761,8 +775,8 @@ def use_plot_style() -> None:
     })
 
 
-def save_figure(fig, name: str, caption: str) -> Path:
-    """Enregistre la figure (figures/<name>.png), l'affiche avec sa légende et la ferme.
+def save_figure(fig, name: str, caption: str) -> None:
+    """Enregistre la figure (figures/<name>.png), l'affiche avec sa légende et la ferme ; ne renvoie rien.
 
     `name` : identifiant court en minuscules (lettres, chiffres, « _ ») ; `caption` : ce que la figure montre et comment
     la lire, en une ou deux phrases. Les figures enregistrées ainsi illustrent aussi le README du dépôt."""
@@ -779,14 +793,14 @@ def save_figure(fig, name: str, caption: str) -> Path:
         display(Image(filename=str(path)), metadata={"figure": {"name": name, "caption": caption}})
         display(Markdown(f"*Figure — {caption}*"))
     except ImportError:
-        print(f"figure enregistrée : {path} — {caption}")
-    return path
+        print(f"figure enregistrée : {_shown_path(path)} — {caption}")
 
 
 def plot_comparison(results: dict, metrics: list[str] | None = None, name: str = "comparison",
-                    caption: str | None = None) -> Path:
+                    caption: str | None = None) -> None:
     """Figure de synthèse : une barre par approche et par métrique, avec l'intervalle de confiance à 95 % quand il
-    existe. Par défaut, la métrique principale puis jusqu'à trois autres métriques."""
+    existe. Par défaut, la métrique principale puis jusqu'à trois autres métriques. Une métrique sans objet pour une
+    approche (None) n'a pas de barre pour elle."""
     import matplotlib.pyplot as plt
     primary = results["primary_metric"]
     all_keys = list(results["approaches"][0]["metrics"])
@@ -794,11 +808,12 @@ def plot_comparison(results: dict, metrics: list[str] | None = None, name: str =
     use_plot_style()
     fig, axes = plt.subplots(1, len(keys), figsize=(3.4 * len(keys) + 1, 4), squeeze=False)
     for ax, key in zip(axes[0], keys):
-        names = [a["name"] for a in results["approaches"]]
-        values = [a["metrics"][key] for a in results["approaches"]]
-        colors = [COLORS["new"] if a["role"] == "new" else COLORS["reference"] for a in results["approaches"]]
+        shown = [a for a in results["approaches"] if _is_number(a["metrics"].get(key))]
+        names = [a["name"] for a in shown]
+        values = [a["metrics"][key] for a in shown]
+        colors = [COLORS["new"] if a["role"] == "new" else COLORS["reference"] for a in shown]
         errors = [[0, 0]] * len(values)
-        cis = [(a.get("ci95") or {}).get(key) for a in results["approaches"]]
+        cis = [(a.get("ci95") or {}).get(key) for a in shown]
         if any(cis):
             errors = [[v - ci[0], ci[1] - v] if ci else [0, 0] for v, ci in zip(values, cis)]
         bars = ax.bar(range(len(values)), values, color=colors, yerr=list(zip(*errors)), capsize=5)
@@ -812,4 +827,4 @@ def plot_comparison(results: dict, metrics: list[str] | None = None, name: str =
     default = (f"Valeur de chaque métrique par approche (★ : métrique principale, "
                f"{'à maximiser' if results['direction'] == 'max' else 'à minimiser'}) ; les barres d'erreur donnent "
                f"l'intervalle de confiance à 95 % sur {results['dataset']['n_examples']} exemples de test.")
-    return save_figure(fig, name, caption or default)
+    save_figure(fig, name, caption or default)

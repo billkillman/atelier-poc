@@ -619,7 +619,7 @@ class Atelier:
             publique += (f"\n\nPour mémoire, échelle réduite validée dans le sandbox (CPU, {r['dataset']['n_examples']} exemples) :\n"
                          + json.dumps({a["name"]: a["metrics"] for a in r["approaches"]}, ensure_ascii=False))
         prompt = _prompt("poc_revue", fiche=self._json(self.fiche), plan=self._json(self.plan), echelle=ECHELLES_REVUE[echelle].format(raison=raison),
-                         cellules=self._json(code["cellules"]), publique=publique, privee=compte_rendu(ban))
+                         cellules=self._json(code["cellules"]), publique=publique, privee=compte_rendu(ban), api_aide=api_aide())
         return self.r.rediger(prompt, _schema("poc_revue"), etape=f"poc_revue:{self.sid}", role="poc_revue")
 
     # ---------------------------------------------------------------- échelle complète
@@ -927,7 +927,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog=f"python -m {__package__}.atelier")
     sous = ap.add_subparsers(dest="action", required=True)
     sous.add_parser("lister", help="commandes en attente (JSON)")
-    for nom in ("executer", "publier"):
+    for nom in ("executer", "publier", "indexer"):
         p = sous.add_parser(nom)
         p.add_argument("commande", help="chemin de la commande (commandes/<jour>/<sujet>.json)")
     a = ap.parse_args(argv)
@@ -945,6 +945,9 @@ def main(argv: list[str] | None = None) -> int:
     res = read_json(_travail(commande) / "resultat.json", None) or {
         "jour": commande["jour"], "sujet_id": commande["sujet_id"], "depot": commande["depot"], "titre": commande["plan"]["titre"],
         "statut": "non_traite", "raison": "exécution interrompue avant son terme (délai du job ou panne) : à relancer"}
+    if a.action == "indexer":  # après publication : réécrit l'entrée sur l'index le plus récent (jobs parallèles)
+        maj_index(ROOT, res)
+        return 0
     if res.get("statut") == "valide":
         if not jeton:
             raise SystemExit("POC_PUBLICATION_TOKEN absent : publication impossible")

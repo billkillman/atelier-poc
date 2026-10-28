@@ -112,12 +112,17 @@ jobs:
           python -m lab.atelier publier "$COMMANDE"
           git config user.name "atelier-poc"
           git config user.email "atelier-poc@users.noreply.github.com"
-          git add index.json
-          git commit -m "Résultat : $COMMANDE" || exit 0
           url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          for essai in 1 2 3; do
-            git pull --rebase "$url" main && git push "$url" HEAD:main && exit 0
-            sleep $((essai * 20))
+          # Les jobs parallèles écrivent tous index.json : on repart de la dernière version et on y réécrit son entrée
+          # (resultat.json est hors du dépôt, il survit à la remise à niveau), plutôt que de fusionner du JSON.
+          for essai in 1 2 3 4 5; do
+            git fetch -q "$url" main && git reset -q --hard FETCH_HEAD
+            python -m lab.atelier indexer "$COMMANDE"
+            git add index.json
+            git diff --cached --quiet && exit 0
+            git commit -q -m "Résultat : $COMMANDE"
+            git push -q "$url" HEAD:main && exit 0
+            sleep $((essai * 15))
           done
           exit 1
 

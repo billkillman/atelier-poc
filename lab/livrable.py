@@ -399,6 +399,13 @@ def cadre(plan: dict, code: dict) -> list:
     ]
 
 
+def _meme_titre(ligne: str, groupe: str) -> bool:
+    """« ### La question » redit « 1. La question » : même texte, numéro, casse et ponctuation mis à part."""
+    def norme(t):
+        return re.sub(r"[\W\d_]+", " ", t.lower()).strip()
+    return ligne.startswith("#") and norme(ligne) == norme(groupe)
+
+
 def assembler(fiche: dict, plan: dict, faits: dict, code: dict, jour: str = ""):
     """Notebook complet : cadre du moteur, puis le code rédigé avec un titre numéroté par groupe de sections."""
     nb = nbformat.v4.new_notebook()
@@ -406,11 +413,17 @@ def assembler(fiche: dict, plan: dict, faits: dict, code: dict, jour: str = ""):
                         "language_info": {"name": "python"}})
     cellules, titre = cadre(plan, code), None
     for c in code["cellules"]:
-        groupe = SECTIONS.get(c["section"])
+        groupe, source = SECTIONS.get(c["section"]), c["source"]
         if groupe and groupe != titre:
             titre = groupe
-            cellules.append(_nb_md(f"## {groupe}", section=c["section"]))
-        cellules.append((_nb_md if c["type"] == "markdown" else _nb_code)(c["source"], section=c["section"]))
+            if c["type"] == "markdown":  # le titre de section ouvre la première cellule de texte, sans la redire
+                premiere, _, suite = source.lstrip().partition("\n")
+                if _meme_titre(premiere, groupe):
+                    source = suite.lstrip("\n")
+                source = f"## {groupe}\n\n{source}".rstrip()
+            else:
+                cellules.append(_nb_md(f"## {groupe}", section=c["section"]))
+        cellules.append((_nb_md if c["type"] == "markdown" else _nb_code)(source, section=c["section"]))
     nb.cells = cellules
     return nb
 
@@ -442,14 +455,19 @@ def _valeur(a: dict, m: str) -> str:
     return nombre(a["metrics"].get(m), 3) + (f" [{nombre(ci[0])} ; {nombre(ci[1])}]" if ci else "")
 
 
+def _numerique(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and v == v
+
+
 def tableau_resultats(res: dict, lisibles: dict) -> str:
-    """Tableau Markdown : une ligne par approche ; la meilleure valeur de chaque métrique orientée en gras."""
-    cles = list(res["approaches"][0]["metrics"])
+    """Tableau Markdown : une ligne par approche ; la meilleure valeur de chaque métrique orientée en gras. Une métrique
+    sans objet pour une approche (None) s'affiche « — » et n'entre pas dans la comparaison."""
+    cles = list(dict.fromkeys(m for a in res["approaches"] for m in a["metrics"]))
     meilleures = {}
     for m in cles:
         sens = lisibles.get(m, {}).get("sens")
-        vals = [a["metrics"][m] for a in res["approaches"]]
-        if sens in ("max", "min") and len(set(vals)) > 1:
+        vals = [v for a in res["approaches"] if _numerique(v := a["metrics"].get(m))]
+        if sens in ("max", "min") and len(vals) == len(res["approaches"]) and len(set(vals)) > 1:
             meilleures[m] = max(vals) if sens == "max" else min(vals)
     tete = ["Approche", *[lisibles.get(m, {}).get("libelle", m) + (" ★" if m == res["primary_metric"] else "")
                           + {"max": " ↑", "min": " ↓"}.get(lisibles.get(m, {}).get("sens"), "") for m in cles]]
@@ -461,7 +479,7 @@ def tableau_resultats(res: dict, lisibles: dict) -> str:
         cellules = [f"{_cellule(a['name'])} ({ROLES.get(a['role'], a['role']).lower()})"]
         for m in cles:
             v = _valeur(a, m)
-            cellules.append(f"**{v}**" if m in meilleures and a["metrics"][m] == meilleures[m] else v)
+            cellules.append(f"**{v}**" if m in meilleures and a["metrics"].get(m) == meilleures[m] else v)
         if latence:
             cellules.append(nombre((a.get("latency_ms") or {}).get("p50")))
         lignes.append("| " + " | ".join(cellules) + " |")
@@ -475,16 +493,23 @@ def en_bref(plan: dict, res: dict, revue: dict, echelle_complete: bool, lisibles
     libelle = (lisibles or {}).get(mp, {}).get("libelle") or (res.get("metric_labels") or {}).get(mp) or mp
     vals = {a["role"]: a for a in res["approaches"]}
     nouv, ref = vals.get("new"), vals.get("reference")
+    verdict = neutre(revue.get("en_bref") or " ".join(_FIN_DE_PHRASE.split(revue["conclusion"])[:2]))
     if not (nouv and ref):
-        return neutre(revue["conclusion"])
-    echelle = "sur tout le jeu de test" if echelle_complete else "à l'échelle réduite (indicatif)"
-    chiffres = (f"{neutre(nouv['name'])} : {_valeur(nouv, mp)} ; {neutre(ref['name'])} : {_valeur(ref, mp)} "
-                f"({libelle}, {res['dataset']['n_examples']} exemples, {echelle}).")
-    return f"{chiffres} {neutre(revue['conclusion'])}"
+        return verdict
+    echelle = "échelle complète" if echelle_complete else "échelle réduite, chiffres indicatifs"
+    chiffres = (f"{libelle} : {_valeur(nouv, mp)} pour {neutre(nouv['name'])}, contre {_valeur(ref, mp)} pour "
+                f"{neutre(ref['name'])} ({res['dataset']['n_examples']} exemples de test, {echelle}).")
+    return f"{verdict} {chiffres}"
 
 
 def _points(titre: str, items: list[str]) -> list[str]:
     return [f"**{titre}**", "", *[f"- {neutre(x)}" for x in items], ""] if items else []
+
+
+def pour_le_lecteur(revue: dict, gravite: str) -> list[str]:
+    """Problèmes de la revue reformulés pour le lecteur des résultats ; une revue plus ancienne n'a que `description`."""
+    return [x.get("pour_le_lecteur", x["description"]) for x in revue["problemes"]
+            if x["gravite"] == gravite and x.get("pour_le_lecteur", x["description"]).strip()]
 
 
 def bilan_markdown(plan: dict, etat: dict, res: dict, revue: dict, code: dict | None = None, figures: list[dict] | None = None) -> str:
@@ -504,11 +529,11 @@ def bilan_markdown(plan: dict, etat: dict, res: dict, revue: dict, code: dict | 
                    "ils sont indicatifs et à confirmer avec `SCALE = \"full\"`.*")
     lignes = ["## 7. Bilan", "", f"> **Verdict** (confiance {revue['confiance']}). {neutre(revue['conclusion'])}", "", echelle, "",
               tableau_resultats(res, lisibles), ""]
-    lignes += _points("Réserves", [x["description"] for x in revue["problemes"] if x["gravite"] == "majeur"])
+    lignes += _points("Réserves", pour_le_lecteur(revue, "majeur"))
     lignes += _points("Limites", code.get("limites") or [])
     if code.get("ecarts_sandbox") or plan.get("adaptation_sandbox"):
         lignes += _points("Échelle réduite : ce qui diffère de l'échelle complète", [code.get("ecarts_sandbox") or plan["adaptation_sandbox"]])
-    lignes += _points("Améliorations possibles", [x["description"] for x in revue["problemes"] if x["gravite"] == "mineur"][:5])
+    lignes += _points("Améliorations possibles", pour_le_lecteur(revue, "mineur")[:5])
     lignes += ["**Et ensuite ?** Rejouer le même protocole sur vos données : `PHASE = \"private\"`, `SCALE = \"full\"`, après avoir "
                "préparé le jeu et la configuration décrits dans le README (section « Sur vos données »)."]
     return "\n".join(lignes)
@@ -518,7 +543,7 @@ def bilan_markdown(plan: dict, etat: dict, res: dict, revue: dict, code: dict | 
 
 def _etiquette_mermaid(texte: str, n: int = 60) -> str:
     t = re.sub(r"[\"\[\]{}()<>|#;`]", " ", neutre(str(texte)))
-    t = re.sub(r"\s+", " ", t).strip()
+    t = re.sub(r"\s+([,.;:…])", r"\1", re.sub(r"\s+", " ", t)).strip()
     return t if len(t) <= n else t[: n - 1].rstrip() + "…"
 
 
@@ -537,6 +562,14 @@ def _figures_md(figures: list[dict]) -> list[str]:
     for f in figures:
         lignes += [f"![{_texte_alternatif(f['legende'])}]({f['fichier']})", "", f"*{f['legende']}*", ""]
     return lignes
+
+
+def _licence(licence: str | None) -> str:
+    """Licence déclarée sur le Hub ; « other » ou « unknown » cachent souvent des restrictions (usage commercial)."""
+    if not licence:
+        return "non précisée : lire la fiche du modèle"
+    return f"{licence} (licence propre au modèle : lire ses conditions, notamment d'usage commercial)" \
+        if licence in ("other", "unknown") else licence
 
 
 def _materiel(info: dict) -> str:
@@ -622,9 +655,9 @@ def readme(fiche: dict, plan: dict, faits: dict, etat: dict, res: dict, revue: d
 
     # 4. Ce qu'il faut retenir
     L += ["## Ce qu'il faut retenir", ""]
-    L += _points("Réserves", [x["description"] for x in revue["problemes"] if x["gravite"] == "majeur"])
+    L += _points("Réserves", pour_le_lecteur(revue, "majeur"))
     L += _points("Limites", code.get("limites") or [])
-    L += _points("Pistes d'amélioration", [x["description"] for x in revue["problemes"] if x["gravite"] == "mineur"][:5])
+    L += _points("Pistes d'amélioration", pour_le_lecteur(revue, "mineur")[:5])
 
     # 5. Rejouer l'expérience
     L += ["## Rejouer l'expérience", "", DIAGRAMME_PHASES, "",
@@ -633,7 +666,8 @@ def readme(fiche: dict, plan: dict, faits: dict, etat: dict, res: dict, revue: d
           "Dans la cellule de paramètres : `PHASE = \"public\"`, puis `SCALE = \"reduced\"` (quelques minutes sur CPU, pour "
           "vérifier) ou `SCALE = \"full\"` (résultats publiés"
           + (f" ; {_materiel(info)})." if complet else ").") + " Les résultats sont "
-          "écrits dans `outputs/results_public.json`, les figures dans `outputs/figures/`.", "",
+          "écrits dans `outputs/results_public.json`, les figures dans `outputs/figures/` (les résultats publiés en sont une "
+          "copie, dans `results/` et `figures/`).", "",
           "### Sur vos données (environnement de services financiers)", "",
           "Le même protocole, sur vos données, dans votre environnement : seule la cellule `PRIVATE_CONFIG` s'adapte. Le code "
           "de cette phase a été exécuté de bout en bout sur un jeu factice écrit comme un vrai export (dossier de fichiers, "
@@ -679,7 +713,7 @@ def readme(fiche: dict, plan: dict, faits: dict, etat: dict, res: dict, revue: d
         L += [(f"| [{_cellule(x['nom'])}]({x['url']})" if x.get("url") else f"| {_cellule(x['nom'])}")
               + f" | {ACCES.get(x['acces'], _cellule(x['acces']))} | {_cellule(x['adequation'])} | {_cellule(x['raison'])} |" for x in autres]
         L += [""]
-    licences = [f"`{m}` : {f.get('licence') or 'non précisée'}" for m, f in (faits.get("modeles") or {}).items() if f]
+    licences = [f"`{m}` : {_licence(f.get('licence'))}" for m, f in (faits.get("modeles") or {}).items() if f]
     jeu = (faits.get("jeu") or {}).get("licence")
     L += ["**Licences**", "", f"- Jeu de données `{j['hub_id']}` : {jeu or 'voir sa fiche'}"]
     L += [f"- {x}" for x in licences] + ["- Vérifier la licence de chaque modèle avant tout usage au-delà de l'évaluation.", ""]
