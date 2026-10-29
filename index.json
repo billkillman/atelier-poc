@@ -3,6 +3,75 @@
  "pocs": [
   {
    "jour": "2026-10-27",
+   "sujet_id": "modeles-decision-typees-audit-independant-d3-ultra",
+   "depot": "20261027_typed_decision_slm_camembert_intents",
+   "titre": "Un petit LLM en décision typée (distribution sur options) rivalise-t-il avec CamemBERT fine-tuné sur des intentions françaises hiérarchisées ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "complete",
+   "materiel": "GPU T4 (Google Colab)",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné)",
+    "raison": ""
+   },
+   "iterations": 1,
+   "metrique_principale": "macro_f1",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "CamemBERT-base fine-tuné",
+     "role": "reference",
+     "valeur": 0.4685599228087892,
+     "ic95": [
+      0.4474218340694297,
+      0.49869012407834057
+     ]
+    },
+    {
+     "nom": "Décision typée hiérarchique par LLM",
+     "role": "nouvelle",
+     "valeur": 0.4289851709060419,
+     "ic95": [
+      0.39830049632171516,
+      0.45821939107873905
+     ]
+    }
+   ],
+   "n_exemples": 1500,
+   "jeu": "mteb/amazon_massive_intent",
+   "synthese": "macro_f1 : Décision typée hiérarchique par LLM 0,429 contre 0,469 pour CamemBERT-base fine-tuné (1500 exemples, GPU T4 (Google Colab)).",
+   "conclusion": "À l'échelle complète (phase publique, 1 500 énoncés de test, GPU), le LLM zéro-shot de 3 Md reste à 4 points de macro-F1 de CamemBERT (0,43 contre 0,47), mais l'exactitude chute de 72,9 % à 50,4 % et la parente est fausse dans 42 % des cas, contre 13 %. L'ECE passe sous 0,10 après recalibration (0,06), au prix de probabilités très aplaties (Brier 0,70 contre 0,40). L'accord sous permutation des options n'est que de 49 %, très loin des 95 % visés. La référence est probablement sous-entraînée, ce qui flatte le LLM. Un classifieur entraîné reste donc préférable dès qu'il existe des étiquettes, et l'approche par LLM n'est pas prête sans correction du biais d'ordre.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "reserves": [
+    "Le verdict « écart de macro-F1 < 10 points » est atteint, mais il masque un écart net sur les autres mesures. L'exactitude vaut 72,9 % contre 50,4 %, l'exactitude du niveau parent 84 % contre 58 %, et les erreurs de parente passent de 13 % à 42 %. Le macro-F1 de CamemBERT (0,47) est anormalement bas pour une exactitude de 0,73, ce qui indique que beaucoup de classes ne sont jamais prédites. Aucun test apparié ne porte sur l'écart de macro-F1, et les IC à 95 % se chevauchent (0,447–0,499 contre 0,398–0,458).",
+    "La référence est probablement sous-entraînée. Elle ne reçoit que 3 époques, soit environ 1 080 pas, pour 60 classes. Son macro-F1 est faible par rapport à son exactitude. Sa température de recalibration est de 0,47, donc inférieure à 1, ce qui signale des probabilités sous-confiantes. Son ECE brute est de 0,38. Aucun réglage n'a été essayé, et il n'y a pas de courbe de validation ni de sélection d'époque.",
+    "Le critère de stabilité à l'ordre des options échoue nettement : l'accord est de 49 % (IC 45–53 %) pour un seuil de 95 %. Cet accord est quasi égal à l'exactitude (50 %), ce qui suggère un fort biais de position ou de code, au lieu d'une lecture du contenu des options. Le notebook ne diagnostique pas ce biais. Il ne vérifie ni la distribution des codes choisis ni l'accord restreint aux cas corrects, et ne moyenne pas les probabilités sur plusieurs ordres, ce que la source suggère.",
+    "Le critère de calibration (ECE < 0,10) est satisfait de façon peu informative. L'ECE ne mesure que la confiance de la classe prédite. Avec une température de 5,4, les probabilités sont très aplaties : la confiance moyenne s'aligne sur une exactitude de 50 %, mais le pouvoir de discrimination est faible. Le Brier du LLM reste de 0,70 contre 0,40 pour CamemBERT. Ce Brier est de plus calculé avec une répartition uniforme sur les branches non explorées, ce qui le pénalise artificiellement. Une seule température sert aux deux niveaux."
+   ],
+   "duree_minutes": 40.5,
+   "consommation": {
+    "claude:poc_code:modeles-decision-typees-audit-independant-d3-ultra": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 860.7,
+     "cout_equivalent_usd": 3.0738,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:modeles-decision-typees-audit-independant-d3-ultra": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 91.4,
+     "cout_equivalent_usd": 0.5111,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261027_typed_decision_slm_camembert_intents"
+  },
+  {
+   "jour": "2026-10-27",
    "sujet_id": "cohere-qwen3-8-exfiltration-incident",
    "depot": "20261027_agent_egress_policy_vs_reasoning_monitor",
    "titre": "Un contrôle des appels d'outils détecte-t-il mieux l'exfiltration d'un agent que la lecture de sa trace de raisonnement ?",
