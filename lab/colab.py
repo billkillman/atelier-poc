@@ -110,14 +110,18 @@ def python_sandbox(outils: Path) -> str:
 def gel_pour_colab(gel: str) -> str:
     """Paquets du sandbox (`pip freeze` après l'échelle réduite) réinstallables sur Colab : versions identiques, sans
     les étiquettes locales des roues CPU (« torch==2.10.0+cpu » : la roue standard de PyPI sait utiliser le GPU) ni les
-    installations depuis un chemin ou une URL."""
+    installations depuis un chemin ou une URL. torchaudio, publié avec torch sous le même numéro, en reprend la version :
+    une dépendance peut rétrograder torch seul (le 2026-10-30, qev : torch 2.10.0, torchaudio 2.11.1+cpu de l'image). La
+    roue CPU s'en accommode, pas celle de PyPI, qui attend un symbole absent de torch 2.10 et bloque `import transformers`."""
     lignes = []
     for l in gel.splitlines():
         l = l.strip()
         if not l or l.startswith(("#", "-")) or " @ " in l:
             continue
         lignes.append(re.sub(r"\+[0-9A-Za-z.]+$", "", l))
-    return "\n".join(lignes) + "\n"
+    texte = "\n".join(lignes) + "\n"
+    torch = re.search(r"^torch==(.+)$", texte, re.M)
+    return re.sub(r"^torchaudio==.+$", f"torchaudio=={torch[1]}", texte, flags=re.M) if torch else texte
 
 _DEMARRER = """
 import subprocess, sys

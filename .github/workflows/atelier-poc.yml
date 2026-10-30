@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   poc:
@@ -71,6 +72,15 @@ jobs:
           pipx install --quiet google-colab-cli==0.7.5   # version figée : l'atelier dépend de son comportement
           mkdir -p ~/.config/colab-cli && chmod 700 ~/.config/colab-cli
           (umask 077 && printf '%s' "$COLAB_TOKEN" > ~/.config/colab-cli/token.json)
+
+      # Échelle complète seule : dossier de travail d'un run précédent, lu comme une donnée (aucun code n'en est exécuté
+      # ici, seul le notebook en sort, vers Colab). Introuvable (artefact expiré) : l'expérience s'arrête, sans tout rejouer.
+      - name: Dossier de travail repris (facultatif)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run=$(jq -r '.reprise_run // empty' "$COMMANDE")
+          if [ -n "$run" ]; then gh run download "$run" -R "$GITHUB_REPOSITORY" -D travail_repris; fi
 
       - name: Exécuter l'expérience
         env:

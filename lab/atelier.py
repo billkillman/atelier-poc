@@ -55,6 +55,7 @@ log = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
 REPRISES = ROOT / "reprises"   # reprises/<jour>/<sujet>/<étape>.json : étapes rédigées lors d'un run précédent
+TRAVAIL_REPRIS = ROOT / "travail_repris"   # <artefact>/<jour>/<sujet>/ : dossier de travail du run `reprise_run` de la commande
 OUTILS = ROOT / "tools" / "poc"
 
 
@@ -684,19 +685,43 @@ class Atelier:
 
     # ---------------------------------------------------------------- un POC
 
+    def reprise_complete(self) -> dict | None:
+        """Échelle complète seule : repart de l'itération validée par le run `reprise_run` de la commande, dont le job a
+        téléchargé le dossier de travail (des données : seul le notebook en sort, vers Colab). Code et échelle réduite ne
+        sont pas rejoués ; la revue finale, si : elle doit voir la nouvelle échelle complète. Le 2026-10-30, chaque essai
+        de l'échelle complète de joey-1 repassait par plus d'une heure de génération et de sandbox."""
+        run = self.c.get("reprise_run")
+        if not run:
+            return None
+        dossiers = sorted(TRAVAIL_REPRIS.glob(f"*/{self.jour}/{self.sid}"))
+        etat = read_json(dossiers[0] / "etat.json", None) if dossiers else None
+        if not etat or etat.get("statut") != "valide":
+            raise SystemExit(f"reprise impossible : dossier de travail du run {run} absent, ou POC non validé dans le sandbox")
+        source, k = dossiers[0], len(etat["iterations"])
+        shutil.copytree(source / "etapes", self.r.etapes, dirs_exist_ok=True, ignore=shutil.ignore_patterns(f"revue_{k}.json"))
+        for nom in ("execute_publique.ipynb", "requirements_sandbox.txt"):
+            shutil.copyfile(source / nom, self.dir / nom)
+        versions = [f"mise_en_forme_{k}_{j}" for j in range(MISES_EN_FORME, 0, -1)] + [f"code_{k}"]
+        code = next(read_json(self.r.etapes / f"{v}.json", None) for v in versions if (self.r.etapes / f"{v}.json").exists())
+        self.note(f"[poc] {self.sid} : reprise du run {run}, itération {k} : code et échelle réduite non rejoués")
+        return {"code": code, "iterations": etat["iterations"][:-1], "publique": etat["publique"], "privee": etat["privee"]}
+
     def un_poc(self, sans_execution: bool = False) -> dict:
         sid, plan, faits, travail = self.sid, self.plan, self.faits, self.dir
         etat = {"sujet_id": sid, "titre": plan["titre"], "niveau_sandbox": plan["niveau_sandbox"], "iterations": [], "statut": "echec",
                 "faits": faits}
-        code = self.r.etape("code_1", self.ecrire)
-        for k in range(1, self.conf["iterations_max"] + 1):
+        reprise = self.reprise_complete()
+        if reprise:
+            etat["iterations"] = reprise["iterations"]
+        code = reprise["code"] if reprise else self.r.etape("code_1", self.ecrire)
+        for k in range(len(etat["iterations"]) + 1, self.conf["iterations_max"] + 1):
             it = {"numero": k, "diagnostic": code.get("diagnostic", "")}
             etat["iterations"].append(it)
             motif, compte, pub, ban = None, "", {}, None
             # Lisibilité d'abord (deux passes au plus, sans exécution) : le notebook publié doit se lire comme un tutoriel.
             for j in range(1, MISES_EN_FORME + 1):
                 defauts = controler_lisibilite(code, plan)
-                if not defauts or controler_cellules(code, faits, plan):
+                if reprise or not defauts or controler_cellules(code, faits, plan):
                     break
                 self.note(f"[poc] {sid} itération {k} : mise en forme {j} ({len(defauts)} défaut(s) de lisibilité)")
                 code = self.r.etape(f"mise_en_forme_{k}_{j}", lambda: self.mettre_en_forme(code, defauts))
@@ -715,12 +740,13 @@ class Atelier:
                 break
             else:
                 t = self.conf["timeouts"]
-                pub = self.sandbox.executer(travail, "publique", t["publique"], t["cellule"])
+                pub = reprise["publique"] if reprise else self.sandbox.executer(travail, "publique", t["publique"], t["cellule"])
                 it["publique"] = {"ok": pub.get("ok"), "secondes": pub.get("secondes"), "erreur": (pub.get("erreur") or {}).get("nature")}
                 self.note(f"[poc] {sid} itération {k} : phase publique {'réussie' if pub.get('ok') else 'en échec'} ({pub.get('secondes')} s)")
                 erreurs = valider_execution(pub, None, plan, self.min_exemples())
                 if not erreurs:
-                    ban = self.sandbox.executer(travail, "privee", t["privee"], t["cellule"], modeles=modeles_par_taille(plan)["reduced"])
+                    ban = reprise["privee"] if reprise else self.sandbox.executer(travail, "privee", t["privee"], t["cellule"],
+                                                                                  modeles=modeles_par_taille(plan)["reduced"])
                     it["privee"] = {"ok": ban.get("ok"), "secondes": ban.get("secondes"), "erreur": (ban.get("erreur") or {}).get("nature"),
                                     "appels": ban.get("appels_service")}
                     self.note(f"[poc] {sid} itération {k} : phase privée {'réussie' if ban.get('ok') else 'en échec'} ({ban.get('secondes')} s)")
@@ -767,6 +793,7 @@ class Atelier:
                         f"- {x['description']} — correction attendue : {x['correction']}" for x in bloquants)
                     if complet:
                         etat["revue"] = revue
+            reprise = None   # une correction demandée ensuite repasse par le sandbox, comme toute itération
             etat["dernier_compte_rendu"] = compte[-4000:]
             if k == self.conf["iterations_max"]:
                 break
