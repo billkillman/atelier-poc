@@ -689,7 +689,9 @@ class Atelier:
         """Échelle complète seule : repart de l'itération validée par le run `reprise_run` de la commande, dont le job a
         téléchargé le dossier de travail (des données : seul le notebook en sort, vers Colab). Code et échelle réduite ne
         sont pas rejoués ; la revue finale, si : elle doit voir la nouvelle échelle complète. Le 2026-10-30, chaque essai
-        de l'échelle complète de joey-1 repassait par plus d'une heure de génération et de sandbox."""
+        de l'échelle complète de joey-1 repassait par plus d'une heure de génération et de sandbox. Avec une `correction`
+        (défaut que seule une relecture humaine a vu), le code est corrigé d'abord et l'échelle réduite rejouée, comme
+        toute correction ; les itérations permises repartent de là."""
         run = self.c.get("reprise_run")
         if not run:
             return None
@@ -703,18 +705,24 @@ class Atelier:
             shutil.copyfile(source / nom, self.dir / nom)
         versions = [f"mise_en_forme_{k}_{j}" for j in range(MISES_EN_FORME, 0, -1)] + [f"code_{k}"]
         code = next(read_json(self.r.etapes / f"{v}.json", None) for v in versions if (self.r.etapes / f"{v}.json").exists())
+        consigne = self.c.get("correction")
+        if consigne:
+            self.note(f"[poc] {self.sid} : reprise du run {run}, itération {k}, avec correction")
+            motif = "une relecture de l'exécution précédente a relevé un défaut que l'échelle réduite ne pouvait pas voir."
+            code = self.r.etape(f"code_{k + 1}", lambda: self.reparer(code, motif, consigne))
+            return {"code": code, "iterations": etat["iterations"]}
         self.note(f"[poc] {self.sid} : reprise du run {run}, itération {k} : code et échelle réduite non rejoués")
-        return {"code": code, "iterations": etat["iterations"][:-1], "publique": etat["publique"], "privee": etat["privee"]}
+        return {"code": code, "iterations": etat["iterations"][:-1], "sandbox": {"publique": etat["publique"], "privee": etat["privee"]}}
 
     def un_poc(self, sans_execution: bool = False) -> dict:
         sid, plan, faits, travail = self.sid, self.plan, self.faits, self.dir
         etat = {"sujet_id": sid, "titre": plan["titre"], "niveau_sandbox": plan["niveau_sandbox"], "iterations": [], "statut": "echec",
                 "faits": faits}
-        reprise = self.reprise_complete()
-        if reprise:
-            etat["iterations"] = reprise["iterations"]
-        code = reprise["code"] if reprise else self.r.etape("code_1", self.ecrire)
-        for k in range(len(etat["iterations"]) + 1, self.conf["iterations_max"] + 1):
+        depart = self.reprise_complete() or {}
+        etat["iterations"] = depart.get("iterations", [])
+        code = depart.get("code") or self.r.etape("code_1", self.ecrire)
+        reprise, dernier = depart.get("sandbox"), len(etat["iterations"]) + self.conf["iterations_max"]
+        for k in range(len(etat["iterations"]) + 1, dernier + 1):
             it = {"numero": k, "diagnostic": code.get("diagnostic", "")}
             etat["iterations"].append(it)
             motif, compte, pub, ban = None, "", {}, None
@@ -795,7 +803,7 @@ class Atelier:
                         etat["revue"] = revue
             reprise = None   # une correction demandée ensuite repasse par le sandbox, comme toute itération
             etat["dernier_compte_rendu"] = compte[-4000:]
-            if k == self.conf["iterations_max"]:
+            if k == dernier:
                 break
             if self.temps_restant() < self.conf["timeouts"]["publique"] + self.conf["timeouts"]["privee"] + 600:
                 etat["dernier_compte_rendu"] = "budget de temps épuisé. " + etat["dernier_compte_rendu"]
