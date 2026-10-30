@@ -68,9 +68,11 @@ if paquets:
             log.write("\\n[atelier] dépendance incompatible avec le Python de Colab (%d.%d) : environnement Python %s "
                       "recréé avec les paquets du sandbox\\n" % (sys.version_info[0], sys.version_info[1], {python_sandbox!r}))
             log.flush()
+            # Le gel tel quel, sans résolution (--no-deps) : le sandbox peut tolérer une incohérence que uv refuserait
+            # (le 2026-10-30 : torchaudio 2.11.1 de l'image avec le torch 2.10.0 imposé par qev, inutilisé par le notebook).
+            uvpip = [py, "-m", "uv", "pip", "install", "-q", "--python", str(venv / "bin" / "python")]
             etapes = ([py, "-m", "pip", "install", "-q", "uv"], [py, "-m", "uv", "venv", "-q", "-p", {python_sandbox!r}, str(venv)],
-                      [py, "-m", "uv", "pip", "install", "-q", "--python", str(venv / "bin" / "python"),
-                       "-r", "requirements_colab.txt", "nbclient", "ipykernel"],
+                      uvpip + ["--no-deps", "-r", "requirements_colab.txt"], uvpip + ["nbclient", "ipykernel"],
                       [str(venv / "bin" / "python"), "-m", "ipykernel", "install", "--sys-prefix", "--name", "python3"])
             ok = all(subprocess.call(c, cwd=r, stdout=log, stderr=subprocess.STDOUT) == 0 for c in etapes)
         py = str(venv / "bin" / "python")
