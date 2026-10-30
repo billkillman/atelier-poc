@@ -6,7 +6,7 @@ poc:
   min_exemples_evaluation: 100
   min_enregistrements_evaluation: 20
   reprises_techniques: 1
-  duree_max_minutes: 105
+  duree_max_minutes: 180
   image: atelier-sandbox:latest
   timeouts:
     publique: 900

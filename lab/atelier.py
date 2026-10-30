@@ -592,10 +592,15 @@ class Atelier:
         return self.conf["duree_max_minutes"] * 60 - (time.time() - self.t0)
 
     def sandbox_txt(self) -> str:
+        unite = "enregistrements" if self.plan.get("type_exemples") == "enregistrements_longs" else "exemples"
+        evaluation = (f"\nÉvaluation : au moins {self.min_exemples()} {unite} de test, à l'échelle réduite comme à l'échelle "
+                      "complète ; en deçà, l'exécution est refusée (non concluante). Pour tenir les délais, allège plutôt "
+                      "l'entraînement, la validation ou le coût par exemple que le jeu de test.")
         if self.colab is None or self.colab.pret:
-            return self.sandbox.description(self.conf)
+            return self.sandbox.description(self.conf) + evaluation
         return self.sandbox.description(self.conf, f"Aujourd'hui, le GPU est indisponible ({self.colab.raison}) : une échelle "
-                                                   "complète qui le demande ne sera pas exécutée, le POC sera publié à l'échelle réduite.")
+                                                   "complète qui le demande ne sera pas exécutée, le POC sera publié à l'échelle "
+                                                   "réduite.") + evaluation
 
     # ---------------------------------------------------------------- étapes LLM
 
