@@ -74,11 +74,16 @@ if paquets:
             etapes = ([py, "-m", "pip", "install", "-q", "uv"], [py, "-m", "uv", "venv", "-q", "-p", {python_sandbox!r}, str(venv)],
                       uvpip + ["--no-deps", "-r", "requirements_colab.txt"], uvpip + ["nbclient", "ipykernel"])
             ok = all(subprocess.call(c, cwd=r, stdout=log, stderr=subprocess.STDOUT) == 0 for c in etapes)
-        # Noyau « python3 » de cet environnement, sans la configuration IPython de Colab : elle impose sa classe de noyau
-        # (google.colab._kernel.Kernel), introuvable ici (le 2026-10-30 : « Kernel died before replying to kernel_info »).
+        # Noyau « python3 » de cet environnement, sans la configuration IPython de Colab (/etc/ipython) : elle impose sa
+        # classe de noyau et ses extensions (google.colab), introuvables ici (le 2026-10-30 : « Kernel died before replying
+        # to kernel_info », puis « No module named 'google' ») ; le noyau tourne alors comme dans le sandbox.
+        lancement = ("import sys, IPython.core.application as a\\n"
+                     "if sys.path and sys.path[0] == '':\\n    del sys.path[0]\\n"
+                     "a.SYSTEM_CONFIG_DIRS.clear()\\n"
+                     "from ipykernel import kernelapp\\nkernelapp.launch_new_instance()\\n")
         noyau = venv / "share" / "jupyter" / "kernels" / "python3"
         noyau.mkdir(parents=True, exist_ok=True)
-        (noyau / "kernel.json").write_text(json.dumps({{"argv": [str(venv / "bin" / "python"), "-m", "ipykernel_launcher", "-f",
+        (noyau / "kernel.json").write_text(json.dumps({{"argv": [str(venv / "bin" / "python"), "-c", lancement, "-f",
             "{{connection_file}}", "--IPKernelApp.kernel_class=ipykernel.ipkernel.IPythonKernel"], "display_name": "Python",
             "language": "python"}}))
         (r / ".ipython_sandbox").mkdir(exist_ok=True)
