@@ -2,40 +2,6 @@
  "version": 1,
  "pocs": [
   {
-   "jour": "2026-10-30",
-   "sujet_id": "baseten-joey-1-decision-model",
-   "depot": "20261030_typed_decision_model_camembert_hierarchical_intent",
-   "titre": "Un modèle de décision typé entraîné pour la calibration (joey-1) rattrape-t-il un classifieur CamemBERT bien réglé sur des intentions françaises hiérarchisées ?",
-   "statut": "echec",
-   "cause": "technique",
-   "raison": "modèle en échec : poc_revue:baseten-joey-1-decision-model : success — Your organization has disabled Claude subscription access for Claude Code · Use an Anthropic API key instead, or ask your admin to enable access 403",
-   "duree_minutes": 38.6,
-   "consommation": {
-    "claude:poc_code:baseten-joey-1-decision-model": {
-     "appels": 1,
-     "echecs": 0,
-     "secondes": 713.2,
-     "cout_equivalent_usd": 1.7216,
-     "recherches_web": 0
-    },
-    "claude:poc_reparation:baseten-joey-1-decision-model": {
-     "appels": 1,
-     "echecs": 0,
-     "secondes": 233.3,
-     "cout_equivalent_usd": 1.0661,
-     "recherches_web": 0
-    },
-    "claude:poc_revue:baseten-joey-1-decision-model": {
-     "appels": 4,
-     "echecs": 3,
-     "secondes": 76.4,
-     "cout_equivalent_usd": 0.2879,
-     "recherches_web": 0
-    }
-   },
-   "tentatives": 1
-  },
-  {
    "jour": "2026-10-27",
    "sujet_id": "modeles-decision-typees-audit-independant-d3-ultra",
    "depot": "20261027_typed_decision_slm_camembert_intents",

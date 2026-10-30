@@ -50,7 +50,7 @@ JETON = "~/.config/colab-cli/token.json"
 # Une dépendance qui refuse le Python de Colab (le 2026-10-30, qev exige 3.12, Colab est en 3.13) : environnement
 # recréé dans la version du sandbox, avec ses paquets (requirements_colab.txt, `gel_pour_colab`), où le code a été validé.
 _LANCEUR = """
-import importlib.util, os, pathlib, re, subprocess, sys
+import importlib.util, json, os, pathlib, re, subprocess, sys
 for k in [k for k in os.environ if re.search(r"TBE_|CRED|TOKEN|SECRET|KEY|PASSWORD|AUTH", k, re.I)]:
     del os.environ[k]
 r = pathlib.Path({racine!r})
@@ -72,12 +72,19 @@ if paquets:
             # (le 2026-10-30 : torchaudio 2.11.1 de l'image avec le torch 2.10.0 imposé par qev, inutilisé par le notebook).
             uvpip = [py, "-m", "uv", "pip", "install", "-q", "--python", str(venv / "bin" / "python")]
             etapes = ([py, "-m", "pip", "install", "-q", "uv"], [py, "-m", "uv", "venv", "-q", "-p", {python_sandbox!r}, str(venv)],
-                      uvpip + ["--no-deps", "-r", "requirements_colab.txt"], uvpip + ["nbclient", "ipykernel"],
-                      [str(venv / "bin" / "python"), "-m", "ipykernel", "install", "--sys-prefix", "--name", "python3"])
+                      uvpip + ["--no-deps", "-r", "requirements_colab.txt"], uvpip + ["nbclient", "ipykernel"])
             ok = all(subprocess.call(c, cwd=r, stdout=log, stderr=subprocess.STDOUT) == 0 for c in etapes)
+        # Noyau « python3 » de cet environnement, sans la configuration IPython de Colab : elle impose sa classe de noyau
+        # (google.colab._kernel.Kernel), introuvable ici (le 2026-10-30 : « Kernel died before replying to kernel_info »).
+        noyau = venv / "share" / "jupyter" / "kernels" / "python3"
+        noyau.mkdir(parents=True, exist_ok=True)
+        (noyau / "kernel.json").write_text(json.dumps({{"argv": [str(venv / "bin" / "python"), "-m", "ipykernel_launcher", "-f",
+            "{{connection_file}}", "--IPKernelApp.kernel_class=ipykernel.ipkernel.IPythonKernel"], "display_name": "Python",
+            "language": "python"}}))
+        (r / ".ipython_sandbox").mkdir(exist_ok=True)
         py = str(venv / "bin" / "python")
         env.update(PATH=str(venv / "bin") + os.pathsep + env.get("PATH", ""), VIRTUAL_ENV=str(venv),
-                   JUPYTER_PATH=str(venv / "share" / "jupyter"))   # noyau « python3 » de cet environnement d'abord
+                   JUPYTER_PATH=str(venv / "share" / "jupyter"), IPYTHONDIR=str(r / ".ipython_sandbox"))
     if not ok:
         (r / "fin.code").write_text("97")
         sys.exit()
