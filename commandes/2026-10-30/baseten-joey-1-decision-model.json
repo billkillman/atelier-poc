@@ -1,0 +1,432 @@
+{
+ "version": 1,
+ "jour": "2026-10-30",
+ "sujet_id": "baseten-joey-1-decision-model",
+ "depot": "20261030_typed_decision_model_camembert_hierarchical_intent",
+ "fiche": {
+  "sujet_id": "baseten-joey-1-decision-model",
+  "titre": "joey-1 : un modèle de décision ouvert de 2 Md sous licence MIT, rapide et quasi gratuit, mais anglais seul et calibration non mesurée",
+  "en_une_phrase": "Baseten publie joey-1, modèle de 2 Md sous licence MIT qui rend des probabilités au lieu de texte, à 20 ms et 0,01 $/M tokens ; chiffres auto-déclarés, anglais seul, calibration non mesurée.",
+  "probleme": "Pour router un ticket, filtrer un message ou noter une urgence, on interroge souvent un LLM génératif, puis on analyse le texte qu'il rédige. C'est lent et coûteux, et on n'obtient qu'une réponse, sans la probabilité des alternatives : impossible de fixer un seuil de confiance fiable. Le classifieur fine-tuné est rapide, mais il exige des données annotées pour chaque tâche. Les « modèles de décision typés » (Jev de TypeSafe AI, Clef de Cloudflare…) visent l'entre-deux. Jusqu'ici, ils étaient plutôt de taille moyenne (9 à 27 Md), et l'audit du 27 octobre jugeait leur confiance trompeuse.",
+  "comment_ca_marche": "joey-1 est un **modèle de décision typé** : il ne rédige pas de texte. Il rend une réponse d'un type fixé à l'avance, avec une probabilité pour chaque réponse possible.\n\n1. **Entrée** : l'application envoie un *état*, c'est-à-dire le texte ou l'image à juger (un ticket, par exemple), et une ou plusieurs questions. Chaque question a l'un de trois types : *choix* entre des options nommées (« quelle équipe ? »), *oui/non* (le modèle renvoie la probabilité du oui), ou *score* sur des niveaux ordonnés (urgence faible à forte).\n2. **Lecture unique** : le modèle lit l'entrée une seule fois. Cette phase s'appelle le *prefill*. Toutes les questions réutilisent ce préfixe commun, donc une question de plus coûte peu.\n3. **Sortie** : en un seul passage dans le réseau, le modèle donne une probabilité pour chaque option de chaque question. Il dispose aussi d'une option « je ne sais pas », apprise à l'entraînement.\n4. **Seuil** : l'application fixe un seuil de confiance. En dessous, la demande remonte vers elephant-1 (9 Md), mammoth-1 (27 Md) ou un humain.\n\n**Construction.** Base Labs, le labo de Baseten, a ré-entraîné entièrement Qwen3.5-2B, un petit LLM d'Alibaba. Son encodeur d'images reste gelé. Dans certaines couches, un masque « bidirectionnel par blocs » laisse chaque mot voir aussi les mots qui le suivent dans son bloc, comme dans un encodeur de type BERT. Un LLM classique ne voit que ce qui précède. L'objectif d'entraînement ajoute à l'erreur de classification un **terme de Brier**, qui pénalise l'écart entre la probabilité annoncée et le résultat réel. Il doit rendre les probabilités *calibrées* : une réponse annoncée à 80 % est juste 8 fois sur 10.\n\n**Ce qui est nouveau** : pas le principe, puisque Clef et Jev existent déjà, mais la taille (2 Md) et le prix. joey-1 partage les données et l'API de elephant-1 et mammoth-1, sortis une semaine plus tôt.",
+  "demarche_experimentale": "Il n'y a ni article ni évaluation indépendante : seulement la fiche du modèle et le billet de Baseten.\n\n- **Entraînement** : 6,21 M exemples de décision (58,3 % compétences de décision générales, 16,1 % sécurité et abstention, 16,1 % jugement et domaines experts, 9,5 % données publiques). Une époque, sur 16 GPU H100.\n- **Évaluation** : le *Jev Decision Index 0.4*, un classement communautaire sur Hugging Face (230 modèles, 5 domaines), sur sa partie publique. S'y ajoute une réplique faite par Baseten de l'*Artificial Analysis Decision Index*. Les scores des concurrents sont repris de la fiche de Baseten.\n- **Latence** : valeur médiane (P50) mesurée de bout en bout sur la plateforme Baseten, pour une requête moyenne de 2 000 tokens.\n- **Absents** : comparaison à un classifieur fine-tuné, mesure de calibration, langues autres que l'anglais, taille des jeux de test.",
+  "resultats": [
+   {
+    "metrique": "Jev Decision Index 0.4, partie publique (plus haut = mieux)",
+    "valeur": "63,30",
+    "comparaison": "Clef 27 Md : 61,71 ; Jev 1.14 : 60,70 ; Perplexity Decider Flash 4 Md : 60,06 ; elephant-1 9 Md : 72,24",
+    "conditions": "Auto-déclaré par Baseten ; scores des concurrents repris de sa fiche",
+    "citation": "On the same split, Cloudflare's 27B Clef scores 61.71 and Jev 1.14 scores 60.70."
+   },
+   {
+    "metrique": "Rang au Jev Decision Index 0.4 public",
+    "valeur": "37e sur 230",
+    "comparaison": "Meilleur modèle de moins de 4 Md",
+    "conditions": "Classement communautaire Hugging Face, auto-déclaré",
+    "citation": "On the Jev Decision Index 0.4 public split, joey-1 scores 63.30. That ranks #37 of 230 models and is the top score under 4B."
+   },
+   {
+    "metrique": "Réplique de l'Artificial Analysis Decision Index (plus haut = mieux)",
+    "valeur": "62,9",
+    "comparaison": "mammoth-1 : 65,9",
+    "conditions": "Réplique interne de Baseten, non officielle",
+    "citation": "On Baseten's replica of the Artificial Analysis Decision Index, joey-1 scores 62.9, versus 65.9 for mammoth-1."
+   },
+   {
+    "metrique": "Latence médiane P50 de bout en bout (plus bas = mieux)",
+    "valeur": "20 ms",
+    "comparaison": "elephant-1 : 49 ms",
+    "conditions": "Requête moyenne de 2 000 tokens, plateforme Baseten",
+    "citation": "Baseten reports a P50 end-to-end latency of 20 ms for an average 2,000-token request. That is about 2.5x faster than elephant-1 (49 ms)."
+   },
+   {
+    "metrique": "Prix API par million de tokens d'entrée",
+    "valeur": "0,01 $",
+    "comparaison": "elephant-1 : 0,035 $ ; mammoth-1 : 0,10 $",
+    "conditions": "Baseten Model APIs ; sortie et entrée en cache à 0 $",
+    "citation": "Model APIs charge $0.01 per 1M input tokens; output and cached input are listed at $0.00. elephant-1 costs $0.035 and mammoth-1 costs $0.10."
+   }
+  ],
+  "limites": [
+   "Tous les chiffres sont auto-déclarés par Baseten, y compris ceux des concurrents. Le « 5 fois plus rapide que les modèles de décision comparables » ne nomme pas ces modèles.",
+   "Calibration affirmée mais jamais mesurée : aucune erreur de calibration ni score de Brier publié. Le blog AnyDecisionModel rappelle que la confiance mesure la concentration des probabilités, pas la justesse de la réponse.",
+   "La fiche Hugging Face n'indique que l'anglais : rien sur le français. Aucune comparaison à un classifieur fine-tuné, alors que l'audit du 27 octobre en plaçait un devant ce type de modèle.",
+   "Contexte limité à 16 384 tokens, et les requêtes plus longues sont refusées : problème pour les e-mails avec pièces jointes. Mémoire GPU non précisée. La fiche annonce 2 Md de paramètres, ses métadonnées en indiquent 3 Md."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "63,30",
+    "libelle": "Jev Decision Index 0.4 public, meilleur score sous 4 Md (auto-déclaré)"
+   },
+   {
+    "valeur": "20 ms",
+    "libelle": "Latence médiane bout en bout, requête de 2 000 tokens, plateforme Baseten"
+   },
+   {
+    "valeur": "0,01 $",
+    "libelle": "Prix par million de tokens d'entrée, contre 0,10 $ pour mammoth-1"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "joey-1 est un modèle de 2 Md de paramètres, post-entraîné à partir de Qwen3.5-2B.",
+    "citation": "a 2B parameter decision model post-trained from Qwen3.5-2B"
+   },
+   {
+    "affirmation": "Il rend une étiquette et une probabilité calibrée au lieu de texte ; ses poids sont sur Hugging Face sous licence MIT.",
+    "citation": "The joey-1 decision model returns a label and a calibrated probability instead of generated text. [...] Baseten prices it at $0.01 per million input tokens, with open weights on Hugging Face under MIT."
+   },
+   {
+    "affirmation": "Il obtient 63,30 sur la partie publique du Jev Decision Index 0.4 (37e sur 230), meilleur score sous 4 Md, selon Baseten.",
+    "citation": "On the Jev Decision Index 0.4 public split, joey-1 scores 63.30. That ranks #37 of 230 models and is the top score under 4B."
+   },
+   {
+    "affirmation": "Les scores sont auto-déclarés par Baseten.",
+    "citation": "All scores below are self-reported on Baseten's model card."
+   },
+   {
+    "affirmation": "L'objectif d'entraînement combine entropie croisée et terme de calibration de Brier, avec une option « je ne sais pas » apprise.",
+    "citation": "Objective: cross-entropy plus a Brier calibration term, with a trained \"I don't know\" option."
+   },
+   {
+    "affirmation": "Les requêtes dépassant la longueur d'entraînement sont refusées, pas tronquées.",
+    "citation": "Requests longer than the trained length limits are refused, not truncated."
+   },
+   {
+    "affirmation": "Arize Phoenix 20.27.0 prend en charge les modèles de décision Jev dans ses évaluateurs de classification Python.",
+    "citation": "evals: support TypeSafe Jev decision models in Python classification evaluators (#16953)"
+   },
+   {
+    "affirmation": "La confiance rendue par AnyDecisionModel mesure la concentration des probabilités, pas la justesse de la réponse.",
+    "citation": "It measures how concentrated the probabilities are, not whether the answer is right, so check the error rate on your own data before you pick a threshold."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision typé",
+    "definition": "Modèle qui ne génère pas de texte : il répond à une question de type fixé (choix, oui/non, score) en donnant une probabilité pour chaque réponse possible."
+   },
+   {
+    "terme": "Calibration",
+    "definition": "Accord entre la confiance annoncée et la justesse réelle : un modèle bien calibré qui annonce 80 % a raison 8 fois sur 10."
+   },
+   {
+    "terme": "Score de Brier",
+    "definition": "Écart quadratique moyen entre la probabilité prédite et le résultat réel (0 ou 1). Plus bas = mieux ; il pénalise l'excès de confiance."
+   },
+   {
+    "terme": "ECE",
+    "definition": "Expected Calibration Error : écart moyen entre la confiance annoncée et la précision observée, mesuré par tranches de confiance. Plus bas = mieux."
+   },
+   {
+    "terme": "Prefill",
+    "definition": "Phase où le modèle lit et encode toute l'entrée avant de répondre. joey-1 la fait une seule fois pour toutes les questions."
+   },
+   {
+    "terme": "Masque bidirectionnel par blocs",
+    "definition": "Règle d'attention qui laisse les mots d'un même bloc se voir dans les deux sens, comme un encodeur BERT, au lieu de ne voir que le passé."
+   },
+   {
+    "terme": "Jev Decision Index",
+    "definition": "Classement communautaire sur Hugging Face qui compare les modèles de décision sur cinq domaines (langue, outils, recherche et classification, etc.)."
+   },
+   {
+    "terme": "P50",
+    "definition": "Latence médiane : la moitié des requêtes est plus rapide que cette valeur."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Decisions for a penny: introducing joey-1, our fastest decision model (Baseten)",
+    "url": "https://baseten.co/blog/decisions-for-a-penny-introducing-joey-1/",
+    "type": "primaire",
+    "date": "2026-10"
+   },
+   {
+    "titre": "baselabs/joey-1 — fiche du modèle (Hugging Face)",
+    "url": "https://huggingface.co/baselabs/joey-1",
+    "type": "primaire",
+    "date": ""
+   },
+   {
+    "titre": "Introducing AnySpeechRecognizer and AnyDecisionModel (Hugging Face Blog)",
+    "url": "https://huggingface.co/blog/anydecisionmodel",
+    "type": "primaire",
+    "date": "2026-10-29"
+   },
+   {
+    "titre": "Arize-ai/phoenix arize-phoenix v20.27.0",
+    "url": "https://github.com/Arize-ai/phoenix/releases/tag/arize-phoenix-v20.27.0",
+    "type": "primaire",
+    "date": "2026-10-29"
+   },
+   {
+    "titre": "Baseten Releases joey-1, a 2B Decision Model at $0.01 per 1M Tokens (MarkTechPost)",
+    "url": "https://www.marktechpost.com/2026/10/29/baseten-joey-1-2b-decision-model/",
+    "type": "secondaire",
+    "date": "2026-10-29"
+   },
+   {
+    "titre": "Blog Baseten (index des billets)",
+    "url": "https://www.baseten.co/blog/",
+    "type": "primaire",
+    "date": ""
+   }
+  ],
+  "date_publication": {
+   "date": "2026-10-29",
+   "source": "marktechpost.com"
+  }
+ },
+ "plan": {
+  "titre": "Un modèle de décision typé entraîné pour la calibration (joey-1) rattrape-t-il un classifieur CamemBERT bien réglé sur des intentions françaises hiérarchisées ?",
+  "hypothese": "En zéro-shot, avec décision hiérarchique (scénario puis intention) et moyenne sur deux ordres d'options, joey-1 atteint un macro-F1 à moins de 5 points d'un CamemBERT-base fine-tuné correctement (10 époques, sélection sur validation), avec une ECE < 0,05 après recalibration, un accord > 90 % sous permutation des options et des erreurs de parent < 20 %.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné (réglé)",
+   "description": "Classifieur à tête linéaire sur 60 intentions, entraîné plus longtemps que dans l'expérience antérieure, avec sélection de l'époque sur la validation et recalibration par température.",
+   "implementation": "transformers AutoModelForSequenceClassification sur almanach/camembert-base ; lr 5e-5, 10 époques, batch 32, warmup 10 %, poids de décroissance 0,01, meilleur point de contrôle par macro-F1 de validation ; température ajustée sur validation ; parent déduit du préfixe de l'étiquette.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "joey-1 décision typée hiérarchique",
+   "description": "Modèle de décision de 2 Md (post-entraîné de Qwen3.5-2B) qui rend une probabilité par option en une passe ; interrogé en deux questions de choix : scénario puis intention parmi les enfants, probabilités multipliées, moyennées sur deux ordres d'options.",
+   "implementation": "Paquet qev (DecisionEngine, SystemOneRequest) avec baselabs/joey-1 sur GPU ; questions de type choice avec criteria = libellés lisibles (label_text) ; deux ordres (direct et inversé) moyennés ; température de recalibration unique par niveau ajustée sur validation. Aucun entraînement. Diagnostic du biais d'ordre : distribution des positions choisies et accord restreint aux cas corrects.",
+   "modeles_hf": [
+    "baselabs/joey-1"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen3-0.6B"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "text, label, label_text (parent = préfixe avant le premier « _ »)",
+   "representativite": "Seul jeu français chargeable offrant un arbre à deux niveaux, 60 classes proches et libellés en clair ; même jeu que l'expérience antérieure, donc résultats comparables ; permet de mesurer cohérence parent/enfant, macro-F1, ECE et stabilité à l'ordre.",
+   "ecarts_donnees_reelles": "Énoncés d'assistant vocal très courts, pas de services financiers ; 60 classes au lieu de ~300 ; ni e-mails ni pièces jointes ; joey-1 annoncé anglais seul ; la conclusion reste indicative.",
+   "jeux_explores": [
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "60 intentions en arbre à 2 niveaux, libellés lisibles, 11,5k/2k/3k exemples.",
+     "decision": "retenu",
+     "raison": "Seul arbre français chargeable ; comparable à l'expérience antérieure."
+    },
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "77 intentions de services financiers proches, 10k/3k.",
+     "decision": "ecarte",
+     "raison": "Pas d'arbre officiel, licence Hub vide, libellés à joindre depuis la version anglaise ; piste pour une suite."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "~110 intentions déséquilibrées, bon pour les classes rares.",
+     "decision": "ecarte",
+     "raison": "Étiquettes sans noms, appariement domaine/intention non vérifié, licence floue."
+    },
+    {
+     "nom": "mteb/banking77",
+     "url": "https://huggingface.co/datasets/mteb/banking77",
+     "acces": "hub_libre",
+     "adequation": "Version anglaise avec libellés, isole l'effet de la langue.",
+     "decision": "ecarte",
+     "raison": "Anglais, pas de hiérarchie."
+    },
+    {
+     "nom": "mteb/amazon_reviews_multi",
+     "url": "https://huggingface.co/datasets/mteb/amazon_reviews_multi",
+     "acces": "hub_libre",
+     "adequation": "Avis longs, 5 notes ordinales.",
+     "decision": "ecarte",
+     "raison": "Seulement 5 classes, sans hiérarchie, licence floue."
+    },
+    {
+     "nom": "Mozilla/query-intent-detection-dataset-french",
+     "url": "https://huggingface.co/datasets/Mozilla/query-intent-detection-dataset-french",
+     "acces": "hub_libre",
+     "adequation": "Garde-fou binaire en français.",
+     "decision": "ecarte",
+     "raison": "Deux classes, hors question centrale."
+    },
+    {
+     "nom": "E-mails synthétiques de relation client (EDF R&D, PFIA 2025)",
+     "url": "https://pfia2025.u-bourgogne.fr/Articles/Docs/G%C3%A9n%C3%A9ration%20dune%20base%20de%20courriers%20%C3%A9lectroniques%20synth%C3%A9tiques%20par%20des%20grands%20mod%C3%A8les%20de%20langue%20dans%20le%20domaine%20de%20la%20relation%20client.pdf",
+     "acces": "sur_demande",
+     "adequation": "~1 600 e-mails français de relation client, le plus proche du canal réel.",
+     "decision": "ecarte",
+     "raison": "Publication du jeu non confirmée ; à demander aux auteurs."
+    }
+   ]
+  },
+  "metriques": [
+   "macro_f1",
+   "accuracy",
+   "parent_accuracy",
+   "parent_error_rate",
+   "expected_calibration_error",
+   "brier_score",
+   "permutation_agreement",
+   "p95_latency_ms"
+  ],
+  "metrique_principale": "macro_f1",
+  "sens": "max",
+  "protocole": "Évaluation sur le split test, sous-échantillonné à 1 500 énoncés (mêmes que l'expérience antérieure ; 200 en réduit). Entraînement de la référence sur le split train (11 514 énoncés) ; le split validation (2 033) sert à choisir l'époque et à ajuster la température de recalibration des deux approches. ECE à 15 intervalles. Intervalles de confiance à 95 % par bootstrap (1 000 rééchantillonnages) et test apparié (bootstrap sur les différences de macro-F1, McNemar sur l'exactitude). Accord sous permutation : ordres direct, inversé et un tirage aléatoire. Latence P95 mesurée par énoncé en batch 1 sur le matériel d'exécution. Brier calculé sur la distribution complète de 60 classes sans répartition uniforme artificielle.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "joey-1 (2 à 3 Md) dépasse 1 Md et la RAM de 6,2 Go : en réduit, un substitut Qwen/Qwen3-0.6B note les options par log-vraisemblance dans le même protocole hiérarchique, pour valider le code seulement (il n'est pas un modèle de décision) ; référence entraînée sur ~1 000 exemples, 1 époque, 200 énoncés de test ; le code bascule sur qev dès qu'un GPU est disponible.",
+  "dependances": [
+   "qev"
+  ],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte du message ou de l'e-mail, anonymisé"
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif (niveau parent) validé"
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif (niveau enfant) validé"
+    },
+    {
+     "colonne": "reason_description",
+     "type": "string",
+     "description": "Libellé en clair et description de chaque classe, pour l'interrogation en langage naturel"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception, pour le découpage temporel"
+    },
+    {
+     "colonne": "channel",
+     "type": "string",
+     "description": "Canal (e-mail, chat, formulaire)"
+    }
+   ],
+   "volume_conseille": "Au moins 5 000 messages annotés, dont ≥ 20 par sous-motif pour les classes évaluées et un échantillon de test de 1 000 messages minimum.",
+   "metriques_metier": "Macro-F1 sous-motif, exactitude du motif, taux d'incohérence motif/sous-motif, ECE, couverture à précision fixée (≥ 95 %) avec seuil d'escalade, latence P95, coût par 1 000 messages.",
+   "garde_fous": "Pas de décision automatique sans seuil validé sur données internes ; la confiance du modèle mesure la concentration des probabilités, pas la justesse ; revue humaine des classes à fort enjeu ; données hébergées en environnement maîtrisé, aucun envoi vers une API externe.",
+   "prescriptions": [
+    "Annotation des motifs et sous-motifs par au moins deux annotateurs sur un sous-ensemble de 500 messages, avec accord inter-annotateurs (kappa) rapporté.",
+    "Au moins 20 exemples par sous-motif en entraînement et 5 en test ; classes rares signalées séparément.",
+    "Découpage temporel (entraînement antérieur au test) et par client pour éviter les fuites ; au moins 6 mois couverts pour la saisonnalité.",
+    "Texte en français UTF-8, longueur inférieure à 16 000 tokens ; pièces jointes exclues ou converties en texte, la longueur maximale du modèle étant rejetée et non tronquée.",
+    "Anonymisation des noms, IBAN, numéros de carte et adresses avant extraction ; exclusion des messages juridiques ou contentieux sensibles.",
+    "Libellés et descriptions de classes fournis et figés avant l'évaluation, taxonomie versionnée.",
+    "Distribution réelle des classes conservée dans le test (pas de rééquilibrage) pour que l'ECE reste interprétable."
+   ],
+   "preparation": "Extraire les messages entrants d'un ou plusieurs canaux avec le motif et le sous-motif validés par un conseiller, joindre la description officielle de chaque classe, filtrer les doublons, les messages vides et les réponses automatiques, puis échantillonner par strate de sous-motif en gardant un test non rééquilibré. Découper dans le temps puis par client."
+  },
+  "duree_estimee_minutes": 150,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "baselabs/joey-1": {
+    "id": "baselabs/joey-1",
+    "sha": "9efbe485efbed9598dfca5294cbbe8da00e21908",
+    "tache": "text-classification",
+    "bibliotheque": "transformers",
+    "parametres": 2721801024,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   },
+   "Qwen/Qwen3-0.6B": {
+    "id": "Qwen/Qwen3-0.6B",
+    "sha": "c1899de289a04d12100db370d81485cdf75e47ca",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 751632384,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "splits": [
+    "train",
+    "test",
+    "validation"
+   ],
+   "licence": "apache-2.0",
+   "colonnes": {
+    "id": "Value",
+    "label": "Value",
+    "label_text": "Value",
+    "text": "Value",
+    "lang": "Value"
+   },
+   "exemple": {
+    "id": "1",
+    "label": "alarm_set",
+    "label_text": "alarm_set",
+    "text": "réveille-moi à neuf heures du matin le vendredi",
+    "lang": "fr"
+   },
+   "lignes": {
+    "train": 11514,
+    "test": 2974,
+    "validation": 2033
+   }
+  },
+  "paquets": {
+   "qev": {
+    "paquet": "qev",
+    "derniere_version": "0.2.1",
+    "licence": ""
+   }
+  }
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

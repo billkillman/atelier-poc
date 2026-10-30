@@ -486,7 +486,17 @@ def resume_poc(plan: dict, etat: dict, res: dict, revue: dict) -> dict:
                            "ic95": (a.get("ci95") or {}).get(mp)} for a in res["approaches"]],
             "n_exemples": res["dataset"]["n_examples"], "jeu": res["dataset"]["name"], "synthese": synthese,
             "conclusion": revue["conclusion"], "confiance": revue["confiance"], "reproduit_la_source": revue["reproduit_la_source"],
-            "reserves": [x["description"] for x in revue["problemes"] if x["gravite"] == "majeur"]}
+            # Aperçu dans l'application : verdict court, libellé lisible de la métrique, réserves écrites pour le lecteur.
+            "en_bref": revue.get("en_bref") or "",
+            "libelle_metrique": (livrable.metriques_lisibles(etat.get("code") or {}, res).get(mp) or {}).get("libelle")
+                                or (res.get("metric_labels") or {}).get(mp) or mp,
+            "reserves": livrable.pour_le_lecteur(revue, "majeur")}
+
+
+def cause_echec(etat: dict) -> str:
+    """« technique » (panne du sandbox) : relancé automatiquement ; « methode » (code, validation, revue) : définitif."""
+    it = etat["iterations"][-1] if etat["iterations"] else {}
+    return "technique" if it.get("infrastructure") else "methode"
 
 
 def raison_echec(etat: dict) -> str:
@@ -839,16 +849,17 @@ class Atelier:
             if etat["statut"] == "valide":
                 resultat = {**base, **self.livrer(etat)}
             else:
-                resultat = {**base, "statut": etat["statut"], "iterations": len(etat["iterations"]), "raison": raison_echec(etat)}
+                resultat = {**base, "statut": etat["statut"], "iterations": len(etat["iterations"]), "raison": raison_echec(etat),
+                            "cause": cause_echec(etat)}
         except LivrableNonNeutre as e:  # garde-fou : jamais publié avec un terme qui rattacherait le dépôt à son origine
             self.note(f"[poc] livrable non publiable : {e}")
-            resultat = {**base, "statut": "echec", "raison": f"livrable non neutre : {str(e)[:220]}"}
+            resultat = {**base, "statut": "echec", "cause": "methode", "raison": f"livrable non neutre : {str(e)[:220]}"}
         except llm.QuotaError as e:
             self.note(f"[poc] quota du modèle atteint : {e}")
-            resultat = {**base, "statut": "non_traite", "raison": "quota du modèle atteint : à relancer"}
+            resultat = {**base, "statut": "non_traite", "cause": "technique", "raison": "quota du modèle atteint : à relancer"}
         except llm.LLMError as e:  # modèle indisponible, authentification, réponse illisible après les tentatives
             self.note(f"[poc] modèle en échec : {e}")
-            resultat = {**base, "statut": "echec", "raison": f"modèle en échec : {str(e)[:200]}"}
+            resultat = {**base, "statut": "echec", "cause": "technique", "raison": f"modèle en échec : {str(e)[:200]}"}
         resultat.update(duree_minutes=round((time.time() - self.t0) / 60, 1), consommation=llm.COMPTA.resume())
         write_json(self.dir / "resultat.json", resultat)
         (self.dir / "journal.log").write_text("\n".join(self.r.journal) + "\n", encoding="utf-8")
@@ -906,16 +917,37 @@ def maj_index(racine: Path, res: dict) -> None:
     write_json(chemin, index)
 
 
-def lister(racine: Path) -> list[str]:
-    """Commandes à exécuter : sans résultat définitif dans l'index (valide ou échec)."""
+def a_relancer(entree: dict, reprises: int) -> bool:
+    """Échec technique (panne, interruption, quota, publication) : relancé `reprises` fois au plus ; échec de méthode
+    (code, validation, revue bloquante, livrable non neutre) : jamais."""
+    technique = entree.get("statut") == "non_traite" or entree.get("cause") == "technique"
+    return entree.get("statut") != "valide" and technique and int(entree.get("tentatives") or 1) <= reprises
+
+
+def lister(racine: Path, materiel: str | None = None) -> list[str]:
+    """Commandes à exécuter : sans résultat dans l'index, ou en échec technique encore relançable. `materiel` (« gpu » |
+    « cpu ») : seulement celles dont l'échelle complète demande ce matériel (`materiel_complet`)."""
+    conf = charger_reglages()["poc"]
+    reprises = int(conf.get("reprises_techniques", 1))
     faits = {(p["jour"], p["sujet_id"]) for p in (read_json(racine / "index.json", None) or {}).get("pocs", [])
-             if p.get("statut") in ("valide", "echec")}
+             if not a_relancer(p, reprises)}
     attente = []
     for c in sorted(racine.glob("commandes/*/*.json")):
         d = read_json(c, {})
-        if (d.get("jour"), d.get("sujet_id")) not in faits:
-            attente.append(c.relative_to(racine).as_posix())
+        if (d.get("jour"), d.get("sujet_id")) in faits:
+            continue
+        if materiel and _materiel_commande(d, conf) != materiel:
+            continue
+        attente.append(c.relative_to(racine).as_posix())
     return attente
+
+
+def _materiel_commande(commande: dict, conf: dict) -> str:
+    """« gpu » ou « cpu » ; une commande illisible va avec le GPU (exécution une à une : le cas le plus prudent)."""
+    try:
+        return materiel_complet(commande["plan"], commande.get("faits") or {}, conf)[0]
+    except (KeyError, TypeError):
+        return "gpu"
 
 
 def _travail(commande: dict) -> Path:
@@ -926,13 +958,13 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     ap = argparse.ArgumentParser(prog=f"python -m {__package__}.atelier")
     sous = ap.add_subparsers(dest="action", required=True)
-    sous.add_parser("lister", help="commandes en attente (JSON)")
+    sous.add_parser("lister", help="commandes en attente (JSON)").add_argument("--materiel", choices=("gpu", "cpu"))
     for nom in ("executer", "publier", "indexer"):
         p = sous.add_parser(nom)
         p.add_argument("commande", help="chemin de la commande (commandes/<jour>/<sujet>.json)")
     a = ap.parse_args(argv)
     if a.action == "lister":
-        print(json.dumps(lister(ROOT)))
+        print(json.dumps(lister(ROOT, a.materiel)))
         return 0
     commande = read_json(ROOT / a.commande, None)
     if not commande:
@@ -942,16 +974,30 @@ def main(argv: list[str] | None = None) -> int:
         log.info("POC %s : %s", commande["sujet_id"], res["statut"] + (f" ({res.get('raison')})" if res.get("raison") else ""))
         return 0
     jeton = os.environ.get("POC_PUBLICATION_TOKEN")
-    res = read_json(_travail(commande) / "resultat.json", None) or {
+    travail = _travail(commande)
+    res = read_json(travail / "resultat.json", None) or {
         "jour": commande["jour"], "sujet_id": commande["sujet_id"], "depot": commande["depot"], "titre": commande["plan"]["titre"],
-        "statut": "non_traite", "raison": "exécution interrompue avant son terme (délai du job ou panne) : à relancer"}
+        "statut": "non_traite", "cause": "technique",
+        "raison": "exécution interrompue avant son terme (délai du job ou panne) : à relancer"}
     if a.action == "indexer":  # après publication : réécrit l'entrée sur l'index le plus récent (jobs parallèles)
         maj_index(ROOT, res)
         return 0
     if res.get("statut") == "valide":
         if not jeton:
             raise SystemExit("POC_PUBLICATION_TOKEN absent : publication impossible")
-        res = publier(_travail(commande), jeton)
+        try:
+            res = publier(travail, jeton)
+        except (RuntimeError, requests.RequestException) as e:  # le livrable ne survit pas au job : tout sera rejoué
+            res = {**res, "statut": "non_traite", "cause": "technique", "raison": f"publication impossible : {str(e)[:200]}"}
+    # Tentatives : celles de l'entrée précédente (index lu au début du job), plus celle-ci ; au-delà, échec définitif.
+    precedente = next((p for p in (read_json(ROOT / "index.json", None) or {}).get("pocs", [])
+                       if (p["jour"], p["sujet_id"]) == (res["jour"], res["sujet_id"])), None)
+    res["tentatives"] = int(precedente.get("tentatives") or 1) + 1 if precedente else 1
+    reprises = int(charger_reglages()["poc"].get("reprises_techniques", 1))
+    if res.get("statut") != "valide" and res.get("cause") == "technique" and res["tentatives"] > reprises:
+        res.update(statut="echec", raison=f"{res.get('raison', '')} (abandon après {res['tentatives']} tentatives)"[:300])
+    travail.mkdir(parents=True, exist_ok=True)
+    write_json(travail / "resultat.json", res)  # relu par « indexer » après la remise à niveau de l'index
     maj_index(ROOT, res)
     log.info("POC %s : %s%s", commande["sujet_id"], res["statut"], f" → {res['url']}" if res.get("url") else "")
     return 0

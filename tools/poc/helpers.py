@@ -188,6 +188,7 @@ def prepare_environment() -> None:
     import logging
     import warnings
     warnings.filterwarnings("ignore", message=r"(?s).*(HF_TOKEN|unauthenticated requests)")
+    os.environ.setdefault("HF_HUB_VERBOSITY", "error")  # relu par huggingface_hub à son import, qui réinitialise son niveau
     logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
     if current_phase() == "private" and os.environ.get("LOCAL_MODELS_DIR"):
         os.environ.setdefault("HF_HUB_OFFLINE", "1")

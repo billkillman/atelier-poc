@@ -23,7 +23,8 @@ jobs:
   liste:
     runs-on: ubuntu-latest
     outputs:
-      commandes: ${{ steps.liste.outputs.commandes }}
+      gpu: ${{ steps.liste.outputs.gpu }}
+      cpu: ${{ steps.liste.outputs.cpu }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,115 +34,29 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
+      # Matériel de l'échelle complète, décidé d'après la commande (materiel_complet) : une seule machine Colab à la fois,
+      # les expériences sur CPU en parallèle (une machine du runner chacune).
       - id: liste
-        run: echo "commandes=$(python -m lab.atelier lister)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "gpu=$(python -m lab.atelier lister --materiel gpu)" >> "$GITHUB_OUTPUT"
+          echo "cpu=$(python -m lab.atelier lister --materiel cpu)" >> "$GITHUB_OUTPUT"
 
-  poc:
+  poc-gpu:
     needs: liste
-    if: needs.liste.outputs.commandes != '[]'
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    strategy:
-      matrix:
-        commande: ${{ fromJSON(needs.liste.outputs.commandes) }}
-      max-parallel: 1   # une machine Colab à la fois, un index sans conflit
-      fail-fast: false
-    env:
-      COMMANDE: ${{ matrix.commande }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+    if: needs.liste.outputs.gpu != '[]'
+    uses: ./.github/workflows/atelier-poc.yml
+    with:
+      commandes: ${{ needs.liste.outputs.gpu }}
+      parallele: 1
+      groupe: gpu
+    secrets: inherit
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Dépendances Python
-        run: pip install -r requirements.txt
-
-      - name: Claude Code
-        run: |
-          curl -fsSL https://claude.ai/install.sh | bash
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Sandbox
-        run: |
-          docker build --quiet -t atelier-sandbox:latest tools/poc
-          # Aucun accès des conteneurs aux services de métadonnées et d'agent de la machine hôte. 168.63.129.16 est
-          # aussi le DNS des machines Azure : seul le port 53 y reste ouvert (sinon, plus aucune résolution de nom).
-          sudo iptables -I DOCKER-USER -d 169.254.169.254 -j DROP
-          sudo iptables -I DOCKER-USER -d 168.63.129.16 -j DROP
-          sudo iptables -I DOCKER-USER -d 168.63.129.16 -p udp --dport 53 -j RETURN
-          sudo iptables -I DOCKER-USER -d 168.63.129.16 -p tcp --dport 53 -j RETURN
-
-      # GPU pour l'échelle complète (entraînement PyTorch/TensorFlow, ou modèle trop gros pour le CPU). Sans le
-      # secret COLAB_TOKEN (contenu de ~/.config/colab-cli/token.json), les expériences restent à l'échelle du sandbox.
-      - name: Colab (facultatif)
-        env:
-          COLAB_TOKEN: ${{ secrets.COLAB_TOKEN }}
-        run: |
-          if [ -z "$COLAB_TOKEN" ]; then echo "Pas de secret COLAB_TOKEN : pas de GPU"; exit 0; fi
-          pipx install --quiet google-colab-cli==0.7.5   # version figée : l'atelier dépend de son comportement
-          mkdir -p ~/.config/colab-cli && chmod 700 ~/.config/colab-cli
-          (umask 077 && printf '%s' "$COLAB_TOKEN" > ~/.config/colab-cli/token.json)
-
-      - name: Exécuter l'expérience
-        env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        run: python -m lab.atelier executer "$COMMANDE"
-
-      # Filet de sécurité si l'exécution s'est arrêtée brutalement : aucune machine Colab ne reste allouée (unités).
-      - name: Libérer le GPU Colab
-        if: always()
-        run: |
-          if [ -f ~/.config/colab-cli/token.json ]; then
-            cat travail/*/*/colab_sessions.txt 2>/dev/null | sort -u | while read -r s; do
-              [ -n "$s" ] && colab --auth oauth2 stop -s "$s" || true
-            done
-          fi
-          rm -rf ~/.config/colab-cli
-
-      - name: Publier
-        if: always()
-        env:
-          POC_PUBLICATION_TOKEN: ${{ secrets.POC_PUBLICATION_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          python -m lab.atelier publier "$COMMANDE"
-          git config user.name "atelier-poc"
-          git config user.email "atelier-poc@users.noreply.github.com"
-          url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          # Les jobs parallèles écrivent tous index.json : on repart de la dernière version et on y réécrit son entrée
-          # (resultat.json est hors du dépôt, il survit à la remise à niveau), plutôt que de fusionner du JSON.
-          for essai in 1 2 3 4 5; do
-            git fetch -q "$url" main && git reset -q --hard FETCH_HEAD
-            python -m lab.atelier indexer "$COMMANDE"
-            git add index.json
-            git diff --cached --quiet && exit 0
-            git commit -q -m "Résultat : $COMMANDE"
-            git push -q "$url" HEAD:main && exit 0
-            sleep $((essai * 15))
-          done
-          exit 1
-
-      # Sans les poids des modèles (copies hors ligne de la phase privée, points de contrôle) : 1,44 Go le 2026-10-28.
-      - name: Conserver le dossier de travail (diagnostic)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: poc-${{ github.run_id }}-${{ strategy.job-index }}
-          path: |
-            travail/
-            !travail/*/*/.cache/
-            !travail/*/*/.local/
-            !travail/*/*/.maison/
-            !travail/*/*/modeles_prives/
-            !travail/**/*.safetensors
-            !travail/**/*.bin
-            !travail/**/*.pt
-            !travail/**/*.pth
-            !travail/**/*.ckpt
-            !travail/**/*.onnx
-          retention-days: 7
+  poc-cpu:
+    needs: liste
+    if: needs.liste.outputs.cpu != '[]'
+    uses: ./.github/workflows/atelier-poc.yml
+    with:
+      commandes: ${{ needs.liste.outputs.cpu }}
+      parallele: 3
+      groupe: cpu
+    secrets: inherit

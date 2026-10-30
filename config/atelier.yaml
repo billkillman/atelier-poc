@@ -5,6 +5,7 @@ poc:
   params_max_gpu_milliards: 4
   min_exemples_evaluation: 100
   min_enregistrements_evaluation: 20
+  reprises_techniques: 1
   duree_max_minutes: 105
   image: atelier-sandbox:latest
   timeouts:
