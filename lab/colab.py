@@ -47,25 +47,63 @@ JETON = "~/.config/colab-cli/token.json"
 
 # Lancé sur la machine Colab, détaché du noyau : installe, exécute, puis écrit fin.code (97 : installation impossible).
 # Le notebook tourne sans les variables d'identifiants du noyau Colab (propagation des identifiants, jetons).
+# Une dépendance qui refuse le Python de Colab (le 2026-10-30, qev exige 3.12, Colab est en 3.13) : environnement
+# recréé dans la version du sandbox, avec ses paquets (requirements_colab.txt, `gel_pour_colab`), où le code a été validé.
 _LANCEUR = """
 import importlib.util, os, pathlib, re, subprocess, sys
 for k in [k for k in os.environ if re.search(r"TBE_|CRED|TOKEN|SECRET|KEY|PASSWORD|AUTH", k, re.I)]:
     del os.environ[k]
 r = pathlib.Path({racine!r})
+py, env = sys.executable, dict(os.environ)
 paquets = [l.strip() for l in (r / "dependances.txt").read_text().splitlines() if l.strip()]
 if importlib.util.find_spec("nbclient") is None:
     paquets.append("nbclient")
 if paquets:
     with open(r / "installation.log", "w") as log:
-        if subprocess.call([sys.executable, "-m", "pip", "install", "-q", *paquets], cwd=r, stdout=log, stderr=subprocess.STDOUT):
-            (r / "fin.code").write_text("97")
-            sys.exit()
+        ok = subprocess.call([py, "-m", "pip", "install", "-q", *paquets], cwd=r, stdout=log, stderr=subprocess.STDOUT) == 0
+    journal = (r / "installation.log").read_text(errors="replace")
+    if not ok and "require a different python version" in journal and (r / "requirements_colab.txt").exists():
+        venv = r / ".python_sandbox"
+        with open(r / "installation.log", "a") as log:
+            log.write("\\n[atelier] dépendance incompatible avec le Python de Colab (%d.%d) : environnement Python %s "
+                      "recréé avec les paquets du sandbox\\n" % (sys.version_info[0], sys.version_info[1], {python_sandbox!r}))
+            log.flush()
+            etapes = ([py, "-m", "pip", "install", "-q", "uv"], [py, "-m", "uv", "venv", "-q", "-p", {python_sandbox!r}, str(venv)],
+                      [py, "-m", "uv", "pip", "install", "-q", "--python", str(venv / "bin" / "python"),
+                       "-r", "requirements_colab.txt", "nbclient", "ipykernel"],
+                      [str(venv / "bin" / "python"), "-m", "ipykernel", "install", "--sys-prefix", "--name", "python3"])
+            ok = all(subprocess.call(c, cwd=r, stdout=log, stderr=subprocess.STDOUT) == 0 for c in etapes)
+        py = str(venv / "bin" / "python")
+        env.update(PATH=str(venv / "bin") + os.pathsep + env.get("PATH", ""), VIRTUAL_ENV=str(venv),
+                   JUPYTER_PATH=str(venv / "share" / "jupyter"))   # noyau « python3 » de cet environnement d'abord
+    if not ok:
+        (r / "fin.code").write_text("97")
+        sys.exit()
 with open(r / "execution.log", "w") as log:
-    code = subprocess.call([sys.executable, "executer.py", "--entree", "poc.ipynb", "--sortie", "execute_complete.ipynb",
+    code = subprocess.call([py, "executer.py", "--entree", "poc.ipynb", "--sortie", "execute_complete.ipynb",
                             "--rapport", "rapport_complete.json", "--phase", "publique", "--taille", "complete",
-                            "--timeout-cellule", "{delai_cellule}"], cwd=r, stdout=log, stderr=subprocess.STDOUT)
+                            "--timeout-cellule", "{delai_cellule}"], cwd=r, env=env, stdout=log, stderr=subprocess.STDOUT)
 (r / "fin.code").write_text(str(code))
 """
+
+
+def python_sandbox(outils: Path) -> str:
+    """Version de Python du sandbox (« 3.12 »), lue dans son Dockerfile."""
+    m = re.search(r"^FROM python:(\d+\.\d+)", (outils / "Dockerfile").read_text(encoding="utf-8"), re.M)
+    return m.group(1) if m else "3.12"
+
+
+def gel_pour_colab(gel: str) -> str:
+    """Paquets du sandbox (`pip freeze` après l'échelle réduite) réinstallables sur Colab : versions identiques, sans
+    les étiquettes locales des roues CPU (« torch==2.10.0+cpu » : la roue standard de PyPI sait utiliser le GPU) ni les
+    installations depuis un chemin ou une URL."""
+    lignes = []
+    for l in gel.splitlines():
+        l = l.strip()
+        if not l or l.startswith(("#", "-")) or " @ " in l:
+            continue
+        lignes.append(re.sub(r"\+[0-9A-Za-z.]+$", "", l))
+    return "\n".join(lignes) + "\n"
 
 _DEMARRER = """
 import subprocess, sys
@@ -159,11 +197,16 @@ class Colab:
             p = self._exec(nom, f"import os; os.makedirs({self.racine!r}, exist_ok=True); print('POC_PRET')")
             if "POC_PRET" not in p.stdout:
                 return echec("machine Colab inutilisable", p.stderr + p.stdout)
-            for f in (dossier / "poc.ipynb", dossier / "dependances.txt", dossier / "helpers.py", outils / "executer.py"):
+            gel = dossier / "requirements_sandbox.txt"
+            if gel.exists():
+                (dossier / "requirements_colab.txt").write_text(gel_pour_colab(gel.read_text(encoding="utf-8")), encoding="utf-8")
+            envois = [dossier / "poc.ipynb", dossier / "dependances.txt", dossier / "helpers.py", outils / "executer.py"]
+            for f in envois + ([dossier / "requirements_colab.txt"] if gel.exists() else []):
                 p = self._cmd("upload", "-s", nom, str(f), f"{self.racine}/{f.name}", delai=300)
                 if p.returncode:
                     return echec(f"envoi de {f.name} vers Colab impossible", p.stderr + p.stdout)
-            lanceur = _LANCEUR.format(racine=self.racine, delai_cellule=self.conf.get("timeout_cellule", 1800))
+            lanceur = _LANCEUR.format(racine=self.racine, delai_cellule=self.conf.get("timeout_cellule", 1800),
+                                      python_sandbox=python_sandbox(outils))
             p = self._exec(nom, _DEMARRER.format(lanceur=lanceur, racine=self.racine))
             if "POC_LANCE" not in p.stdout:
                 return echec("lancement sur Colab impossible", p.stderr + p.stdout)
