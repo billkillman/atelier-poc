@@ -3,6 +3,98 @@
  "pocs": [
   {
    "jour": "2026-10-31",
+   "sujet_id": "tabulaire-fondation-calibration-explicabilite",
+   "depot": "20261031_tabular_foundation_credit_calibration",
+   "titre": "Un modèle de fondation tabulaire (TabICL) est-il mieux calibré et discriminant qu'XGBoost sur un scoring de crédit, à petit n et après recalibration ?",
+   "statut": "valide",
+   "niveau_sandbox": "complet",
+   "echelle": "complete",
+   "materiel": "CPU, 4 cœurs",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "cpu",
+    "raison_materiel": "TabICL est un modèle de quelques dizaines de millions de paramètres sans entraînement ; avec n ≤ 3 000 lignes, 10 variables et 5 000 lignes de test, l'inférence CPU reste de l'ordre de quelques dizaines de secondes par tirage, soit environ 15 min en tout : le CPU suffit.",
+    "raison": ""
+   },
+   "iterations": 2,
+   "metrique_principale": "expected_calibration_error",
+   "sens": "min",
+   "approches": [
+    {
+     "nom": "XGBoost (brut)",
+     "role": "reference",
+     "valeur": 0.03543893966265023,
+     "ic95": [
+      0.03357195143140854,
+      0.04477842532917858
+     ]
+    },
+    {
+     "nom": "XGBoost + Platt",
+     "role": "reference",
+     "valeur": 0.027883049383634263,
+     "ic95": [
+      0.026696461352865828,
+      0.03728298529730796
+     ]
+    },
+    {
+     "nom": "TabICL v2 T=0,9 (brut)",
+     "role": "nouvelle",
+     "valeur": 0.02486587713514454,
+     "ic95": [
+      0.023005479778489095,
+      0.03358059928957373
+     ]
+    },
+    {
+     "nom": "TabICL v2 T=0,9 + Platt",
+     "role": "nouvelle",
+     "valeur": 0.02914341648005908,
+     "ic95": [
+      0.026293853401410387,
+      0.038992838023244006
+     ]
+    },
+    {
+     "nom": "TabICL v2 T=1,0 (brut)",
+     "role": "nouvelle",
+     "valeur": 0.029980903654824954,
+     "ic95": [
+      0.02670690394956618,
+      0.03916356092281639
+     ]
+    }
+   ],
+   "n_exemples": 5000,
+   "jeu": "inria-soda/tabular-benchmark",
+   "synthese": "expected_calibration_error : TabICL v2 T=1,0 (brut) 0,03 contre 0,0279 pour XGBoost + Platt (5000 exemples, CPU, 4 cœurs).",
+   "conclusion": "À l'échelle complète (jeu public, CPU, 4 tirages par taille), TabICL v2 discrimine mieux qu'XGBoost : AUC de 0,847 contre 0,829 à n=500, et écart de 0,049 à n=200. Son ECE brute est plus basse (0,025 contre 0,035). Après Platt sur 500 lignes, les deux s'égalent à n=500 (0,029 contre 0,028), comme dans la source. À n=3 000, TabICL garde une légère avance (AUC +0,006, ECE après Platt −0,008), donc l'hypothèse d'égalité n'est pas confirmée. Ces résultats portent sur un jeu à environ 50 % d'événements, avec des intervalles trop étroits (variabilité d'apprentissage ignorée) et une référence un peu désavantagée. TabICL est aussi bien plus lent sur CPU (environ 34 s contre 0,3 s).",
+   "confiance": "moyenne",
+   "reproduit_la_source": "partiellement",
+   "en_bref": "TabICL discrimine mieux et se calibre un peu mieux à petit n, mais la recalibration locale égalise les deux modèles à n=500. L'avantage subsiste faiblement à grand n, sur un jeu rééquilibré peu représentatif.",
+   "libelle_metrique": "ECE (10 quantiles)",
+   "reserves": [
+    "Les écarts de calibration mesurés ici viennent d'un jeu à environ 50 % d'événements. Ils ne se transposent pas tels quels à un portefeuille déséquilibré, où l'étude source observe justement les difficultés de calibration.",
+    "Les intervalles affichés sont trop étroits : ils ignorent la variabilité de l'échantillon d'apprentissage. Les petits écarts d'ECE (environ 0,01) sont moins certains qu'ils n'en ont l'air, alors que l'écart d'AUC à n=200 est grand et plus robuste.",
+    "La référence est légèrement désavantagée aux petits n, surtout à n=200. L'avance d'AUC de TabICL à petit n est probablement un peu surestimée.",
+    "L'avantage de TabICL ne disparaît pas totalement à n=3 000 : un petit gain de discrimination et de calibration subsiste. À n=500, la recalibration égalise bien les deux modèles."
+   ],
+   "duree_minutes": 24.2,
+   "consommation": {
+    "claude:poc_revue:tabulaire-fondation-calibration-explicabilite": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 56.5,
+     "cout_equivalent_usd": 0.2739,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261031_tabular_foundation_credit_calibration",
+   "tentatives": 1
+  },
+  {
+   "jour": "2026-10-31",
    "sujet_id": "modeles-decision-juges-hallucination",
    "depot": "20261031_typed_decision_rag_faithfulness_judge",
    "titre": "Un petit LLM en décision typée (P(oui)/P(non)) juge-t-il la fidélité d'une réponse RAG en français aussi bien qu'un même LLM en verdict génératif, avec une meilleure calibration ?",
