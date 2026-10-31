@@ -44,6 +44,7 @@ def notebook_json(chemin: Path) -> None:
 # Le CLI remplace un nom de GPU inconnu par une A100 (la plus chère) : liste fermée.
 GPUS = ("T4", "L4")
 JETON = "~/.config/colab-cli/token.json"
+ESSAIS_PREPARATION = 3
 
 # Lancé sur la machine Colab, détaché du noyau : installe, exécute, puis écrit fin.code (97 : installation impossible).
 # Le notebook tourne sans les variables d'identifiants du noyau Colab (propagation des identifiants, jetons).
@@ -56,6 +57,8 @@ for k in [k for k in os.environ if re.search(r"TBE_|CRED|TOKEN|SECRET|KEY|PASSWO
 r = pathlib.Path({racine!r})
 py, env = sys.executable, dict(os.environ)
 paquets = [l.strip() for l in (r / "dependances.txt").read_text().splitlines() if l.strip()]
+if (r / "dependances_gpu.txt").exists():
+    paquets += [l.strip() for l in (r / "dependances_gpu.txt").read_text().splitlines() if l.strip()]
 if importlib.util.find_spec("nbclient") is None:
     paquets.append("nbclient")
 if paquets:
@@ -224,14 +227,19 @@ class Colab:
             p = self._cmd("new", "-s", nom, "--gpu", self.gpu, delai=600)
             if p.returncode:
                 return echec("allocation du GPU Colab impossible", p.stderr + p.stdout)
-            p = self._exec(nom, f"import os; os.makedirs({self.racine!r}, exist_ok=True); print('POC_PRET')")
-            if "POC_PRET" not in p.stdout:
+            # Une machine juste allouée peut ne pas répondre tout de suite (le 2026-10-31 : échec après 150 s, deuxième run réussi).
+            for essai in range(1, ESSAIS_PREPARATION + 1):
+                p = self._exec(nom, f"import os; os.makedirs({self.racine!r}, exist_ok=True); print('POC_PRET')")
+                if "POC_PRET" in p.stdout:
+                    break
+                suivi(f"[poc] Colab : machine pas encore prête (essai {essai}/{ESSAIS_PREPARATION})")
+            else:
                 return echec("machine Colab inutilisable", p.stderr + p.stdout)
             gel = dossier / "requirements_sandbox.txt"
             if gel.exists():
                 (dossier / "requirements_colab.txt").write_text(gel_pour_colab(gel.read_text(encoding="utf-8")), encoding="utf-8")
             envois = [dossier / "poc.ipynb", dossier / "dependances.txt", dossier / "helpers.py", outils / "executer.py"]
-            for f in envois + ([dossier / "requirements_colab.txt"] if gel.exists() else []):
+            for f in envois + [c for c in (dossier / "requirements_colab.txt", dossier / "dependances_gpu.txt") if c.exists()]:
                 p = self._cmd("upload", "-s", nom, str(f), f"{self.racine}/{f.name}", delai=300)
                 if p.returncode:
                     return echec(f"envoi de {f.name} vers Colab impossible", p.stderr + p.stdout)

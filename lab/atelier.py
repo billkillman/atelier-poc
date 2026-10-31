@@ -740,6 +740,8 @@ class Atelier:
             nbformat.write(nb, travail / "poc.ipynb")
             shutil.copyfile(OUTILS / "helpers.py", travail / "helpers.py")
             (travail / "dependances.txt").write_text("\n".join(sorted(set(code["dependances"]))) + "\n", encoding="utf-8")
+            if plan.get("dependances_gpu"):  # Colab seulement : un paquet qui casserait le sandbox CPU (triton sans pilote)
+                (travail / "dependances_gpu.txt").write_text("\n".join(plan["dependances_gpu"]) + "\n", encoding="utf-8")
             if statiques:
                 it["controle"] = statiques
                 motif = "il ne respecte pas les règles de l'atelier (contrôle avant exécution)."
