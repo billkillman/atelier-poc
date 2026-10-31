@@ -2,6 +2,69 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-10-30",
+   "sujet_id": "baseten-joey-1-decision-model",
+   "depot": "20261030_typed_decision_model_camembert_hierarchical_intent",
+   "titre": "Un modèle de décision typé entraîné pour la calibration (joey-1) rattrape-t-il un classifieur CamemBERT bien réglé sur des intentions françaises hiérarchisées ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné (réglé))",
+    "raison": "délai global dépassé sur Colab (100 min) (cellule 72, section new_approach)"
+   },
+   "iterations": 3,
+   "metrique_principale": "macro_f1",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "CamemBERT-base fine-tuné",
+     "role": "reference",
+     "valeur": 0.036329011938768044,
+     "ic95": [
+      0.023901808785529718,
+      0.06134573162856774
+     ]
+    },
+    {
+     "nom": "Décision typée hiérarchique (Qwen/Qwen3-0.6B)",
+     "role": "nouvelle",
+     "valeur": 0.003205128205128205,
+     "ic95": [
+      0.0,
+      0.011029411764705883
+     ]
+    }
+   ],
+   "n_exemples": 100,
+   "jeu": "mteb/amazon_massive_intent",
+   "synthese": "macro_f1 : Décision typée hiérarchique (Qwen/Qwen3-0.6B) 0,00321 contre 0,0363 pour CamemBERT-base fine-tuné (100 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (CPU, 100 messages de test), joey-1 n'a pas été exécuté : un substitut Qwen3-0.6B, non conçu comme modèle de décision, le remplace. Il prédit une classe quasi constante (macro-F1 0,003, accord sous permutation 0, ECE 0,49). La référence CamemBERT, entraînée sur 1 000 exemples et 1 époque, atteint un macro-F1 de 0,036 (exactitude 14 %). Ces chiffres valident au mieux le code et ne permettent pas de trancher entre les deux approches. Ils ne vérifient ni les 20 ms ni la calibration annoncées par l'éditeur. L'échelle complète n'a pas abouti (délai dépassé), donc l'hypothèse d'un écart de macro-F1 inférieur à 5 points reste ouverte.",
+   "confiance": "faible",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Verdict impossible : joey-1 n'a pas tourné, seul un substitut dégénéré a été évalué. Les chiffres valident le code, pas la comparaison avec CamemBERT, ni la calibration ou la stabilité annoncées.",
+   "libelle_metrique": "macro-F1 (classe fine)",
+   "reserves": [
+    "Aucun chiffre ne concerne joey-1. Le tableau compare un petit modèle de substitution à un classifieur sous-entraîné, il ne répond pas à la question posée.",
+    "L'ECE, le score de Brier et l'accord sous permutation du substitut décrivent un modèle qui répond toujours pareil. Ils ne disent rien du biais d'ordre ni de la calibration de joey-1."
+   ],
+   "duree_minutes": 101.2,
+   "consommation": {
+    "claude:poc_revue:baseten-joey-1-decision-model": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 57.5,
+     "cout_equivalent_usd": 0.307,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261030_typed_decision_model_camembert_hierarchical_intent",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-10-27",
    "sujet_id": "modeles-decision-typees-audit-independant-d3-ultra",
    "depot": "20261027_typed_decision_slm_camembert_intents",
