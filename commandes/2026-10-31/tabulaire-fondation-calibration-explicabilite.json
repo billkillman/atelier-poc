@@ -1,0 +1,351 @@
+{
+ "version": 1,
+ "jour": "2026-10-31",
+ "sujet_id": "tabulaire-fondation-calibration-explicabilite",
+ "depot": "20261031_tabular_foundation_credit_calibration",
+ "fiche": {
+  "sujet_id": "tabulaire-fondation-calibration-explicabilite",
+  "titre": "Modèles de fondation tabulaires : pas de raccourci vers la calibration, et une piste d'explicabilité native",
+  "en_une_phrase": "Une simulation pré-enregistrée (médecine) montre que TabPFN-3.5, TabICLv2 et Mitra-v2 ne sont pas mieux calibrés qu'une régression logistique pénalisée ; TICL³, preprint séparé, les rend explicables mais reste sous TabICLv2.",
+  "probleme": "Les modèles de fondation tabulaires prédisent sans entraînement, mais leur calibration (des risques prédits égaux aux risques réels) n'a été jugée que sur données réelles, où le vrai risque est inconnu. Et leurs prédictions restent difficiles à expliquer, car les explications post-hoc ne reflètent pas forcément ce que le modèle utilise.",
+  "comment_ca_marche": "TICL³ (Tabular In-Context Local Linear Learning) fait faire la prédiction par une règle linéaire simple, guidée par un modèle de fondation tabulaire (TabICLv2 gelé). Étapes :\n\n1. Le modèle de fondation produit, pour chaque ligne d'entraînement, des probabilités de classe et une représentation interne (un vecteur).\n2. Un premier modèle linéaire ElasticNet (régression linéaire à pénalité qui force beaucoup de coefficients à zéro) apprend les effets moyens des variables sur ces probabilités.\n3. Pour chaque requête, sa représentation sert à retrouver les lignes d'entraînement proches.\n4. Un second ElasticNet est ajusté sur les erreurs du premier, sur ces seules lignes.\n5. La somme des deux donne un score linéaire propre à la requête, dont les coefficients sont la contribution de chaque variable.\n\nLe modèle de fondation ne prédit donc pas : il fournit les cibles et choisit les voisins.",
+  "demarche_experimentale": "Calibration : simulation pré-enregistrée (OSF, 8 oct. 2026) où le vrai risque est connu, 58 scénarios et 1 000 plans aléatoires, puis 4 jeux cliniques. TICL³ : 386 évaluations de classification contre TabICLv2, CatBoost et MAPLE (méthode d'explication locale linéaire).",
+  "resultats": [
+   {
+    "metrique": "Pente de calibration vs FLIC (régression logistique de Firth avec correction d'intercept)",
+    "valeur": "équivalente dans 36–37 scénarios sur 48",
+    "comparaison": "meilleure seulement dans 4 cellules (n=200, 3 % d'événements)",
+    "conditions": "TabPFN-3.5, TabICLv2, Mitra-v2 ; marges larges fixées avant l'étude ; simulation médicale",
+    "citation": "Their calibration slope matched FLIC’s within the pre-registered margin in 36 or 37 of 48 core scenarios and was better only at n=200 with a 3% event rate."
+   },
+   {
+    "metrique": "Part d'échantillons à risques proches du vrai (moyenne, intercept, pente) à n=3 000 : plus haut = mieux",
+    "valeur": "63–83 % (10 et 30 % d'événements), 35–50 % (3 %) ; TabICLv2 : 8–39 % et 1–3 %",
+    "comparaison": "FLIC, TabPFN-3.5 et Mitra-v2 comparables",
+    "conditions": "Calibration dite faible ; TabICLv2 pénalisé en partie par sa température de softmax livrée (0,9)",
+    "citation": "with FLIC, TabPFN-3.5 or Mitra-v2, 63%–83% of samples gave risks close to the truth in average, intercept and slope at event rates of 10% and 30%, and 35%–50% at 3%. TabICLv2 did worse (8%–39% and 1%–3%)."
+   },
+   {
+    "metrique": "Exactitude de classification de TICL³ (plus haut = mieux)",
+    "valeur": "−1,1 point vs TabICLv2 ; > CatBoost dans 266 évaluations sur 386",
+    "comparaison": "+4,7 points de F1 de support vs MAPLE",
+    "conditions": "Auto-rapporté par les auteurs, preprint, 386 évaluations benchmark–jeu de données",
+    "citation": "Across 386 classification benchmark–dataset evaluations, TICL3 trails TabICLv2 by 1.1 percentage points and outperforms CatBoost in 266 evaluations."
+   }
+  ],
+  "limites": [
+   "Étude de calibration en contexte clinique, avec 8 variables simulées : transfert au scoring interne non démontré ; les plans aléatoires ne confirment pas la grille (12 à 15 scénarios sur 48 concordent), selon les auteurs.",
+   "Les marges d'équivalence sont larges : même un oracle parfait n'est qu'« équivalent » à FLIC dans 12 scénarios sur 48 ; Mitra-v2 limité à 6 Go de mémoire GPU (auteurs).",
+   "TICL³ : résultats auto-rapportés, jamais vus en français ni en finance ; il reste sous TabICLv2 et la méthode complète (coûts, code) n'a pas pu être vérifiée dans l'extrait."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "36–37 / 48",
+    "libelle": "scénarios où la pente de calibration des modèles de fondation égale celle de FLIC (marge pré-enregistrée)"
+   },
+   {
+    "valeur": "35–50 %",
+    "libelle": "échantillons bien calibrés à n=3 000 et 3 % d'événements (FLIC, TabPFN-3.5, Mitra-v2)"
+   },
+   {
+    "valeur": "−1,1 pt",
+    "libelle": "écart de TICL³ face à TabICLv2 sur 386 évaluations de classification"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Les modèles de fondation tabulaires égalent FLIC en pente de calibration dans 36 ou 37 des 48 scénarios et ne font mieux qu'à n=200 avec 3 % d'événements.",
+    "citation": "Their calibration slope matched FLIC’s within the pre-registered margin in 36 or 37 of 48 core scenarios and was better only at n=200 with a 3% event rate."
+   },
+   {
+    "affirmation": "TabICLv2 est moins bien calibré avec ses réglages livrés, en partie à cause de sa température de softmax de 0,9.",
+    "citation": "Much of this appears to come from its shipped softmax temperature of 0.9"
+   },
+   {
+    "affirmation": "Une recalibration logistique sur 500 patients locaux rend chaque modèle de fondation équivalent à FLIC recalibré ; 100 lignes ou l'isotonique dégradent souvent.",
+    "citation": "Logistic recalibration on 500 local rows made every foundation model equivalent to FLIC after the same recalibration."
+   },
+   {
+    "affirmation": "Aucun modèle n'a résisté à un changement de taux d'événements entre populations (données réelles, exploratoire).",
+    "citation": "On real data, no model resisted a change in event rate between populations; recalibration on 500 local patients largely repaired it."
+   },
+   {
+    "affirmation": "TICL³ combine un modèle linéaire partagé et une correction linéaire locale choisie par les représentations du modèle de fondation.",
+    "citation": "The shared model captures broad effects, while the local model corrects errors among similar samples."
+   },
+   {
+    "affirmation": "TICL³ est à 1,1 point de TabICLv2 et dépasse CatBoost dans 266 évaluations sur 386, selon les auteurs.",
+    "citation": "TICL3 trails TabICLv2 by 1.1 percentage points and outperforms CatBoost in 266 evaluations."
+   },
+   {
+    "affirmation": "Les poids de TabPFN-3.5 sont distribués sous une licence interdisant la redistribution.",
+    "citation": "TabPFN-3.5 weights are distributed by Prior Labs under a licence that does not allow redistribution"
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de fondation tabulaire",
+    "definition": "Réseau pré-entraîné sur des millions de tables simulées ; il lit les données d'entraînement comme un prompt et prédit sans ajuster de paramètres (TabPFN, TabICL, Mitra)."
+   },
+   {
+    "terme": "Calibration",
+    "definition": "Un modèle est calibré si, parmi les cas prédits à 20 % de risque, environ 20 % ont réellement l'événement."
+   },
+   {
+    "terme": "FLIC",
+    "definition": "Régression logistique de Firth avec correction d'intercept : stable avec peu d'événements, et risque moyen prédit égal au taux observé."
+   },
+   {
+    "terme": "ICI",
+    "definition": "Integrated calibration index : écart moyen absolu entre risque prédit et courbe lissée du risque. 0 = parfait ; plus bas = mieux."
+   },
+   {
+    "terme": "Température softmax",
+    "definition": "Réglage qui divise les logits avant conversion en probabilités ; inférieur à 1, les prédictions deviennent plus extrêmes."
+   },
+   {
+    "terme": "Recalibration logistique",
+    "definition": "Refaire l'intercept et la pente d'une régression logistique de l'issue sur le logit de la prédiction, sur un échantillon local."
+   },
+   {
+    "terme": "ElasticNet",
+    "definition": "Régression linéaire pénalisée qui produit des coefficients parcimonieux (beaucoup à zéro), donc lisibles."
+   },
+   {
+    "terme": "In-context learning",
+    "definition": "Prédire en lisant des exemples fournis en entrée, sans réentraîner le modèle."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Tabular foundation models are not a shortcut to calibrated clinical risk prediction: a pre-registered simulation against the true risk",
+    "url": "https://arxiv.org/abs/2610.39065",
+    "type": "primaire",
+    "date": "2026-10-28"
+   },
+   {
+    "titre": "Interpretable by Design Tabular Prediction via In-Context Local Linear Learning",
+    "url": "https://arxiv.org/abs/2610.39506",
+    "type": "primaire",
+    "date": "2026-10-29"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-10-28",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un modèle de fondation tabulaire (TabICL) est-il mieux calibré et discriminant qu'XGBoost sur un scoring de crédit, à petit n et après recalibration ?",
+  "hypothese": "À n ≤ 500 TabICL dépasse XGBoost d'au moins 0,01 AUC et réduit l'ECE d'au moins 30 % ; à n ≥ 3 000 l'écart d'AUC passe sous 0,005 et XGBoost recalibré (régression logistique sur 500 lignes) égale TabICL recalibré en ECE à ±0,005.",
+  "reference": {
+   "nom": "XGBoost (API scikit-learn) réglé",
+   "description": "Gradient boosting avec réglage léger par validation croisée interne, probabilités brutes puis recalibrées par régression logistique de Platt.",
+   "implementation": "xgboost.XGBClassifier (tree_method hist, n_estimators 300 avec arrêt précoce sur 20 % du train, max_depth ∈ {3,5}, learning_rate ∈ {0,05,0,1}) choisi par validation croisée 3 plis sur le train ; recalibration Platt sur un lot local de 500 lignes séparé.",
+   "modeles_hf": [],
+   "modeles_hf_sandbox": [],
+   "entrainement": "autre",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "TabICL v2 en apprentissage en contexte",
+   "description": "Modèle de fondation tabulaire pré-entraîné qui prédit sans entraînement en lisant le jeu d'entraînement comme contexte ; probabilités brutes puis recalibrées de la même façon.",
+   "implementation": "Paquet PyPI tabicl (soda-inria/tabicl) : TabICLClassifier avec le checkpoint v2 (tabicl-classifier-v2-20260212.ckpt) téléchargé depuis le dépôt Hub jingang/TabICL ; réglages par défaut puis variante avec température de softmax à 1,0 ; fit/predict_proba sans entraînement ; recalibration Platt sur les mêmes 500 lignes locales.",
+   "modeles_hf": [
+    "jingang/TabICL"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "aucun",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "inria-soda/tabular-benchmark",
+   "config": "clf_num_credit",
+   "split_evaluation": "train",
+   "split_entrainement": "train",
+   "colonnes_utiles": "SeriousDlqin2yrs (cible) et les 10 variables numériques de bureau de crédit",
+   "representativite": "Vrai scoring de crédit (Give Me Some Credit) avec déséquilibre, taille permettant de couvrir les régimes petit n et n=3 000 ; calibration jugée contre les fréquences observées.",
+   "ecarts_donnees_reelles": "Jeu américain préparé et sous-échantillonné (taux d'événements possiblement modifié), uniquement numérique, sans dimension temporelle ni dérive, pas de vrai risque connu ; le défaut à 2 ans diffère d'un scoring français ; aucune donnée de produit financier européen. Le split unique « train » est découpé dans le notebook (test stratifié de 5 000 lignes, lot local de 500 lignes, reste en réservoir d'apprentissage).",
+   "jeux_explores": [
+    {
+     "nom": "inria-soda/tabular-benchmark",
+     "url": "https://huggingface.co/datasets/inria-soda/tabular-benchmark",
+     "acces": "hub_libre",
+     "adequation": "Config clf_num_credit : 16 714 lignes de scoring crédit, autres configs financières (heloc, bank-marketing).",
+     "decision": "retenu",
+     "raison": "Vrai scoring, taille adaptée au sous-échantillonnage, chargeable en parquet."
+    },
+    {
+     "nom": "scikit-learn/credit-card-clients",
+     "url": "https://huggingface.co/datasets/scikit-learn/credit-card-clients",
+     "acces": "hub_libre",
+     "adequation": "30 000 lignes, défaut à 6 mois d'historique, CC0.",
+     "decision": "ecarte",
+     "raison": "Variables sensibles (sexe, mariage) et jeu de réplication ; le premier jeu suffit à la question."
+    },
+    {
+     "nom": "jlh/home-credit",
+     "url": "https://huggingface.co/datasets/jlh/home-credit",
+     "acces": "hub_libre",
+     "adequation": "307 511 lignes, déséquilibre et catégorielles réalistes.",
+     "decision": "ecarte",
+     "raison": "Licence floue et coût de calcul de TabICL sur de grandes tables mixtes."
+    },
+    {
+     "nom": "AiresPucrs/german-credit-data",
+     "url": "https://huggingface.co/datasets/AiresPucrs/german-credit-data",
+     "acces": "hub_libre",
+     "adequation": "1 000 lignes, très petit n.",
+     "decision": "ecarte",
+     "raison": "Trop petit pour une calibration fine."
+    },
+    {
+     "nom": "cestwc/bank-marketing",
+     "url": "https://huggingface.co/datasets/cestwc/bank-marketing",
+     "acces": "hub_libre",
+     "adequation": "Appétence produit, 45 211 lignes.",
+     "decision": "ecarte",
+     "raison": "Fuite par duration et licence non précisée ; piste pour l'appétence."
+    },
+    {
+     "nom": "Zenodo 10.5281/zenodo.23737416 (simulation de calibration)",
+     "url": "https://doi.org/10.5281/zenodo.23737416",
+     "acces": "telechargement_libre",
+     "adequation": "Seule source avec vrai risque connu (médical).",
+     "decision": "ecarte",
+     "raison": "Hors Hub, contenu non vérifié."
+    }
+   ]
+  },
+  "metriques": [
+   "roc_auc",
+   "brier_score",
+   "expected_calibration_error",
+   "calibration_slope",
+   "calibration_intercept",
+   "log_loss",
+   "fit_predict_seconds"
+  ],
+  "metrique_principale": "expected_calibration_error",
+  "sens": "min",
+  "protocole": "Un seul split « train » est chargé puis découpé : test stratifié fixe de 5 000 lignes, lot local stratifié de 500 lignes pour la recalibration, le reste en réservoir. Pour chaque n ∈ {200, 500, 3 000}, 5 tirages stratifiés du réservoir (à l'échelle réduite : test de quelques centaines de lignes, n ≤ 500, 2 tirages). Deux conditions : probabilités brutes et recalibrées. ECE en 10 intervalles de quantiles, pente et intercept par régression logistique sur le logit prédit. Différences appariées avec bootstrap de 1 000 rééchantillonnages par n. Décalage de taux d'événements : sous-échantillonnage du test pour passer de x à x/2 d'événements, recalibration locale comparée.",
+  "niveau_sandbox": "complet",
+  "adaptation_sandbox": "",
+  "dependances": [
+   "tabicl"
+  ],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "customer_id",
+     "type": "str",
+     "description": "Identifiant pseudonymisé"
+    },
+    {
+     "colonne": "features",
+     "type": "colonnes numériques et catégorielles",
+     "description": "Variables explicatives du scoring (revenus, encours, incidents, ancienneté), sans variables protégées"
+    },
+    {
+     "colonne": "target",
+     "type": "int",
+     "description": "Événement observé (défaut, appétence) sur l'horizon défini"
+    },
+    {
+     "colonne": "observation_date",
+     "type": "date",
+     "description": "Date d'observation, pour le découpage temporel"
+    }
+   ],
+   "volume_conseille": "≥ 20 000 lignes et ≥ 500 événements ; plus un lot local de 500 lignes pour recalibrer.",
+   "metriques_metier": "AUC, Brier, ECE et pente par segment, taux d'acceptation à perte attendue fixe, stabilité sur la période de dérive.",
+   "garde_fous": "Exclure les variables protégées et leurs proxys ; modèle non retenu sans calibration validée ; contrôler la licence de tout modèle tiers (TabPFN) ; scoring de crédit des particuliers = haut risque, explicabilité à documenter séparément.",
+   "prescriptions": [
+    "Au moins 500 événements dans le train et 200 dans le test.",
+    "Découpage temporel : apprentissage sur les périodes anciennes, recalibration puis test sur les plus récentes.",
+    "Étiquette observée sur un horizon complet (pas de censure).",
+    "Exclure variables protégées, identifiants et variables postérieures à la décision (fuite).",
+    "Inclure un lot de population décalé (autre taux d'événements) pour la dérive.",
+    "Pseudonymiser les identifiants et supprimer les données directes avant extraction."
+   ],
+   "preparation": "Extraire l'historique client à une date d'observation, joindre les variables d'encours et d'incidents calculées avant cette date, joindre l'événement observé sur l'horizon suivant, filtrer les clients éligibles, tirer un échantillon stratifié sur l'événement et couper par date."
+  },
+  "duree_estimee_minutes": 15,
+  "analyse_materiel": "TabICL est un modèle de quelques dizaines de millions de paramètres sans entraînement ; avec n ≤ 3 000 lignes, 10 variables et 5 000 lignes de test, l'inférence CPU reste de l'ordre de quelques dizaines de secondes par tirage, soit environ 15 min en tout : le CPU suffit.",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "jingang/TabICL": {
+    "id": "jingang/TabICL",
+    "sha": "4dcd344ece2c00be9e831fdd35bed57b5ad83e19",
+    "tache": "tabular-classification",
+    "bibliotheque": "tabicl",
+    "parametres": null,
+    "licence": "bsd-3-clause",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "inria-soda/tabular-benchmark",
+   "config": "clf_num_credit",
+   "splits": [
+    "train"
+   ],
+   "licence": [],
+   "colonnes": {
+    "RevolvingUtilizationOfUnsecuredLines": "Value",
+    "age": "Value",
+    "NumberOfTime30-59DaysPastDueNotWorse": "Value",
+    "DebtRatio": "Value",
+    "MonthlyIncome": "Value",
+    "NumberOfOpenCreditLinesAndLoans": "Value",
+    "NumberOfTimes90DaysLate": "Value",
+    "NumberRealEstateLoansOrLines": "Value",
+    "NumberOfTime60-89DaysPastDueNotWorse": "Value",
+    "NumberOfDependents": "Value",
+    "SeriousDlqin2yrs": "Value"
+   },
+   "exemple": {
+    "RevolvingUtilizationOfUnsecuredLines": 0.0069995,
+    "age": 38,
+    "NumberOfTime30-59DaysPastDueNotWorse": 0,
+    "DebtRatio": 0.30215034,
+    "MonthlyIncome": 5440.0,
+    "NumberOfOpenCreditLinesAndLoans": 4,
+    "NumberOfTimes90DaysLate": 0,
+    "NumberRealEstateLoansOrLines": 1,
+    "NumberOfTime60-89DaysPastDueNotWorse": 0,
+    "NumberOfDependents": 3,
+    "SeriousDlqin2yrs": 0
+   },
+   "lignes": {
+    "train": 16714
+   }
+  },
+  "paquets": {
+   "tabicl": {
+    "paquet": "tabicl",
+    "derniere_version": "2.2.0",
+    "licence": "BSD 3-Clause License\n        \n        Copyright (c) 2025, So",
+    "auteur": "Jingang Qu, David Holzmüller, Marine Le Morvan, Gaël Varoqua",
+    "source": ""
+   }
+  }
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

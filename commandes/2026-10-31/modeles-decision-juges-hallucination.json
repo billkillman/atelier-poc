@@ -1,0 +1,407 @@
+{
+ "version": 1,
+ "jour": "2026-10-31",
+ "sujet_id": "modeles-decision-juges-hallucination",
+ "depot": "20261031_typed_decision_rag_faithfulness_judge",
+ "fiche": {
+  "sujet_id": "modeles-decision-juges-hallucination",
+  "titre": "Juges d'hallucination : des modèles de décision égalent un LLM juge sur la fidélité RAG pour 1 à 3 % du coût, pas sur la logique ni les consignes (anglais seulement)",
+  "en_une_phrase": "Sur 9 852 cas en anglais, des modèles de décision en cascade égalent le juge gpt-6-sol sur les hallucinations factuelles et RAG pour 1 à 3 % du coût, mais décrochent sur la logique et les consignes.",
+  "probleme": "Pour évaluer automatiquement des réponses générées (RAG, chatbot), on fait souvent juger chaque réponse par un grand LLM : c'est le « LLM-as-a-Judge ». Contrôler tout le trafic de cette façon coûte cher et prend du temps. De plus, le juge peut lui-même halluciner ou être trop sûr de lui. Les modèles de décision typés promettent un juge beaucoup moins cher, qui renvoie en plus une probabilité exploitable. Jusqu'ici, chaque étude n'en testait qu'un, sur d'autres tâches. On ignorait donc s'ils détectent tous les types d'hallucination et si leur confiance est fiable.",
+  "comment_ca_marche": "Un **modèle de décision typé** est un modèle de langage entraîné à répondre à une question fermée sans écrire de texte. Il lit un contexte, puis renvoie directement une probabilité pour chaque réponse autorisée, en un seul passage dans le réseau. L'étude l'emploie comme juge, de la façon suivante.\n\n1. **Entrée** : la réponse à juger, la consigne d'origine et, pour le RAG, le document récupéré. Le juge ne voit jamais les étiquettes ni l'emplacement de l'erreur.\n2. **Une question fermée par type d'hallucination** : « la réponse contient-elle cette erreur ? », avec deux options, oui (H) ou non (N). Cinq types sont testés séparément :\n   - contradiction factuelle ;\n   - fait inventé ;\n   - infidélité au contexte fourni (le cas du RAG) ;\n   - incohérence logique interne ;\n   - non-respect d'une consigne explicite.\n3. **Sortie** : deux probabilités, P(H) et P(N), dont la somme vaut 1. Le verdict est l'option la plus probable. La *confiance* est la plus grande des deux probabilités, donc entre 0,5 et 1.\n4. **Cascade de confiance** : pour chaque type, les trois meilleurs modèles sont rangés du plus précis au moins précis.\n   - Le premier tranche tout, sauf la part r1 de ses cas les moins sûrs (de 0 à 50 %), qu'il transmet au deuxième.\n   - Le deuxième transmet à son tour sa part r2 la moins sûre au troisième, qui décide.\n   - Les seuils sont des quantiles de confiance : ils se calculent sans aucune étiquette.\n5. **Comparaisons** :\n   - chaque modèle seul ;\n   - un vote à la majorité des trois ;\n   - un arbitrage, où le troisième modèle n'est appelé que si les deux premiers sont en désaccord ;\n   - un LLM génératif de référence, gpt-6-sol, à qui l'on demande un verdict structuré avec sa propre estimation de probabilité.\n\n**Ce qui est nouveau** : cinq modèles de décision sont comparés type d'erreur par type d'erreur. Et la cascade n'utilise que des modèles de décision, alors que les travaux précédents renvoyaient les cas douteux vers un LLM génératif.",
+  "demarche_experimentale": "**Données** : 9 852 cas en anglais, tirés de six jeux annotés existants (FAVABench, HADTest, RAGTruth, ContraDoc, ROSCOE, IF-RewardBench) et ramenés à des étiquettes binaires sans nouvelle annotation. Les classes ne sont pas rééquilibrées.\n\n**Juges** : cinq modèles de décision (jev, d1, clef, pplx-decider, gpt-6-luna) face au LLM génératif gpt-6-sol. Tous sont appelés par API hébergée, avec un seul prompt par type.\n\n**Métriques** :\n- exactitude équilibrée (BAcc), soit la moyenne des taux de détection sur les cas avec et sans erreur (50 = hasard) ;\n- ECE, l'écart moyen entre confiance affichée et justesse réelle (plus bas = mieux) ;\n- conf-AUROC, la capacité de la confiance à séparer bonnes et mauvaises décisions (0,5 = nulle).\n\n**Protocole** : tests bootstrap appariés. Les réglages de cascade (36 combinaisons) sont aussi choisis par validation croisée en 5 plis.",
+  "resultats": [
+   {
+    "metrique": "BAcc, infidélité au contexte RAG",
+    "valeur": "pplx 82,66 ; jev 82,53",
+    "comparaison": "gpt-6-sol 82,65",
+    "conditions": "RAGTruth, 2 675 cas, modèles seuls",
+    "citation": "On CI, pplx, gpt-6-sol, and jev are within 0.2 points of one another at about 82.6."
+   },
+   {
+    "metrique": "BAcc, non-respect des consignes",
+    "valeur": "pplx 71,08 ; jev 61,75",
+    "comparaison": "gpt-6-sol 78,88",
+    "conditions": "IF-RewardBench filtré en anglais, 2 294 cas",
+    "citation": "The gap is widest on II, where gpt-6-sol reaches 78.9 against 71.1 for pplx and 61.8 for jev."
+   },
+   {
+    "metrique": "BAcc de la cascade (FC, FF, CI)",
+    "valeur": "82,2 / 84,6 / 84,6 au meilleur réglage ; 81,7 / 84,4 / 84,2 en validation croisée",
+    "comparaison": "+0,6 / +2,6 / +1,9 pt sur gpt-6-sol au pic ; écart non significatif en validation croisée",
+    "conditions": "Coût de 1,2 à 3,3 % de gpt-6-sol, 1,1 à 1,3 appel par cas",
+    "citation": "the confidence cascade achieves BAcc scores of 82.2, 84.6, and 84.6 on FC, FF, and CI, respectively—0.6, 2.6, and 1.9 points higher than gpt-6-sol—at only 1.2–3.3% of its estimated cost. [...] Their cross-fitted differences from gpt-6-sol have intervals containing zero."
+   },
+   {
+    "metrique": "Coût et latence par cas",
+    "valeur": "0,5 à 10 % du coût ; 0,22 à 0,62 s",
+    "comparaison": "gpt-6-sol : 1,6 à 2,6 s",
+    "conditions": "Prix catalogue des API, latence de bout en bout",
+    "citation": "Per item, the decision models cost between 0.5% (pplx) and 10% (clef) of gpt-6-sol, and they answer in 0.22 to 0.62 seconds against 1.6 to 2.6 seconds (Table 2)."
+   },
+   {
+    "metrique": "Erreurs commises avec une confiance ≥ 0,9",
+    "valeur": "10 à 30 % (modèles de décision hors gpt-6-luna)",
+    "comparaison": "gpt-6-luna 47 % ; gpt-6-sol 69 %",
+    "conditions": "Moyenne sur les 5 types",
+    "citation": "For the other decision models, 10–30% of errors are made at c≥0.9, with clef lowest (10%); [...] gpt-6-sol is the most extreme case: it assigns c≥0.9 to 88% of its decisions and makes 69% of its errors at this level."
+   },
+   {
+    "metrique": "Exactitude, typage des conflits entre sources RAG (étude voisine)",
+    "valeur": "50,0 à 67,0 %",
+    "comparaison": "Gemini 2.5 Flash 61,3 % ; Gemini 3.8 Flash 70,0 %",
+    "conditions": "Benchmark CONFLICTS, 406 requêtes de test, 11 modèles de décision",
+    "citation": "Asked directly, the decision models reach 50.0–67.0 % accuracy; 10 of the 11 match or exceed Gemini 2.5 Flash, the paper’s model (61.3 %), at 4–39 × lower billed cost (2 were free) and 2.6–6.0 × lower latency."
+   }
+  ],
+  "limites": [
+   "**Anglais seulement** : le jeu sur les consignes a même été filtré pour exclure les caractères chinois. Rien n'est testé en français ni sur des données internes réelles.",
+   "**Gains de cascade optimistes**, comme le reconnaissent les auteurs : les meilleurs réglages sont choisis sur les données d'évaluation elles-mêmes. En validation croisée, l'avantage sur gpt-6-sol n'est plus statistiquement significatif.",
+   "**Couverture inégale**, signalée par les auteurs : l'infidélité au contexte et le respect des consignes reposent chacun sur une seule source, et le type d'erreur se confond avec la source. Un seul prompt a été testé par type.",
+   "**Accès** : tous les juges ont été appelés via des API hébergées, américaines pour la plupart. Les poids de pplx-decider sont sous Apache 2.0, mais dans un dépôt privé à accès authentifié. Plusieurs versions de modèles ne sont pas précisées."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "1,2–3,3 %",
+    "libelle": "coût de la cascade de modèles de décision, rapporté au juge gpt-6-sol"
+   },
+   {
+    "valeur": "82,7 vs 82,7",
+    "libelle": "exactitude équilibrée sur la fidélité RAG : meilleur modèle de décision contre gpt-6-sol"
+   },
+   {
+    "valeur": "−7,1 pts",
+    "libelle": "retard de la meilleure cascade sur gpt-6-sol pour le respect des consignes"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Le meilleur modèle de décision égale gpt-6-sol sur l'infidélité au contexte, approche à 3 points près sur les erreurs factuelles et reste 4 à 8 points derrière sur la logique et les consignes.",
+    "citation": "the best decision model matches gpt-6-sol in balanced accuracy on context inconsistency and comes within 3 percentage points on factual errors, but trails it by 4–8 points on logical and instruction inconsistency."
+   },
+   {
+    "affirmation": "Par cas, les modèles de décision coûtent de 0,5 à 10 % du prix de gpt-6-sol et répondent en 0,22 à 0,62 s, contre 1,6 à 2,6 s.",
+    "citation": "Per item, the decision models cost between 0.5% (pplx) and 10% (clef) of gpt-6-sol, and they answer in 0.22 to 0.62 seconds against 1.6 to 2.6 seconds (Table 2)."
+   },
+   {
+    "affirmation": "Au meilleur réglage, la cascade dépasse gpt-6-sol de 0,6 à 2,6 points sur trois types, pour 1,2 à 3,3 % de son coût.",
+    "citation": "the confidence cascade achieves BAcc scores of 82.2, 84.6, and 84.6 on FC, FF, and CI, respectively—0.6, 2.6, and 1.9 points higher than gpt-6-sol—at only 1.2–3.3% of its estimated cost."
+   },
+   {
+    "affirmation": "Quand les réglages sont choisis par validation croisée, l'écart avec gpt-6-sol n'est plus significatif.",
+    "citation": "Their cross-fitted differences from gpt-6-sol have intervals containing zero."
+   },
+   {
+    "affirmation": "gpt-6-sol commet 69 % de ses erreurs avec une confiance d'au moins 0,9.",
+    "citation": "gpt-6-sol is the most extreme case: it assigns c≥0.9 to 88% of its decisions and makes 69% of its errors at this level."
+   },
+   {
+    "affirmation": "Le jeu sur le respect des consignes a été filtré pour ne garder que l'anglais.",
+    "citation": "IF-RewardBench’s English filter retains instructions and checklists containing no characters in U+4E00--U+9FFF"
+   },
+   {
+    "affirmation": "10 modèles de décision sur 11 typent les conflits entre sources RAG au moins aussi bien que Gemini 2.5 Flash, pour 4 à 39 fois moins cher.",
+    "citation": "10 of the 11 match or exceed Gemini 2.5 Flash, the paper’s model (61.3 %), at 4–39 × lower billed cost (2 were free) and 2.6–6.0 × lower latency."
+   },
+   {
+    "affirmation": "pplx-decider-v1.1-27b demande environ 49 Gio de mémoire GPU pour ses poids.",
+    "citation": "a CUDA GPU with room for roughly 49 GiB of weights plus working memory."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision typé",
+    "definition": "Modèle de langage qui ne génère pas de texte : il répond à une question fermée en donnant directement une probabilité pour chaque option autorisée."
+   },
+   {
+    "terme": "LLM-as-a-Judge",
+    "definition": "Pratique qui consiste à faire évaluer les sorties d'un modèle par un grand modèle de langage, à la place d'un annotateur humain."
+   },
+   {
+    "terme": "Exactitude équilibrée (BAcc)",
+    "definition": "Moyenne du taux de détection sur les cas positifs et sur les cas négatifs. Insensible au déséquilibre des classes. 50 = hasard, plus haut = mieux."
+   },
+   {
+    "terme": "ECE",
+    "definition": "Erreur de calibration attendue : écart moyen entre la confiance affichée et le taux réel de bonnes réponses. Plus bas = mieux."
+   },
+   {
+    "terme": "conf-AUROC",
+    "definition": "Probabilité qu'une bonne décision ait une confiance plus élevée qu'une erreur. 0,5 = la confiance ne sert à rien, 1 = séparation parfaite."
+   },
+   {
+    "terme": "Cascade de confiance",
+    "definition": "Enchaînement de modèles où chacun ne transmet au suivant que la part des cas sur lesquels il est le moins sûr."
+   },
+   {
+    "terme": "Validation croisée (cross-fitting)",
+    "definition": "Choisir les réglages sur une partie des données et mesurer sur une autre, pour éviter un score gonflé par la sélection."
+   },
+   {
+    "terme": "Faux négatif",
+    "definition": "Hallucination réelle que le juge laisse passer en la déclarant correcte."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Decision Models as Judges for Hallucination Detection (Liu et al.)",
+    "url": "https://arxiv.org/abs/2610.37229",
+    "type": "primaire",
+    "date": "2026-10-27"
+   },
+   {
+    "titre": "Do We Need an LLM to Know Why Sources Conflict? Decision Models for Knowledge-Conflict Typing in RAG",
+    "url": "https://arxiv.org/abs/2610.36915",
+    "type": "primaire",
+    "date": "2026-10-27"
+   },
+   {
+    "titre": "MedJev: Evaluating Zero-Shot System-One Decision Making in Medicine",
+    "url": "https://arxiv.org/abs/2610.36006",
+    "type": "primaire",
+    "date": "2026-10-26"
+   },
+   {
+    "titre": "Fiche Hugging Face perplexity-ai/pplx-decider-v1.1-27b",
+    "url": "https://huggingface.co/perplexity-ai/pplx-decider-v1.1-27b",
+    "type": "primaire",
+    "date": ""
+   },
+   {
+    "titre": "Fiche Hugging Face bespokelabs/Bespoke-Nimble-9B",
+    "url": "https://huggingface.co/bespokelabs/Bespoke-Nimble-9B",
+    "type": "primaire",
+    "date": "2026-09-24"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-10-27",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un petit LLM en décision typée (P(oui)/P(non)) juge-t-il la fidélité d'une réponse RAG en français aussi bien qu'un même LLM en verdict génératif, avec une meilleure calibration ?",
+  "hypothese": "La décision typée (probabilité sur deux options lue sur les logits, recalibrée par une température) atteint une exactitude équilibrée à moins de 2 points du verdict génératif du même modèle, avec une ECE inférieure d'au moins 30 % et une conf-AUROC supérieure, en une seule passe sans génération.",
+  "reference": {
+   "nom": "Juge génératif (verdict + confiance verbalisée)",
+   "description": "Le LLM lit contexte, question et réponse puis écrit un verdict (fidèle / infidèle) et une confiance entre 0 et 1, analysés dans le texte généré.",
+   "implementation": "transformers, AutoModelForCausalLM en fp16 sur GPU, template de chat, génération gloutonne limitée à 24 tokens, extraction par expression régulière du verdict et de la confiance (défaut 0,5 si non analysable, taux d'échec rapporté). Prompt unique identique pour les deux approches quant à l'énoncé de la tâche. Entrées tronquées à 1 024 tokens (contexte conservé en tête).",
+   "modeles_hf": [
+    "Qwen/Qwen2.5-3B-Instruct"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen2.5-0.5B-Instruct"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "llmaas"
+  },
+  "nouvelle": {
+   "nom": "Décision typée à deux options avec recalibration",
+   "description": "Même modèle, même énoncé, mais la sortie est la distribution restreinte aux deux tokens d'options (H = hallucination, N = fidèle) lue au dernier token du prompt ; une température calibrée sur un lot séparé donne la probabilité.",
+   "implementation": "Une passe avant par exemple, logits des tokens « H » et « N » extraits, softmax sur ces deux seuls tokens ; deux ordres de présentation des options (H/N puis N/H avec lettres échangées) moyennés ; température et seuil ajustés par minimisation de la log-vraisemblance sur le lot de calibration (150 exemples) ; cascade optionnelle : les 25 % de cas les moins confiants sont comptés comme « à renvoyer à un second juge » (taux de couverture et exactitude sur le reste).",
+   "modeles_hf": [
+    "Qwen/Qwen2.5-3B-Instruct"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen2.5-0.5B-Instruct"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "KRLabsOrg/ragtruth-fr-translated",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "",
+   "colonnes_utiles": "prompt (consigne + contexte), answer, labels (spans ; liste vide = fidèle), task_type",
+   "representativite": "RAGTruth est le jeu de la ligne « infidélité au contexte » de l'étude source ; sa version française (test de 2 700 lignes, MIT) permet de mesurer la qualité et la calibration d'un juge de fidélité RAG avec étiquettes humaines au niveau réponse (dérivées des spans).",
+   "ecarts_donnees_reelles": "Traduction automatique (français artificiel), réponses de LLM de 2023 aux erreurs plus grossières, domaines actualités / QA web / descriptions de restaurants, aucune donnée de services financiers, spans pouvant avoir bougé à la traduction (évaluation au niveau réponse seulement), classes déséquilibrées.",
+   "jeux_explores": [
+    {
+     "nom": "KRLabsOrg/ragtruth-fr-translated",
+     "url": "https://huggingface.co/datasets/KRLabsOrg/ragtruth-fr-translated",
+     "acces": "hub_libre",
+     "adequation": "RAGTruth traduit, split test de 2 700 lignes, spans d'hallucination, trois tâches.",
+     "decision": "retenu",
+     "raison": "Même source que le chiffre de l'étude (BAcc 82,6), licence MIT, chargeable, split test explicite."
+    },
+    {
+     "nom": "alexandrainst/ragtruth-translated-hallucinations",
+     "url": "https://huggingface.co/datasets/alexandrainst/ragtruth-translated-hallucinations",
+     "acces": "hub_libre",
+     "adequation": "Seconde traduction française (config fr) du même corpus.",
+     "decision": "ecarte",
+     "raison": "Licence avec clause de restriction OpenAI à valider et test à extraire via la colonne split ; utile plus tard pour mesurer le bruit de traduction."
+    },
+    {
+     "nom": "imerad-kv/memerag",
+     "url": "https://huggingface.co/datasets/imerad-kv/memerag",
+     "acces": "hub_libre",
+     "adequation": "Français natif annoté par des humains, mais par phrase et seulement ~250 questions.",
+     "decision": "ecarte",
+     "raison": "Trop petit pour trancher à 2 points, licence CC BY-NC et miroir tiers non audité."
+    },
+    {
+     "nom": "wandb/RAGTruth-processed",
+     "url": "https://huggingface.co/datasets/wandb/RAGTruth-processed",
+     "acces": "hub_libre",
+     "adequation": "Version anglaise d'origine, utile pour reproduire l'anglais.",
+     "decision": "ecarte",
+     "raison": "Schéma non vérifié et licence non précisée ; la question porte sur le français."
+    },
+    {
+     "nom": "greenbureau/rag-hallucination-dataset-fr",
+     "url": "https://huggingface.co/datasets/greenbureau/rag-hallucination-dataset-fr",
+     "acces": "hub_libre",
+     "adequation": "800 triplets contexte/question/réponse en français.",
+     "decision": "ecarte",
+     "raison": "Aucune étiquette de fidélité, réponses d'abstention quasi uniques."
+    },
+    {
+     "nom": "MEMERAG (amazon-science)",
+     "url": "https://github.com/amazon-science/MEMERAG",
+     "acces": "telechargement_libre",
+     "adequation": "Meilleure référence humaine en français natif pour juger des juges.",
+     "decision": "ecarte",
+     "raison": "Hors Hub (GitHub), CC BY-NC, petit effectif ; piste de confirmation pour la phase interne."
+    }
+   ]
+  },
+  "metriques": [
+   "balanced_accuracy",
+   "false_negative_rate",
+   "expected_calibration_error",
+   "brier_score",
+   "conf_auroc",
+   "parse_failure_rate",
+   "coverage_at_25pct_deferral",
+   "balanced_accuracy_after_deferral"
+  ],
+  "metrique_principale": "balanced_accuracy",
+  "sens": "max",
+  "protocole": "Échantillon stratifié de 500 exemples du split test (250 fidèles / 250 infidèles quand possible) : 150 pour la calibration (température, seuil), 350 pour l'évaluation, même découpage pour les deux approches. Verdict binaire : infidèle si labels non vide. IC à 95 % par bootstrap (1 000 rééchantillonnages), test de McNemar apparié sur les verdicts, bootstrap apparié sur les différences d'ECE. Résultats aussi par task_type. Le seuil de décision de la décision typée est choisi pour équilibrer sensibilité et spécificité sur le lot de calibration. Seule la phase d'inférence est exécutée, aucun entraînement.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Substitut Qwen/Qwen2.5-0.5B-Instruct (même famille) sur CPU, 120 exemples (40 calibration, 80 évaluation) et entrées tronquées à 512 tokens. Échelle complète sur T4 en fp16 : 500 exemples × ~800 tokens ≈ 400 k tokens par passe ; passe typée (×2 ordres) ≈ 800 k tokens ÷ 700 tok/s ≈ 19 min, plus le juge génératif (prefill 400 k tokens ≈ 10 min + décodage) ; trop long, donc le second ordre n'est calculé que sur l'évaluation (350) et les entrées sont tronquées à 768 tokens, soit ≈ 30 min au total avec chargement ; limites : le juge génératif ne reçoit qu'un ordre.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "context",
+     "type": "str",
+     "description": "Passages récupérés fournis au générateur"
+    },
+    {
+     "colonne": "question",
+     "type": "str",
+     "description": "Question ou demande du client"
+    },
+    {
+     "colonne": "answer",
+     "type": "str",
+     "description": "Réponse générée à juger"
+    },
+    {
+     "colonne": "is_unfaithful",
+     "type": "int",
+     "description": "Étiquette humaine 1 si la réponse contredit ou invente par rapport au contexte, 0 sinon"
+    },
+    {
+     "colonne": "topic",
+     "type": "str",
+     "description": "Thème de la demande, pour l'analyse par segment"
+    },
+    {
+     "colonne": "generated_at",
+     "type": "datetime",
+     "description": "Date de génération, pour un découpage temporel"
+    }
+   ],
+   "volume_conseille": "≥ 500 réponses annotées, dont ≥ 150 infidèles ; idéalement 1 000.",
+   "metriques_metier": "Taux de faux négatifs (réponses infidèles non détectées), part du trafic traitée sans second avis à exactitude donnée, coût et latence par contrôle.",
+   "garde_fous": "Ne pas utiliser un juge LLM pour produire les étiquettes ; la confiance n'est pas une preuve (examiner les erreurs à confiance ≥ 0,9) ; garder un échantillon humain en production ; juge jamais seul pour une décision sur un client.",
+   "prescriptions": [
+    "Étiquettes d'infidélité posées par au moins deux annotateurs humains avec accord (kappa) rapporté, désaccords arbitrés.",
+    "Au moins 150 réponses infidèles et 350 fidèles, pour mesurer faux négatifs et exactitude équilibrée.",
+    "Réponses issues des LLM réellement utilisés en production, pas de LLM obsolètes.",
+    "Découpage temporel : calibration sur la période la plus ancienne, évaluation sur la plus récente.",
+    "Contexte exactement tel que vu par le générateur (passages tronqués inclus).",
+    "Anonymiser les noms, numéros de compte et coordonnées avant extraction ; exclure les cas à données de santé."
+   ],
+   "preparation": "Extraire les journaux de génération RAG (contexte récupéré, question, réponse) sur une période représentative, échantillonner par thème avec sur-échantillonnage des réponses à faible score de pertinence, faire annoter par des experts métier le caractère fidèle ou non, puis geler les lots calibration et évaluation."
+  },
+  "duree_estimee_minutes": 300,
+  "analyse_materiel": "Un LLM de 3 Md de paramètres lisant ~400 k tokens par passe est trop lent sur 2 cœurs CPU (plusieurs heures) et dépasse 1 Md : GPU nécessaire.",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "Qwen/Qwen2.5-3B-Instruct": {
+    "id": "Qwen/Qwen2.5-3B-Instruct",
+    "sha": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 3085938688,
+    "licence": "other",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   },
+   "Qwen/Qwen2.5-0.5B-Instruct": {
+    "id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "sha": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 494032768,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "KRLabsOrg/ragtruth-fr-translated",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": "mit",
+   "colonnes": {
+    "prompt": "Value",
+    "answer": "Value",
+    "labels": "liste",
+    "task_type": "Value",
+    "dataset": "Value",
+    "language": "Value"
+   },
+   "exemple": {
+    "prompt": "Résumez les nouvelles suivantes en 116 mots :\nIl y a soixante-dix ans, Anne Frank est décédée de la typhoïde dans un camp de concentration nazi à l'âge de 15 an",
+    "answer": "La Maison Anne Frank a révélé qu'Anne Frank et sa sœur aînée, Margot, sont probablement décédées au moins un mois plus tôt que ce que l'on pensait auparavant. L",
+    "task_type": "Summary",
+    "dataset": "ragtruth",
+    "language": "french"
+   },
+   "lignes": {
+    "train": 15090,
+    "test": 2700
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
