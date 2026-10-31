@@ -36,6 +36,41 @@
    "tentatives": 1
   },
   {
+   "jour": "2026-10-31",
+   "sujet_id": "modeles-decision-juges-hallucination",
+   "depot": "20261031_typed_decision_rag_faithfulness_judge",
+   "titre": "Un petit LLM en décision typée (P(oui)/P(non)) juge-t-il la fidélité d'une réponse RAG en français aussi bien qu'un même LLM en verdict génératif, avec une meilleure calibration ?",
+   "statut": "echec",
+   "iterations": 3,
+   "raison": "la phase publique a échoué",
+   "cause": "methode",
+   "duree_minutes": 132.9,
+   "consommation": {
+    "claude:poc_code:modeles-decision-juges-hallucination": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 765.7,
+     "cout_equivalent_usd": 2.0212,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:modeles-decision-juges-hallucination": {
+     "appels": 4,
+     "echecs": 0,
+     "secondes": 1440.7,
+     "cout_equivalent_usd": 5.8296,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:modeles-decision-juges-hallucination": {
+     "appels": 3,
+     "echecs": 0,
+     "secondes": 145.6,
+     "cout_equivalent_usd": 0.8673,
+     "recherches_web": 0
+    }
+   },
+   "tentatives": 1
+  },
+  {
    "jour": "2026-10-30",
    "sujet_id": "baseten-joey-1-decision-model",
    "depot": "20261030_typed_decision_model_camembert_hierarchical_intent",
