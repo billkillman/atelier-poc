@@ -213,6 +213,7 @@ class Colab:
         base = {"phase": "publique", "taille": "complete", "ok": False, "materiel": self.materiel, "resultats": None}
 
         def echec(nature: str, message: str = "", **kw) -> dict:
+            suivi(f"[poc] Colab : {nature}" + (f" : {message.strip()[-300:]}" if message.strip() else ""))
             return {**base, "secondes": round(time.time() - t0), **kw,
                     "erreur": {"nature": nature, "cellule": kw.pop("cellule", None), "section": kw.pop("section", None),
                                "source": "", "message": message[-3000:]}}

@@ -2,69 +2,6 @@
  "version": 1,
  "pocs": [
   {
-   "jour": "2026-10-30",
-   "sujet_id": "baseten-joey-1-decision-model",
-   "depot": "20261030_typed_decision_model_camembert_hierarchical_intent",
-   "titre": "Un modèle de décision typé entraîné pour la calibration (joey-1) rattrape-t-il un classifieur CamemBERT bien réglé sur des intentions françaises hiérarchisées ?",
-   "statut": "valide",
-   "niveau_sandbox": "reduit",
-   "echelle": "reduite",
-   "materiel": "CPU du sandbox",
-   "echelle_complete": {
-    "statut": "echec",
-    "materiel_requis": "gpu",
-    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné (réglé))",
-    "raison": "machine Colab inutilisable"
-   },
-   "iterations": 3,
-   "metrique_principale": "macro_f1",
-   "sens": "max",
-   "approches": [
-    {
-     "nom": "CamemBERT-base fine-tuné",
-     "role": "reference",
-     "valeur": 0.036329011938768044,
-     "ic95": [
-      0.023901808785529718,
-      0.06134573162856774
-     ]
-    },
-    {
-     "nom": "Décision typée hiérarchique (Qwen/Qwen3-0.6B)",
-     "role": "nouvelle",
-     "valeur": 0.003205128205128205,
-     "ic95": [
-      0.0,
-      0.011029411764705883
-     ]
-    }
-   ],
-   "n_exemples": 100,
-   "jeu": "mteb/amazon_massive_intent",
-   "synthese": "macro_f1 : Décision typée hiérarchique (Qwen/Qwen3-0.6B) 0,00321 contre 0,0363 pour CamemBERT-base fine-tuné (100 exemples, échelle réduite, CPU du sandbox).",
-   "conclusion": "À l'échelle réduite, le substitut Qwen3-0.6B obtient un macro-F1 de 0,003 et 1 % d'exactitude. CamemBERT, entraîné sur ~1 000 exemples pendant une époque, atteint 0,036 et 14 %. Ces deux systèmes sont quasi au hasard, sur 100 messages de test. Ces chiffres valident le code, pas l'hypothèse : on ne sait rien de joey-1 face à un CamemBERT bien réglé. Le substitut n'est pas un modèle de décision et rien ne permet de comparer aux chiffres de la fiche.",
-   "confiance": "moyenne",
-   "reproduit_la_source": "non_comparable",
-   "en_bref": "Verdict impossible : seul un substitut non représentatif et une référence sous-entraînée ont tourné, tous deux proches du hasard. Le code s'exécute, mais ni la justesse, ni la calibration, ni la stabilité de joey-1 ne sont mesurées.",
-   "libelle_metrique": "macro-F1 (classe fine)",
-   "reserves": [
-    "Les chiffres du substitut (exactitude quasi nulle, accord nul) ne disent rien sur joey-1. Ils ne démontrent pas non plus que la chaîne de calcul est exacte : à l'échelle réduite, le comportement de joey-1 reste inconnu.",
-    "Ces résultats valident seulement que le code s'exécute. Ni l'écart ni sa « significativité » ne mesurent la capacité de joey-1 face à un classifieur bien réglé ; aucune conclusion n'est permise."
-   ],
-   "duree_minutes": 4.0,
-   "consommation": {
-    "claude:poc_revue:baseten-joey-1-decision-model": {
-     "appels": 1,
-     "echecs": 0,
-     "secondes": 80.2,
-     "cout_equivalent_usd": 0.3366,
-     "recherches_web": 0
-    }
-   },
-   "url": "https://github.com/billkillman/20261030_typed_decision_model_camembert_hierarchical_intent",
-   "tentatives": 1
-  },
-  {
    "jour": "2026-10-27",
    "sujet_id": "modeles-decision-typees-audit-independant-d3-ultra",
    "depot": "20261027_typed_decision_slm_camembert_intents",
