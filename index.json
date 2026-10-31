@@ -2,6 +2,78 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-10-30",
+   "sujet_id": "baseten-joey-1-decision-model",
+   "depot": "20261030_typed_decision_model_camembert_hierarchical_intent",
+   "titre": "Un modèle de décision typé entraîné pour la calibration (joey-1) rattrape-t-il un classifieur CamemBERT bien réglé sur des intentions françaises hiérarchisées ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "complete",
+   "materiel": "GPU T4 (Google Colab)",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné (réglé))",
+    "raison": ""
+   },
+   "iterations": 4,
+   "metrique_principale": "macro_f1",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "CamemBERT-base fine-tuné",
+     "role": "reference",
+     "valeur": 0.8077034958726389,
+     "ic95": [
+      0.7645369606165637,
+      0.8712017165334539
+     ]
+    },
+    {
+     "nom": "Décision typée hiérarchique (baselabs/joey-1)",
+     "role": "nouvelle",
+     "valeur": 0.7060155759363572,
+     "ic95": [
+      0.653337977999285,
+      0.7685810995527141
+     ]
+    }
+   ],
+   "n_exemples": 404,
+   "jeu": "mteb/amazon_massive_intent",
+   "synthese": "macro_f1 : Décision typée hiérarchique (baselabs/joey-1) 0,706 contre 0,808 pour CamemBERT-base fine-tuné (404 exemples, GPU T4 (Google Colab)).",
+   "conclusion": "À l'échelle complète (GPU T4, 404 énoncés de test sur 1500 prévus, mêmes messages pour les deux approches), CamemBERT-base bien réglé obtient un macro-F1 de 0,81 contre 0,71 pour joey-1 en zéro-shot hiérarchique. L'écart de −10,2 points (intervalle −16,5 à −4,7) rejette l'hypothèse « à moins de 5 points ». L'exactitude suit (0,86 contre 0,77), et McNemar donne 48 messages justes pour la référence seule contre 11. La calibration après recalibration (ECE 0,048 contre 0,043) et l'accord sous permutation (0,92) sont proches des seuils, mais non tranchés vu les intervalles. Le Brier est moins bon (0,33 contre 0,22), et la latence de 8,2 s contre 14 ms ne se compare pas au 20 ms de la fiche. Les chiffres de l'échelle réduite (substitut, micro-modèle) ne valent que pour le code. Conclusion indicative : jeu d'assistant vocal, hors services financiers, langue française.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Le zéro-shot ne rattrape pas un CamemBERT bien réglé sur ces intentions françaises ; il pourrait servir de premier tri sous seuil, mais sa calibration et son coût restent à valider sur données internes.",
+   "libelle_metrique": "macro-F1 (classe fine)",
+   "reserves": [
+    "Les chiffres reposent sur 404 énoncés, soit environ un quart du test prévu. Les écarts fins (calibration, accord sous permutation) ne sont pas tranchés ; seul l'écart de justesse est net.",
+    "La calibration et la stabilité de joey-1 sont compatibles avec les seuils visés, mais pas démontrées : l'incertitude couvre les deux côtés. Le score de Brier, lui, est nettement moins bon que celui de la référence.",
+    "Le chiffre de « part des erreurs de motif » ne se compare pas au seuil de 20 %. Sur l'ensemble des messages, joey-1 se trompe de motif environ une fois sur cinq, contre environ une fois sur dix pour CamemBERT.",
+    "Le rapport de latence d'environ 500 contre CamemBERT vient surtout du protocole hiérarchique à une trentaine de questions sur un GPU modeste. Il ne contredit ni ne confirme le 20 ms annoncé."
+   ],
+   "duree_minutes": 103.2,
+   "consommation": {
+    "claude:poc_reparation:baseten-joey-1-decision-model": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 324.1,
+     "cout_equivalent_usd": 1.4551,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:baseten-joey-1-decision-model": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 103.3,
+     "cout_equivalent_usd": 0.6427,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261030_typed_decision_model_camembert_hierarchical_intent",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-10-27",
    "sujet_id": "modeles-decision-typees-audit-independant-d3-ultra",
    "depot": "20261027_typed_decision_slm_camembert_intents",
