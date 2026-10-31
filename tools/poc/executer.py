@@ -13,6 +13,7 @@ Usage : python executer.py --entree poc.ipynb --sortie execute.ipynb --phase pub
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
@@ -128,7 +129,8 @@ def main() -> int:
             provisoire = progres.with_suffix(".tmp")
             provisoire.write_text(json.dumps({**en_cours, "sortie": flux[-1]["text"][-300:] if flux else ""},
                                              ensure_ascii=False), encoding="utf-8")
-            provisoire.replace(progres)
+            with contextlib.suppress(OSError):  # un relevé manqué ne doit jamais arrêter l'exécution (fichier relu sous Windows)
+                provisoire.replace(progres)
 
     def debut_cellule(cell, cell_index, **_):  # en cas d'arrêt brutal (délai global), dit quelle cellule tournait
         en_cours.update(cellule=cell_index, section=cell.get("metadata", {}).get("section"),

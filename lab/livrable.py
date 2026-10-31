@@ -44,15 +44,16 @@ def empreinte_terme(terme: str) -> str:
     return hashlib.sha256(" ".join(_mots(terme)).encode()).hexdigest()[:16]
 
 
-def termes_interdits(texte: str) -> list[str]:
-    """Mots ou groupes de trois mots au plus du texte dont l'empreinte est interdite."""
-    if not EMPREINTES:
+def termes_interdits(texte: str, empreintes=None) -> list[str]:
+    """Mots ou groupes de trois mots au plus du texte dont l'empreinte est interdite (celles de l'atelier par défaut)."""
+    empreintes = EMPREINTES if empreintes is None else empreintes
+    if not empreintes:
         return []
     mots, trouves = _mots(texte), set()
     for n in (1, 2, 3):
         for i in range(len(mots) - n + 1):
             groupe = " ".join(mots[i:i + n])
-            if hashlib.sha256(groupe.encode()).hexdigest()[:16] in EMPREINTES:
+            if hashlib.sha256(groupe.encode()).hexdigest()[:16] in empreintes:
                 trouves.add(groupe)
     return sorted(trouves)
 
@@ -704,10 +705,14 @@ def readme(fiche: dict, plan: dict, faits: dict, etat: dict, res: dict, revue: d
 
     # 7. Références
     L += ["## Références", ""]
-    sources = [s for s in fiche.get("sources", [])[:8] if s.get("url")]
+    # Une référence que le titre ou l'URL rattacherait à un secteur est retirée entière : ces listes sont facultatives,
+    # et le contrôle final de neutralité porte sur les URL. Le 2026-10-31, l'URL d'un jeu écarté (.../bank-marketing)
+    # a bloqué un POC validé, à la toute fin.
+    sources = [s for s in fiche.get("sources", [])[:8] if s.get("url") and not termes_interdits(f"{s.get('titre')} {s['url']}")]
     if sources:
         L += ["**Sources de l'approche**", ""] + [f"- [{_cellule(s.get('titre') or s['url'])}]({s['url']})" for s in sources] + [""]
-    autres = [x for x in j.get("jeux_explores") or [] if x.get("decision") != "retenu"]
+    autres = [x for x in j.get("jeux_explores") or [] if x.get("decision") != "retenu"
+              and not termes_interdits(f"{x.get('nom')} {x.get('url')}")]
     if autres:
         L += ["**Autres jeux de données examinés**", "", "| Jeu | Accès | Intérêt | Pourquoi pas ici |", "|---|---|---|---|"]
         L += [(f"| [{_cellule(x['nom'])}]({x['url']})" if x.get("url") else f"| {_cellule(x['nom'])}")

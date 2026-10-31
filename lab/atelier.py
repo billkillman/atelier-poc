@@ -167,6 +167,7 @@ def controler_neutralite(code: dict) -> list[str]:
             erreurs.append(f"cellule {i} ({c['section']}) : terme « {terme} » interdit dans un dépôt public (dire « données "
                            "internes », « services financiers », « expérience »)")
     textes = [code.get("protocole"), code.get("ecarts_sandbox"), code.get("resume_simple"), *(code.get("limites") or []),
+              *(code.get("dependances") or []),
               *[f"{g.get('terme')} {g.get('definition')}" for g in code.get("glossaire") or []],
               *[f"{m.get('libelle')} {m.get('explication')}" for m in code.get("lecture_des_metriques") or []]]
     for terme in sorted({x for s in textes for x in livrable.termes_interdits(s or "")}):

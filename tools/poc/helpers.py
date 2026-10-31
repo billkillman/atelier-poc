@@ -620,16 +620,20 @@ def bootstrap_ci(y_true, y_pred, metric, n: int = 1000, seed: int = 0, alpha: fl
     """Valeur de `metric(y_true, y_pred)` et son intervalle de confiance à 95 % par bootstrap : (valeur, bas, haut).
 
     Le bootstrap rééchantillonne les exemples de test avec remise : l'intervalle dit à quel point le chiffre dépend
-    des exemples tirés."""
+    des exemples tirés. `metric` reçoit le type donné ici : des tableaux NumPy pour des tableaux, des listes sinon."""
+    tableaux = hasattr(y_true, "__array__") and hasattr(y_pred, "__array__")
     y_true, y_pred = list(y_true), list(y_pred)
     if len(y_true) != len(y_pred) or not y_true:
         raise ValueError("y_true et y_pred doivent avoir la même longueur non nulle")
+    if tableaux:
+        import numpy as np
+        y_true, y_pred = np.asarray(y_true), np.asarray(y_pred)
     rng = random.Random(seed)
     m = len(y_true)
     values = []
     for _ in range(n):
         idx = [rng.randrange(m) for _ in range(m)]
-        values.append(metric([y_true[i] for i in idx], [y_pred[i] for i in idx]))
+        values.append(metric(y_true[idx], y_pred[idx]) if tableaux else metric([y_true[i] for i in idx], [y_pred[i] for i in idx]))
     values.sort()
     return float(metric(y_true, y_pred)), float(values[int(alpha / 2 * n)]), float(values[min(n - 1, int((1 - alpha / 2) * n))])
 

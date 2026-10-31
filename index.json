@@ -3,40 +3,6 @@
  "pocs": [
   {
    "jour": "2026-10-31",
-   "sujet_id": "tabulaire-fondation-calibration-explicabilite",
-   "depot": "20261031_tabular_foundation_credit_calibration",
-   "titre": "Un modèle de fondation tabulaire (TabICL) est-il mieux calibré et discriminant qu'XGBoost sur un scoring de crédit, à petit n et après recalibration ?",
-   "statut": "echec",
-   "cause": "methode",
-   "raison": "livrable non neutre : README.md : « bank »",
-   "duree_minutes": 40.8,
-   "consommation": {
-    "claude:poc_code:tabulaire-fondation-calibration-explicabilite": {
-     "appels": 1,
-     "echecs": 0,
-     "secondes": 572.3,
-     "cout_equivalent_usd": 1.5254,
-     "recherches_web": 0
-    },
-    "claude:poc_reparation:tabulaire-fondation-calibration-explicabilite": {
-     "appels": 2,
-     "echecs": 0,
-     "secondes": 462.6,
-     "cout_equivalent_usd": 2.0475,
-     "recherches_web": 0
-    },
-    "claude:poc_revue:tabulaire-fondation-calibration-explicabilite": {
-     "appels": 2,
-     "echecs": 0,
-     "secondes": 86.8,
-     "cout_equivalent_usd": 0.5018,
-     "recherches_web": 0
-    }
-   },
-   "tentatives": 1
-  },
-  {
-   "jour": "2026-10-31",
    "sujet_id": "modeles-decision-juges-hallucination",
    "depot": "20261031_typed_decision_rag_faithfulness_judge",
    "titre": "Un petit LLM en décision typée (P(oui)/P(non)) juge-t-il la fidélité d'une réponse RAG en français aussi bien qu'un même LLM en verdict génératif, avec une meilleure calibration ?",
