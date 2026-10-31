@@ -18,6 +18,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -84,6 +85,7 @@ def main() -> int:
     ap.add_argument("--taille", choices=["sandbox", "complete"], default="sandbox")
     ap.add_argument("--graine", type=int, default=42)
     ap.add_argument("--timeout-cellule", type=int, default=1800)
+    ap.add_argument("--intervalle-progres", type=int, default=60, help="secondes entre deux relevés de la sortie de la cellule en cours")
     ap.add_argument("--freeze", help="fichier où écrire `pip freeze` après l'exécution")
     ap.add_argument("--modeles", default="", help="phase privée : modèles (org/nom, séparés par des virgules) à servir hors ligne")
     a = ap.parse_args()
@@ -118,12 +120,29 @@ def main() -> int:
     client = NotebookClient(nb, timeout=a.timeout_cellule, kernel_name="python3", allow_errors=False,
                             resources={"metadata": {"path": str(dossier)}})
     progres = dossier / f"progres_{a.phase}.json"
+    en_cours, verrou = {}, threading.Lock()
+
+    def noter_progres():  # écriture atomique : le fichier est relu pendant l'exécution (Colab)
+        flux = [o for o in nb.cells[en_cours["cellule"]].get("outputs", []) if o.get("output_type") == "stream"]
+        with verrou:
+            provisoire = progres.with_suffix(".tmp")
+            provisoire.write_text(json.dumps({**en_cours, "sortie": flux[-1]["text"][-300:] if flux else ""},
+                                             ensure_ascii=False), encoding="utf-8")
+            provisoire.replace(progres)
 
     def debut_cellule(cell, cell_index, **_):  # en cas d'arrêt brutal (délai global), dit quelle cellule tournait
-        progres.write_text(json.dumps({"cellule": cell_index, "section": cell.get("metadata", {}).get("section"),
-                                       "source": (cell.get("source") or "")[:3000]}, ensure_ascii=False), encoding="utf-8")
+        en_cours.update(cellule=cell_index, section=cell.get("metadata", {}).get("section"),
+                        source=(cell.get("source") or "")[:3000])
+        noter_progres()
+
+    def relever_sortie():  # le notebook n'est écrit qu'à la fin : sans ce relevé, un arrêt brutal ne laisse aucune mesure
+        while True:
+            time.sleep(a.intervalle_progres)
+            if en_cours:
+                noter_progres()
 
     client.on_cell_start = debut_cellule
+    threading.Thread(target=relever_sortie, daemon=True).start()
     try:
         client.execute()
         rapport["ok"] = True

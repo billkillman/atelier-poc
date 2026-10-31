@@ -21,8 +21,8 @@ poc:
     actif: true
     gpu: T4
     solde_min_unites: 5
-    timeout: 2700
-    timeout_cellule: 1800
+    timeout: 6000
+    timeout_cellule: 5400
     intervalle: 60
   empreintes_interdites:
   - 18889a721a537ee1

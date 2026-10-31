@@ -474,11 +474,12 @@ ROLES = {"reference": "référence", "nouvelle": "nouvelle"}
 def resume_poc(plan: dict, etat: dict, res: dict, revue: dict) -> dict:
     mp = res["primary_metric"]
     vals = {a["role"]: a["metrics"][mp] for a in res["approaches"]}
+    noms = {a["role"]: a["name"] for a in res["approaches"]}  # ceux du notebook : à l'échelle réduite, un substitut éventuel
     complet = etat.get("complete") or {}
     echelle = "complete" if etat.get("resultats_complets") else "reduite"
     ou = complet.get("materiel") if echelle == "complete" else "échelle réduite, CPU du sandbox"
-    synthese = (f"{mp} : {plan['nouvelle']['nom']} {nombre(vals.get('new'))} contre "
-                f"{nombre(vals.get('reference'))} pour {plan['reference']['nom']} ({res['dataset']['n_examples']} exemples, {ou}).")
+    synthese = (f"{mp} : {noms.get('new')} {nombre(vals.get('new'))} contre "
+                f"{nombre(vals.get('reference'))} pour {noms.get('reference')} ({res['dataset']['n_examples']} exemples, {ou}).")
     return {"sujet_id": etat["sujet_id"], "titre": plan["titre"], "statut": "valide", "niveau_sandbox": plan["niveau_sandbox"],
             "echelle": echelle, "materiel": complet.get("materiel") if echelle == "complete" else "CPU du sandbox",
             "echelle_complete": {c: complet.get(c) for c in ("statut", "materiel_requis", "raison_materiel", "raison")},
@@ -668,7 +669,7 @@ class Atelier:
         delai = int(self.temps_restant() - 600)
         self.note(f"[poc] {self.sid} : échelle complète sur {'GPU' if materiel == 'gpu' else 'CPU du sandbox'} ({raison})")
         if materiel == "gpu":
-            rapport = self.colab.executer(self.dir, OUTILS, delai=delai)
+            rapport = self.colab.executer(self.dir, OUTILS, delai=delai, suivi=self.note)
             notebook = self.dir / "complete" / "execute_complete.ipynb"
         else:
             budget = min(self.conf["timeouts"]["complete_cpu"], delai)

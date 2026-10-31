@@ -96,7 +96,8 @@ if paquets:
 with open(r / "execution.log", "w") as log:
     code = subprocess.call([py, "executer.py", "--entree", "poc.ipynb", "--sortie", "execute_complete.ipynb",
                             "--rapport", "rapport_complete.json", "--phase", "publique", "--taille", "complete",
-                            "--timeout-cellule", "{delai_cellule}"], cwd=r, env=env, stdout=log, stderr=subprocess.STDOUT)
+                            "--timeout-cellule", "{delai_cellule}", "--intervalle-progres", "{intervalle}"],
+                           cwd=r, env=env, stdout=log, stderr=subprocess.STDOUT)
 (r / "fin.code").write_text(str(code))
 """
 
@@ -133,9 +134,18 @@ print("POC_LANCE")
 _ETAT = """
 import json, pathlib
 r = pathlib.Path({racine!r})
-lire = lambda n: (r / n).read_text(errors="replace").strip() if (r / n).exists() else None
+lire = lambda n: (r / n).read_text(encoding="utf-8", errors="replace").strip() if (r / n).exists() else None
 print("POC_ETAT " + json.dumps({{"fin": lire("fin.code"), "progres": lire("progres_publique.json")}}))
 """
+
+
+def _ligne_progres(progres: str | None) -> str:
+    """Cellule en cours et dernière ligne qu'elle a écrite, depuis le fichier de progression de l'exécuteur."""
+    if not progres:
+        return ""
+    cel = json.loads(progres)
+    lignes = (cel.get("sortie") or "").strip().splitlines()
+    return f"cellule {cel.get('cellule')} ({cel.get('section')})" + (f" : {lignes[-1][:200]}" if lignes else "")
 
 
 def _env_sans_secret() -> dict:
@@ -191,9 +201,10 @@ class Colab:
             return f"solde Colab insuffisant ({self.solde} unités, minimum {seuil}) : jamais sur le palier gratuit"
         return None
 
-    def executer(self, dossier: Path, outils: Path, delai: int | None = None) -> dict:
+    def executer(self, dossier: Path, outils: Path, delai: int | None = None, suivi=print) -> dict:
         """Phase publique, TAILLE « complete », sur GPU. Rapport au format de l'exécuteur, plus « materiel ».
-        `delai` : délai global imposé par l'atelier (temps restant du job), jamais au-delà du réglage."""
+        `delai` : délai global imposé par l'atelier (temps restant du job), jamais au-delà du réglage.
+        `suivi` reçoit la progression : après un arrêt sur délai, elle est la seule mesure qui reste (joey-1, 2026-10-30)."""
         sortie = dossier / "complete"
         shutil.rmtree(sortie, ignore_errors=True)
         sortie.mkdir(parents=True)
@@ -224,11 +235,11 @@ class Colab:
                 if p.returncode:
                     return echec(f"envoi de {f.name} vers Colab impossible", p.stderr + p.stdout)
             lanceur = _LANCEUR.format(racine=self.racine, delai_cellule=self.conf.get("timeout_cellule", 1800),
-                                      python_sandbox=python_sandbox(outils))
+                                      intervalle=intervalle, python_sandbox=python_sandbox(outils))
             p = self._exec(nom, _DEMARRER.format(lanceur=lanceur, racine=self.racine))
             if "POC_LANCE" not in p.stdout:
                 return echec("lancement sur Colab impossible", p.stderr + p.stdout)
-            fin, progres, ratees = None, None, 0
+            fin, progres, ratees, relevee = None, None, 0, None
             while fin is None:
                 if time.time() - t0 > delai:
                     break
@@ -242,9 +253,14 @@ class Colab:
                     continue
                 ratees, etat = 0, json.loads(m.group(1))
                 fin, progres = etat["fin"], etat["progres"] or progres
+                ligne = _ligne_progres(progres)
+                if ligne and ligne != relevee:
+                    suivi(f"[poc] Colab, {round(time.time() - t0)} s : {ligne}")
+                    relevee = ligne
             if fin is None:
                 cel = json.loads(progres) if progres else {}
-                return echec(f"délai global dépassé sur Colab ({delai // 60} min)", cellule=cel.get("cellule"), section=cel.get("section"))
+                return echec(f"délai global dépassé sur Colab ({delai // 60} min)", relevee or "", cellule=cel.get("cellule"),
+                             section=cel.get("section"))
             for distant, local in (("rapport_complete.json", "rapport.json"), ("execute_complete.ipynb", "execute_complete.ipynb"),
                                    ("installation.log", "installation.log"), ("execution.log", "execution.log")):
                 self._cmd("download", "-s", nom, f"{self.racine}/{distant}", str(sortie / local), delai=300)
