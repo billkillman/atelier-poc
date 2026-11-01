@@ -1,0 +1,584 @@
+{
+ "diagnostic": "Protocole revu : plus aucune entrée tronquée à l'échelle complète, échantillon stratifié par tâche et par classe, 500 exemples d'évaluation. Le plantage de l'itération précédente venait de bootstrap_ci, corrigé.",
+ "dependances": [],
+ "cellules": [
+  {
+   "section": "context",
+   "type": "markdown",
+   "source": "### La question\nQuand un assistant répond à partir de documents récupérés (RAG), sa réponse est **infidèle** si elle contredit ces documents ou y ajoute une information absente. Pour la contrôler automatiquement, on demande souvent à un LLM « juge » d'écrire un verdict et une confiance (« sûr à 90 % ») : c'est le **LLM-as-a-Judge**. Il faut alors générer du texte, et la confiance écrite est souvent trop haute.\n\n### L'idée de la nouvelle approche : la décision typée\nMême modèle, même énoncé, mais **on ne le laisse pas écrire** : on lit au dernier token du prompt la probabilité qu'il donne aux deux lettres **H** (hallucination) et **N** (fidèle). *Analogie* : au lieu de demander à un examinateur de rédiger un avis puis de s'auto-évaluer, on regarde de quel côté sa main penche, et avec quelle force.\n\n1. **Entrée** : consigne et documents donnés au générateur, puis la réponse à juger.\n2. **Une passe avant**, sans génération : logits des tokens « H » et « N ».\n3. **Deux ordres** des options (H puis N, N puis H), moyennés contre le biais de position.\n4. **Recalibration** : une température et un décalage ajustés sur un lot séparé donnent $P(H)$.\n5. **Verdict** par un seuil sur $P(H)$ ; les 25 % de cas les moins sûrs peuvent être **renvoyés à un second avis**.\n\n### Ce que la comparaison permet de décider\n- **Condition préalable (éligibilité)** : on n'examine un juge que s'il détecte quelque chose, c'est-à-dire si la borne basse de l'intervalle à 95 % de son exactitude équilibrée dépasse 0,5 (le hasard). Sinon, la calibration d'une probabilité sans signal ne veut rien dire et le test est **non concluant**.\n- **Si les deux juges sont éligibles**, l'hypothèse est soutenue quand la décision typée reste **à moins de 2 points** d'exactitude équilibrée (borne basse de l'écart apparié), avec une **ECE inférieure d'au moins 30 %** et une **conf-AUROC** plus haute. Elle pourrait alors servir de premier filtre peu coûteux.\n- Un **contrôle positif** (erreurs grossières injectées) indique si un échec vient du modèle ou du protocole ; à l'échelle complète, aucune entrée n'est tronquée.\n- Sur les données internes, la référence est le LLM du service de l'environnement cible : l'écart y mêle l'approche et le modèle."
+  },
+  {
+   "section": "public_data",
+   "type": "markdown",
+   "source": "### Charger RAGTruth en français\nOn lit le split **test** de la traduction française de RAGTruth, le jeu de la ligne « infidélité au contexte » de l'étude source. Chaque ligne contient :\n- `prompt` : la consigne et les documents fournis au générateur ;\n- `answer` : la réponse produite ;\n- `labels` : les passages annotés comme hallucinés.\n\nOn ramène ces passages à une **étiquette au niveau réponse** : 1 (infidèle) dès qu'au moins un passage est annoté, 0 (fidèle) sinon. La traduction a pu déplacer les positions des passages, c'est pourquoi on ne les utilise pas."
+  },
+  {
+   "section": "public_data",
+   "type": "code",
+   "source": "import datasets\nimport numpy as np\nimport pandas as pd\nfrom huggingface_hub.utils import disable_progress_bars as disable_hub_progress_bars\nfrom sklearn.model_selection import train_test_split\n\ndatasets.disable_progress_bars()  # sorties lisibles : pas de barres de progression\ndisable_hub_progress_bars()\n\nDATASET_ID = \"KRLabsOrg/ragtruth-fr-translated\"  # RAGTruth traduit en français (licence MIT)\nDATASET_CONFIG = \"default\"  # unique configuration du jeu\nDATASET_SPLIT = \"test\"  # split d'évaluation officiel (2 700 lignes)\nN_TOTAL = sample_size(reduced=150, full=650)  # exemples tirés : calibration + évaluation\nN_CALIBRATION = by_scale(reduced=40, full=150)  # lot réservé à la température et au seuil\nMIN_EVAL_EXAMPLES = 100  # en dessous, la comparaison n'est pas concluante\nCALIBRATION_FRACTION = 0.3  # données internes : part la plus ancienne réservée à la calibration\n\n\ndef to_binary_label(spans) -> int:\n    \"\"\"Étiquette au niveau réponse : 1 (infidèle) si au moins un passage halluciné est annoté, 0 sinon.\"\"\"\n    if spans is None or (isinstance(spans, float) and np.isnan(spans)):\n        return 0\n    return int(len(spans) > 0)\n\n\nif PHASE == \"public\":\n    raw = datasets.load_dataset(DATASET_ID, DATASET_CONFIG, split=DATASET_SPLIT).to_pandas()\n    missing = {\"prompt\", \"answer\", \"labels\", \"task_type\"} - set(raw.columns)\n    assert not missing, f\"Colonnes absentes : {missing}\"\n    corpus = pd.DataFrame({\n        \"source_text\": raw[\"prompt\"].astype(str),  # consigne + documents fournis au générateur\n        \"answer\": raw[\"answer\"].astype(str),\n        \"label\": raw[\"labels\"].apply(to_binary_label).astype(int),\n        \"segment\": raw[\"task_type\"].astype(str),  # tâche : QA, Summary, Data2txt\n    })\n    corpus = corpus[(corpus[\"source_text\"].str.strip() != \"\") & (corpus[\"answer\"].str.strip() != \"\")]\n    corpus = corpus.reset_index(drop=True)\n    corpus[\"example_id\"] = \"test-\" + corpus.index.astype(str)\n    display(pd.crosstab(corpus[\"segment\"], corpus[\"label\"].map({0: \"fidèle\", 1: \"infidèle\"}), margins=True))"
+  },
+  {
+   "section": "public_data",
+   "type": "markdown",
+   "source": "### Un échantillon équilibré, puis deux lots\n- On tire autant d'exemples pour chaque couple **tâche × classe**. Dans le split complet, 64 % des réponses Data2txt sont infidèles contre 18 % des réponses QA : sans cette précaution, un juge pourrait gagner en reconnaissant le type de tâche.\n- Le lot de **calibration** sert uniquement à régler la température et le seuil de la décision typée ; il ne sert jamais à mesurer.\n- Le lot d'**évaluation** est mélangé avec la graine. Si un budget de temps interrompt l'inférence, les exemples déjà traités forment toujours un tirage au hasard, et ce sont les mêmes pour les deux approches."
+  },
+  {
+   "section": "public_data",
+   "type": "code",
+   "source": "def balanced_sample(df: pd.DataFrame, n_total: int, seed: int) -> pd.DataFrame:\n    \"\"\"Tire n_total exemples à parts égales entre les couples (tâche, classe), dans un ordre aléatoire.\"\"\"\n    groups = [group for _, group in df.groupby([\"segment\", \"label\"])]\n    per_group = n_total // len(groups)\n    parts = [group.sample(n=min(per_group, len(group)), random_state=seed) for group in groups]\n    sample = pd.concat(parts)\n    if len(sample) < n_total:  # division non exacte ou couple trop petit : on complète au hasard\n        rest = df.drop(index=sample.index)\n        sample = pd.concat([sample, rest.sample(n=min(n_total - len(sample), len(rest)), random_state=seed)])\n    return sample.sample(frac=1.0, random_state=seed).reset_index(drop=True)\n\n\ndef describe_splits(calibration: pd.DataFrame, evaluation: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Effectifs par classe et longueurs médianes (en caractères) des deux lots.\"\"\"\n    rows = []\n    for name, df in [(\"calibration\", calibration), (\"évaluation\", evaluation)]:\n        rows.append({\n            \"lot\": name, \"exemples\": len(df),\n            \"infidèles\": int(df[\"label\"].sum()), \"fidèles\": int((df[\"label\"] == 0).sum()),\n            \"source (car., médiane)\": int(df[\"source_text\"].str.len().median()),\n            \"réponse (car., médiane)\": int(df[\"answer\"].str.len().median()),\n        })\n    return pd.DataFrame(rows).set_index(\"lot\")\n\n\nif PHASE == \"public\":\n    sample = balanced_sample(corpus, N_TOTAL, SEED)\n    calibration_df, evaluation_df = train_test_split(\n        sample, train_size=N_CALIBRATION, stratify=sample[\"segment\"] + \"-\" + sample[\"label\"].astype(str), random_state=SEED\n    )\n    calibration_df = calibration_df.reset_index(drop=True)\n    evaluation_df = evaluation_df.reset_index(drop=True)  # ordre aléatoire conservé\n    DATASET_INFO = {\"name\": DATASET_ID, \"config\": DATASET_CONFIG, \"split\": DATASET_SPLIT}\n    display(describe_splits(calibration_df, evaluation_df))"
+  },
+  {
+   "section": "public_data",
+   "type": "markdown",
+   "source": "### Voir les données\nLa figure a deux panneaux :\n- à gauche, la **répartition des classes** par type de tâche. Le jeu complet n'est pas équilibré, et la tâche se confond en partie avec la classe ;\n- à droite, la **longueur des entrées**. À l'échelle complète, la longueur maximale de prompt (4 096 tokens) les laisse toutes entières ; seule l'échelle réduite, sur CPU, les coupe pour tenir dans son budget de temps."
+  },
+  {
+   "section": "public_data",
+   "type": "code",
+   "source": "import matplotlib.pyplot as plt\n\n\ndef plot_data_overview(df: pd.DataFrame, name: str, caption: str) -> None:\n    \"\"\"Deux panneaux : effectifs par segment et par classe ; longueur des entrées selon la classe.\"\"\"\n    fig, axes = plt.subplots(1, 2, figsize=(12, 4.2))\n    counts = pd.crosstab(df[\"segment\"], df[\"label\"]).reindex(columns=[0, 1], fill_value=0)\n    positions = np.arange(len(counts))\n    axes[0].bar(positions - 0.2, counts[0], width=0.4, color=COLORS[\"good\"], label=\"fidèle (0)\")\n    axes[0].bar(positions + 0.2, counts[1], width=0.4, color=COLORS[\"bad\"], label=\"infidèle (1)\")\n    axes[0].set_xticks(positions, counts.index, rotation=15)\n    axes[0].set(title=\"Répartition des classes par segment\", xlabel=\"segment\", ylabel=\"nombre de réponses\")\n    axes[0].legend()\n    lengths = (df[\"source_text\"].str.len() + df[\"answer\"].str.len()) / 1000\n    bins = np.linspace(0, float(lengths.quantile(0.99)), 25)\n    for value, color, text in [(0, COLORS[\"good\"], \"fidèle\"), (1, COLORS[\"bad\"], \"infidèle\")]:\n        axes[1].hist(lengths[df[\"label\"] == value], bins=bins, alpha=0.6, color=color, label=text)\n    axes[1].set(title=\"Longueur des entrées (source + réponse)\", xlabel=\"milliers de caractères\",\n                ylabel=\"nombre de réponses\")\n    axes[1].legend()\n    fig.tight_layout()\n    save_figure(fig, name, caption)\n\n\nif PHASE == \"public\":\n    plot_data_overview(\n        corpus, \"data_overview\",\n        \"Split test de RAGTruth en français. À gauche : réponses fidèles et infidèles par tâche (classes déséquilibrées). \"\n        \"À droite : longueur des entrées, toutes conservées entières à l'échelle complète.\",\n    )"
+  },
+  {
+   "section": "public_data",
+   "type": "markdown",
+   "source": "### Quelques exemples\nPour garder un affichage lisible, on coupe les textes à 160 caractères. La même fonction `shorten` resservira à l'analyse des erreurs."
+  },
+  {
+   "section": "public_data",
+   "type": "code",
+   "source": "def shorten(df: pd.DataFrame, width: int = 160) -> pd.DataFrame:\n    \"\"\"Copie du tableau dont les textes longs sont coupés à `width` caractères, pour l'affichage.\"\"\"\n    out = df.copy()\n    for column in (\"source_text\", \"answer\"):\n        if column in out:\n            out[column] = out[column].str.slice(0, width) + \"…\"\n    return out\n\n\nif PHASE == \"public\":\n    preview(shorten(evaluation_df[[\"segment\", \"label\", \"source_text\", \"answer\"]]), n=3)"
+  },
+  {
+   "section": "private_data",
+   "type": "markdown",
+   "source": "### Données internes : colonnes attendues et jeu factice\nLa phase interne lit six colonnes : passages récupérés, question, réponse, étiquette humaine d'infidélité, thème et date de génération. Pour vérifier que tout s'exécute sans exposer de vraies données, `make_fake_data` fabrique un jeu **factice** au même format :\n- des extraits de conditions (carte de paiement, virement, compte…) ;\n- une réponse fidèle, ou rendue infidèle par une **valeur modifiée** (contradiction) ou par une **affirmation inventée** ;\n- des dates étalées sur neuf mois, pour permettre le découpage temporel.\n\nCe même générateur sert, dans les deux phases, de **contrôle positif** à l'analyse : des erreurs grossières qu'un juge utile doit repérer."
+  },
+  {
+   "section": "private_data",
+   "type": "code",
+   "source": "FAKE_FACTS = [  # (thème, fait, unité, valeurs possibles) : contenu entièrement inventé\n    (\"carte de paiement\", \"le plafond de paiement sur 30 jours\", \"{} euros\", [1500, 2500, 3000, 5000]),\n    (\"carte de paiement\", \"le délai de réception d'une carte de remplacement\", \"{} jours ouvrés\", [3, 5, 7, 10]),\n    (\"virement\", \"le délai d'exécution d'un virement standard\", \"{} jours ouvrés\", [1, 2, 3]),\n    (\"virement\", \"le plafond d'un virement instantané\", \"{} euros\", [5000, 10000, 15000]),\n    (\"compte\", \"la cotisation mensuelle de l'offre essentielle\", \"{} euros\", [2, 3, 5, 8]),\n    (\"compte\", \"le délai de clôture d'un compte\", \"{} jours\", [10, 15, 30]),\n    (\"frais\", \"la commission sur un retrait hors zone euro\", \"{} %\", [1, 2, 3]),\n]\nFAKE_FILLERS = [\"Ces conditions s'appliquent à compter du 1er mars.\", \"Le client peut consulter ses conditions en ligne.\",\n                \"Toute modification est notifiée deux mois à l'avance.\", \"Les montants sont exprimés toutes taxes comprises.\",\n                \"Le service client répond du lundi au samedi.\"]\nFAKE_INVENTIONS = [\"Cette option est gratuite la première année.\", \"Ce montant peut être doublé sur simple demande.\",\n                   \"Aucun justificatif n'est demandé.\", \"Cette règle ne s'applique pas le week-end.\"]\n\n\ndef make_fake_data(n: int) -> pd.DataFrame:\n    \"\"\"Jeu factice au format des données internes : réponses fidèles ou infidèles (valeur changée ou ajout inventé).\"\"\"\n    rng = np.random.default_rng(SEED)\n    rows = []\n    for _ in range(n):\n        topic, fact, unit, values = FAKE_FACTS[rng.integers(len(FAKE_FACTS))]\n        value = values[rng.integers(len(values))]\n        context = f\"Extrait des conditions : {fact} est de {unit.format(value)}. \" + \" \".join(rng.choice(FAKE_FILLERS, 2, replace=False))\n        answer = f\"D'après les conditions en vigueur, {fact} est de {unit.format(value)}.\"\n        unfaithful = int(rng.random() < 0.4)\n        if unfaithful and rng.random() < 0.5:  # contradiction : la valeur est modifiée\n            wrong = [other for other in values if other != value][rng.integers(len(values) - 1)]\n            answer = answer.replace(unit.format(value), unit.format(wrong))\n        elif unfaithful:  # invention : affirmation absente du contexte\n            answer += \" \" + str(rng.choice(FAKE_INVENTIONS))\n        moment = pd.Timestamp(\"2026-01-05\") + pd.Timedelta(minutes=int(rng.integers(0, 60 * 24 * 270)))\n        rows.append({\"context\": context, \"question\": f\"Pouvez-vous m'indiquer {fact} ?\", \"answer\": answer,\n                     \"is_unfaithful\": unfaithful, \"topic\": topic, \"generated_at\": moment.isoformat()})\n    return pd.DataFrame(rows)"
+  },
+  {
+   "section": "private_data",
+   "type": "markdown",
+   "source": "### Nettoyer et découper dans le temps\nLe jeu est relu depuis un fichier, et tous les types y sont des chaînes. On convertit donc explicitement chaque colonne :\n- **étiquette** : déduite des deux valeurs présentes (nombres, booléens ou oui/non), la plus grande valeur désignant « infidèle » ;\n- **date** : `pd.to_datetime`. Les lignes sans étiquette ou sans date sont écartées, et leur nombre est affiché.\n\nLe **découpage temporel** réserve la période la plus ancienne à la calibration et la plus récente à l'évaluation, comme en production, où l'on règle le juge sur le passé avant de l'utiliser sur la suite."
+  },
+  {
+   "section": "private_data",
+   "type": "code",
+   "source": "PRIVATE_COLUMNS = {\n    \"context\": \"Passages récupérés fournis au générateur\",\n    \"question\": \"Question ou demande du client\",\n    \"answer\": \"Réponse générée à juger\",\n    \"is_unfaithful\": \"Étiquette humaine 1 si la réponse contredit ou invente par rapport au contexte, 0 sinon\",\n    \"topic\": \"Thème de la demande, pour l'analyse par segment\",\n    \"generated_at\": \"Date de génération, pour un découpage temporel\",\n}\nN_FAKE_ROWS = 240  # assez de lignes factices pour évaluer au moins 100 exemples\n\n\ndef parse_binary_label(series: pd.Series) -> pd.Series:\n    \"\"\"Étiquette 0/1 déduite des deux valeurs présentes ; la plus grande désigne une réponse infidèle.\"\"\"\n    text = series.astype(str).str.strip().str.lower()\n    text = text.replace({\"true\": \"1\", \"false\": \"0\", \"oui\": \"1\", \"non\": \"0\", \"yes\": \"1\", \"no\": \"0\"})\n    numeric = pd.to_numeric(text, errors=\"coerce\")\n    classes = sorted(numeric.dropna().unique())\n    assert len(classes) == 2, f\"Deux classes attendues, {len(classes)} trouvée(s)\"\n    return numeric.map({classes[0]: 0, classes[1]: 1})\n\n\ndef clean_private(df: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Types explicites, lignes inutilisables écartées, texte source = question + passages (question en tête).\"\"\"\n    out = pd.DataFrame({column: df[column].fillna(\"\").astype(str) for column in (\"context\", \"question\", \"answer\")})\n    out[\"label\"] = parse_binary_label(df[\"is_unfaithful\"])\n    out[\"segment\"] = df[\"topic\"].fillna(\"inconnu\").astype(str)\n    out[\"generated_at\"] = pd.to_datetime(df[\"generated_at\"], errors=\"coerce\", utc=True)\n    before = len(out)\n    out = out.dropna(subset=[\"label\", \"generated_at\"])\n    out = out[out[\"answer\"].str.strip() != \"\"].copy()\n    print(f\"{before - len(out)} ligne(s) écartée(s) : étiquette, date ou réponse manquante.\")\n    out[\"label\"] = out[\"label\"].astype(int)\n    out[\"source_text\"] = \"Question du client : \" + out[\"question\"] + \"\\n\\nPassages fournis au générateur :\\n\" + out[\"context\"]\n    out[\"example_id\"] = [f\"interne-{position}\" for position in range(len(out))]\n    return out.reset_index(drop=True)"
+  },
+  {
+   "section": "private_data",
+   "type": "markdown",
+   "source": "### Charger les données internes\nOn applique le nettoyage et le découpage temporel, puis on affiche les **mêmes contrôles** que pour le jeu public : effectifs, longueurs, figure. Le lot d'évaluation est mélangé avec la graine, pour qu'un arrêt anticipé laisse un tirage au hasard. Seule la structure des données est affichée, jamais leur contenu."
+  },
+  {
+   "section": "private_data",
+   "type": "code",
+   "source": "def temporal_split(df: pd.DataFrame, calibration_fraction: float, seed: int) -> tuple[pd.DataFrame, pd.DataFrame]:\n    \"\"\"Calibration sur la période la plus ancienne, évaluation (mélangée) sur la plus récente.\"\"\"\n    ordered = df.sort_values(\"generated_at\", kind=\"mergesort\").reset_index(drop=True)\n    n_calibration = max(20, int(round(len(ordered) * calibration_fraction)))\n    calibration = ordered.iloc[:n_calibration].reset_index(drop=True)\n    evaluation = ordered.iloc[n_calibration:].sample(frac=1.0, random_state=seed).reset_index(drop=True)\n    assert calibration[\"label\"].nunique() == 2, \"La calibration doit contenir les deux classes\"\n    assert evaluation[\"label\"].nunique() == 2, \"L'évaluation doit contenir les deux classes\"\n    return calibration, evaluation\n\n\nif PHASE == \"private\":\n    private_raw = load_private_data(PRIVATE_COLUMNS, make_fake_data, n_fake=N_FAKE_ROWS)\n    private_df = clean_private(private_raw)\n    calibration_df, evaluation_df = temporal_split(private_df, CALIBRATION_FRACTION, SEED)\n    DATASET_INFO = {\"name\": \"données internes\", \"config\": \"private\", \"split\": \"évaluation (période la plus récente)\"}\n    display(describe_splits(calibration_df, evaluation_df))\n    plot_data_overview(\n        private_df, \"data_overview_private\",\n        \"Données internes : réponses fidèles et infidèles par thème (gauche) et longueur des entrées (droite).\",\n    )\n    preview(shorten(evaluation_df[[\"segment\", \"label\", \"source_text\", \"answer\"]]), n=3)"
+  },
+  {
+   "section": "reference",
+   "type": "markdown",
+   "source": "### Le modèle juge, commun aux deux approches\nPour que la comparaison soit juste, les deux approches utilisent **le même LLM**, Qwen2.5-Instruct, chargé une seule fois :\n- à l'échelle complète, le modèle de 3 Md de paramètres en `float16` sur GPU ;\n- à l'échelle réduite, son petit frère de 0,5 Md en `float32` sur CPU.\n\nCette cellule fixe le modèle de chaque échelle et définit `load_judge`. En phase publique, le modèle est épinglé à une **révision** précise du Hub, c'est-à-dire une version figée des poids. En phase interne, il est lu dans un dossier local."
+  },
+  {
+   "section": "reference",
+   "type": "code",
+   "source": "import copy\nimport re\nimport time\nfrom pathlib import Path\n\nimport torch\nimport transformers\nfrom packaging import version\nfrom transformers import AutoModelForCausalLM, AutoTokenizer\n\ntransformers.utils.logging.set_verbosity_error()  # masque les avertissements de génération répétitifs\ntransformers.utils.logging.disable_progress_bar()\n\nMODEL_ID = by_scale(reduced=\"Qwen/Qwen2.5-0.5B-Instruct\", full=\"Qwen/Qwen2.5-3B-Instruct\")  # substitut CPU / modèle étudié\nMODEL_REVISIONS = {  # révisions épinglées du Hub, pour la reproductibilité\n    \"Qwen/Qwen2.5-0.5B-Instruct\": \"7ae557604adf67be50417f59c2c2f167def9a775\",\n    \"Qwen/Qwen2.5-3B-Instruct\": \"aa8e72537993ba99e69dfaafa59ed015b17504d1\",\n}\nCOMPUTE_DEVICE = device()\nMODEL_DTYPE = torch.float16 if COMPUTE_DEVICE == \"cuda\" else torch.float32  # fp16 sur GPU, fp32 ailleurs\n\n\ndef load_judge(model_id: str):\n    \"\"\"Charge tokeniseur et modèle causal : révision épinglée en phase publique, dossier local en phase interne.\"\"\"\n    pinned = {\"revision\": MODEL_REVISIONS[model_id]} if PHASE == \"public\" else {}\n    # l'argument de précision a changé de nom dans transformers 4.56\n    dtype_key = \"dtype\" if version.parse(transformers.__version__) >= version.parse(\"4.56\") else \"torch_dtype\"\n    judge_tokenizer = AutoTokenizer.from_pretrained(model_path(model_id), **pinned)\n    judge_model = AutoModelForCausalLM.from_pretrained(model_path(model_id), **{dtype_key: MODEL_DTYPE}, **pinned)\n    return judge_tokenizer, judge_model.to(COMPUTE_DEVICE).eval()"
+  },
+  {
+   "section": "reference",
+   "type": "markdown",
+   "source": "### Charger le juge et relever ce qui tourne\nOn charge le modèle une seule fois, puis on affiche ce qui tourne réellement : modèle, révision, matériel, précision, implémentation de l'attention et versions. Un `assert` vérifie la **précision** (`float16` ou `float32`), qui influe sur les logits. En phase interne, ce modèle local sert à la décision typée, tandis que le juge génératif passe par le service LLM de l'environnement cible."
+  },
+  {
+   "section": "reference",
+   "type": "code",
+   "source": "set_seed(SEED)\ntokenizer, model = load_judge(MODEL_ID)\nassert model.dtype == MODEL_DTYPE, f\"Précision inattendue : {model.dtype}\"\nRUNTIME_INFO = {\n    \"modèle\": MODEL_ID,\n    \"révision\": MODEL_REVISIONS[MODEL_ID] if PHASE == \"public\" else \"dossier local\",\n    \"matériel\": COMPUTE_DEVICE,\n    \"précision\": str(MODEL_DTYPE).replace(\"torch.\", \"\"),\n    \"attention\": str(getattr(model.config, \"_attn_implementation\", \"inconnue\")),\n    \"transformers\": transformers.__version__,\n    \"torch\": torch.__version__,\n}\npd.Series(RUNTIME_INFO, name=\"valeur\").to_frame()"
+  },
+  {
+   "section": "reference",
+   "type": "markdown",
+   "source": "### Un énoncé de tâche unique\nLes deux approches lisent **exactement le même énoncé** : définition d'une hallucination, documents, réponse et options H / N. Seule change la consigne de sortie :\n- **juge génératif** : écrire deux lignes, « Verdict : H ou N » puis « Confiance : nombre entre 0 et 1 ». Une variante JSON est prévue pour le service de la phase interne ;\n- **décision typée** : « Répondez par une seule lettre », mais on ne génère rien, on lit seulement les probabilités des deux lettres.\n\nLe prompt est mis en forme par le **gabarit de chat** du modèle, c'est-à-dire les balises système, utilisateur et assistant qu'il a vues pendant son entraînement."
+  },
+  {
+   "section": "reference",
+   "type": "code",
+   "source": "SYSTEM_PROMPT = \"Vous êtes un vérificateur rigoureux de réponses rédigées par un assistant à partir de documents.\"\nTASK_STATEMENT = (\n    \"On vous donne la consigne et les documents fournis à un assistant, puis la réponse de cet assistant. \"\n    \"Une hallucination est une information de la réponse qui contredit les documents ou qui n'y figure pas. \"\n    \"Déterminez si la réponse contient au moins une hallucination.\"\n)\nOPTION_LINES = {\n    \"H\": \"H : la réponse contient au moins une hallucination.\",\n    \"N\": \"N : la réponse est entièrement fidèle aux documents.\",\n}\nTYPED_INSTRUCTION = \"Répondez par une seule lettre : {} ou {}.\"  # lettres dans l'ordre de présentation\nGENERATIVE_INSTRUCTION = (\n    \"Répondez exactement sur deux lignes, sans autre texte :\\nVerdict : H ou N\\n\"\n    \"Confiance : un nombre entre 0 et 1, la probabilité que votre verdict soit correct.\"\n)\nGENERATIVE_JSON_INSTRUCTION = (\n    \"Répondez en JSON avec deux champs : verdict (\\\"H\\\" ou \\\"N\\\") et confidence \"\n    \"(un nombre entre 0 et 1, la probabilité que votre verdict soit correct).\"\n)\n\n\ndef build_messages(source: str, answer: str, option_order: tuple, instruction: str) -> list[dict]:\n    \"\"\"Messages de chat : même énoncé pour les deux approches ; seuls l'ordre des options et la consigne de sortie varient.\"\"\"\n    options = \"\\n\".join(OPTION_LINES[letter] for letter in option_order)\n    user = (f\"{TASK_STATEMENT}\\n\\n### Consigne et documents\\n{source}\\n\\n### Réponse à vérifier\\n{answer}\"\n            f\"\\n\\n### Options\\n{options}\\n\\n{instruction.format(*option_order)}\")\n    return [{\"role\": \"system\", \"content\": SYSTEM_PROMPT}, {\"role\": \"user\", \"content\": user}]\n\n\ndef render_prompt(messages: list[dict]) -> str:\n    \"\"\"Texte complet du prompt selon le gabarit de chat, terminé par l'ouverture du tour de l'assistant.\"\"\"\n    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)\n\n\ndef encode_prompt(messages: list[dict]) -> list[int]:\n    \"\"\"Identifiants de tokens du prompt (le gabarit contient déjà les jetons spéciaux).\"\"\"\n    return tokenizer(render_prompt(messages), add_special_tokens=False)[\"input_ids\"]"
+  },
+  {
+   "section": "reference",
+   "type": "markdown",
+   "source": "### Tenir dans la longueur maximale\nUn prompt complet ne doit pas dépasser `MAX_INPUT_TOKENS`. À l'échelle complète, cette limite vaut 4 096 tokens : mesuré sur tout le split test, aucun prompt ne l'atteint, donc rien n'est coupé. L'échelle réduite, sur CPU, coupe à 384 tokens. On mesure d'abord ce que coûtent le gabarit et les consignes, puis on répartit le reste :\n- la **réponse** reçoit au plus la moitié du budget, car c'est elle qu'on juge ;\n- les **documents** reçoivent le reste, en gardant leur **début**, où se trouvent la consigne et la question.\n\nLa troncature est notée pour chaque exemple : un document coupé peut rendre un verdict impossible. La cellule suivante mesure les prompts de l'échantillon avant toute inférence."
+  },
+  {
+   "section": "reference",
+   "type": "code",
+   "source": "MAX_INPUT_TOKENS = by_scale(reduced=384, full=4096)  # longueur maximale d'un prompt complet (tokens)\nTRUNCATION_MARK = \" […]\"  # signale au juge qu'un texte a été coupé\nPROMPT_OVERHEAD_TOKENS = max(\n    len(encode_prompt(build_messages(\"\", \"\", (\"H\", \"N\"), instruction)))\n    for instruction in (TYPED_INSTRUCTION, GENERATIVE_INSTRUCTION, GENERATIVE_JSON_INSTRUCTION)\n) + 16  # marge : marques de troncature et effets de bord du découpage en tokens\n\n\ndef truncate_inputs(source: str, answer: str) -> tuple[str, str, bool]:\n    \"\"\"Coupe réponse puis documents (début conservé) pour tenir dans MAX_INPUT_TOKENS ; rend aussi un indicateur de coupe.\"\"\"\n    budget = MAX_INPUT_TOKENS - PROMPT_OVERHEAD_TOKENS\n    source_ids = tokenizer.encode(source, add_special_tokens=False)\n    answer_ids = tokenizer.encode(answer, add_special_tokens=False)\n    answer_keep = min(len(answer_ids), budget // 2)  # la réponse prend au plus la moitié du budget\n    source_keep = min(len(source_ids), budget - answer_keep)\n    if answer_keep < len(answer_ids):\n        answer = tokenizer.decode(answer_ids[:answer_keep]) + TRUNCATION_MARK\n    if source_keep < len(source_ids):\n        source = tokenizer.decode(source_ids[:source_keep]) + TRUNCATION_MARK\n    return source, answer, (answer_keep < len(answer_ids)) or (source_keep < len(source_ids))\n\n\ncontent_budget = MAX_INPUT_TOKENS - PROMPT_OVERHEAD_TOKENS\nassert content_budget >= 128, \"Budget trop faible pour les documents et la réponse\"\nprint(f\"Gabarit et consignes : {PROMPT_OVERHEAD_TOKENS} tokens ; reste {content_budget} tokens pour documents et réponse.\")\nif PHASE == \"public\":\n    prompt_lengths = pd.Series([len(encode_prompt(build_messages(text, answer, (\"H\", \"N\"), TYPED_INSTRUCTION)))\n                                for text, answer in zip(sample[\"source_text\"], sample[\"answer\"])])\n    print(f\"Prompts de l'échantillon : médiane {prompt_lengths.median():.0f} tokens, maximum {prompt_lengths.max()} ; \"\n          f\"{(prompt_lengths > MAX_INPUT_TOKENS).sum()} sur {len(prompt_lengths)} au-delà de {MAX_INPUT_TOKENS}.\")"
+  },
+  {
+   "section": "reference",
+   "type": "markdown",
+   "source": "### Lire le verdict écrit par le juge génératif\nLe texte généré est analysé par des **expressions régulières** : « Verdict » suivi de H ou N, puis « Confiance » suivi d'un nombre (0,85, 0.85 ou 85 %).\n- Si le **verdict** est illisible, la sortie compte comme une **erreur** (verdict −1).\n- Si seule la **confiance** est illisible, elle vaut 0,5 par défaut.\n- Dans les deux cas, la sortie compte comme un **échec d'analyse**, dont on rapporte le taux.\n\nEn phase interne, le service renvoie un objet JSON (sortie structurée) ; sa lecture est testée ici sur des réponses construites à la main."
+  },
+  {
+   "section": "reference",
+   "type": "code",
+   "source": "VERDICT_PATTERN = re.compile(r\"verdict\\W*([HN])\\b\", re.IGNORECASE)\nCONFIDENCE_PATTERN = re.compile(r\"confiance\\W*(\\d+(?:[.,]\\d+)?)\\s*(%?)\", re.IGNORECASE)\n\n\ndef to_confidence(value, percent: bool = False) -> float | None:\n    \"\"\"Nombre en confiance dans [0, 1] (les pourcentages sont ramenés sur 1) ; None si invalide.\"\"\"\n    try:\n        number = float(str(value).replace(\",\", \".\"))\n    except (TypeError, ValueError):\n        return None\n    if percent or number > 1:\n        number /= 100\n    return number if 0.0 <= number <= 1.0 else None\n\n\ndef parse_generative_output(text: str) -> tuple[int | None, float | None]:\n    \"\"\"Verdict (1 = infidèle, 0 = fidèle, None si illisible) et confiance (None si illisible) d'un texte généré.\"\"\"\n    verdict_match = VERDICT_PATTERN.search(text)\n    verdict = None if verdict_match is None else int(verdict_match.group(1).upper() == \"H\")\n    confidence_match = CONFIDENCE_PATTERN.search(text)\n    if confidence_match is None:\n        return verdict, None\n    return verdict, to_confidence(confidence_match.group(1), percent=confidence_match.group(2) == \"%\")\n\n\ndef parse_service_reply(reply) -> tuple[int | None, float | None]:\n    \"\"\"Verdict et confiance d'une réponse JSON décodée du service (None si absente ou invalide).\"\"\"\n    if not isinstance(reply, dict):\n        return None, None\n    verdict = {\"H\": 1, \"N\": 0}.get(str(reply.get(\"verdict\", \"\")).strip().upper())\n    return verdict, to_confidence(reply.get(\"confidence\"))\n\n\n# Contrôles sur des sorties construites à la main (dont le format du service)\nassert parse_generative_output(\"Verdict : H\\nConfiance : 0,85\") == (1, 0.85)\nassert parse_generative_output(\"**Verdict :** N\\n**Confiance :** 90 %\") == (0, 0.9)\nassert parse_generative_output(\"Je ne peux pas répondre.\") == (None, None)\nassert parse_service_reply({\"verdict\": \"n\", \"confidence\": 0.7}) == (0, 0.7)\nassert parse_service_reply(None) == (None, None)"
+  },
+  {
+   "section": "reference",
+   "type": "markdown",
+   "source": "### Appeler le juge : modèle local ou service\n- **Phase publique** : le modèle local génère de façon **gloutonne** (il prend toujours le token le plus probable), avec au plus 24 nouveaux tokens.\n- **Phase interne** : `llm_chat` interroge le service à la convention OpenAI avec un **schéma JSON**. L'adresse, la clé et le modèle viennent tous de l'environnement. Un appel en échec est compté comme sortie illisible, et son type d'erreur est noté."
+  },
+  {
+   "section": "reference",
+   "type": "code",
+   "source": "MAX_NEW_TOKENS = 24  # le verdict et la confiance tiennent en une quinzaine de tokens\nGENERATIVE_SCHEMA = {\n    \"type\": \"object\",\n    \"properties\": {\"verdict\": {\"type\": \"string\", \"enum\": [\"H\", \"N\"]}, \"confidence\": {\"type\": \"number\"}},\n    \"required\": [\"verdict\", \"confidence\"],\n    \"additionalProperties\": False,\n}\nSERVICE_ERRORS: list[str] = []  # types d'erreurs des appels au service (phase interne)\n\n\n@torch.inference_mode()\ndef generate_local(messages: list[dict]) -> str:\n    \"\"\"Génération gloutonne locale limitée à MAX_NEW_TOKENS ; rend le texte produit.\"\"\"\n    input_ids = torch.tensor([encode_prompt(messages)], device=COMPUTE_DEVICE)\n    output = model.generate(\n        input_ids, attention_mask=torch.ones_like(input_ids), max_new_tokens=MAX_NEW_TOKENS,\n        do_sample=False, temperature=None, top_p=None, top_k=None,\n        pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id,\n    )\n    return tokenizer.decode(output[0, input_ids.shape[1]:], skip_special_tokens=True)\n\n\ndef ask_service(messages: list[dict]):\n    \"\"\"Appel au service LLM avec sortie structurée ; None (compté comme illisible) si l'appel échoue.\"\"\"\n    try:\n        return llm_chat(messages, schema=GENERATIVE_SCHEMA, temperature=0.0, max_tokens=64)\n    except Exception as error:  # une panne isolée ne doit pas interrompre l'évaluation ; elle est comptée\n        SERVICE_ERRORS.append(type(error).__name__)\n        return None"
+  },
+  {
+   "section": "reference",
+   "type": "markdown",
+   "source": "### Du texte au verdict chiffré\nChaque sortie devient quatre valeurs :\n- le **verdict** (1, 0 ou −1 si illisible) ;\n- la **confiance** dans ce verdict ;\n- $P(\\text{infidèle})$, qui vaut la confiance si le verdict est H et $1 - \\text{confiance}$ sinon ;\n- un indicateur d'**échec d'analyse**.\n\nCes quatre champs sont les mêmes pour la décision typée, ce qui permet de calculer les métriques de la même façon pour les deux approches."
+  },
+  {
+   "section": "reference",
+   "type": "code",
+   "source": "def outcome(verdict: int | None, confidence: float | None) -> dict:\n    \"\"\"Verdict, confiance, P(infidèle) et échec d'analyse ; un verdict illisible devient −1, compté comme erreur.\"\"\"\n    if verdict is None:\n        return {\"verdict\": -1, \"confidence\": 0.5, \"p_unfaithful\": 0.5, \"parse_failed\": True}\n    failed = confidence is None\n    confidence = 0.5 if confidence is None else float(confidence)\n    p_unfaithful = confidence if verdict == 1 else 1.0 - confidence\n    return {\"verdict\": verdict, \"confidence\": confidence, \"p_unfaithful\": p_unfaithful, \"parse_failed\": failed}\n\n\ndef judge_generative(row) -> dict:\n    \"\"\"Juge génératif sur un exemple : modèle local en phase publique, service LLM en phase interne.\"\"\"\n    source, answer, truncated = truncate_inputs(row.source_text, row.answer)\n    if PHASE == \"public\":\n        raw_output = generate_local(build_messages(source, answer, (\"H\", \"N\"), GENERATIVE_INSTRUCTION))\n        verdict, confidence = parse_generative_output(raw_output)\n    else:\n        reply = ask_service(build_messages(source, answer, (\"H\", \"N\"), GENERATIVE_JSON_INSTRUCTION))\n        verdict, confidence = parse_service_reply(reply)\n        raw_output = \"\"  # rien n'est conservé des sorties sur données internes\n    return {**outcome(verdict, confidence), \"truncated\": truncated, \"raw_output\": raw_output}"
+  },
+  {
+   "section": "reference",
+   "type": "markdown",
+   "source": "### Une boucle bornée dans le temps\nL'inférence se fait exemple par exemple, sous un **budget de temps** fixé en constante :\n- quand le budget est dépassé, la boucle s'arrête proprement et garde ce qui a été calculé ;\n- tous les `PROGRESS_EVERY` exemples, elle affiche le rythme et l'exactitude cumulée, et écrit un **point de sauvegarde** sur disque, pour qu'une coupure ne fasse pas tout perdre.\n\nLe mécanisme d'arrêt est testé tout de suite avec un budget négatif, qui doit couper la boucle avant le premier exemple."
+  },
+  {
+   "section": "reference",
+   "type": "code",
+   "source": "TIME_BUDGET_GENERATIVE_S = by_scale(reduced=420, full=1080)  # budget du juge génératif (secondes)\nTIME_BUDGET_TYPED_S = by_scale(reduced=420, full=600)  # budget de la décision typée, par lot (secondes)\nPROGRESS_EVERY = by_scale(reduced=20, full=50)  # fréquence du relevé de progression (exemples)\nCHECKPOINT_DIR = Path(OUTPUT_DIR) / \"checkpoints\"\nCHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)\n\n\ndef save_checkpoint(outputs: list[dict], slug: str) -> None:\n    \"\"\"Écrit les sorties déjà obtenues, sans texte généré : une coupure ne fait pas tout perdre.\"\"\"\n    table = pd.DataFrame(outputs).drop(columns=[\"raw_output\"], errors=\"ignore\")\n    table.to_csv(CHECKPOINT_DIR / f\"{slug}.csv\", index=False)\n\n\ndef run_with_budget(judge_fn, df: pd.DataFrame, budget_s: float, slug: str) -> tuple[pd.DataFrame, list[float]]:\n    \"\"\"Applique judge_fn ligne par ligne jusqu'à la fin du lot ou du budget ; rend les sorties et les durées (ms).\"\"\"\n    outputs, durations = [], []\n    labels = df[\"label\"].to_numpy()\n    start = time.perf_counter()\n    for position, row in enumerate(df.itertuples(index=False)):\n        if time.perf_counter() - start > budget_s:\n            print(f\"[{slug}] budget de {budget_s:.0f} s atteint : arrêt propre après {position} exemples sur {len(df)}.\")\n            break\n        with timer(durations):\n            outputs.append(judge_fn(row))\n        done = position + 1\n        if done % PROGRESS_EVERY == 0 or done == len(df):\n            verdicts = np.array([output[\"verdict\"] for output in outputs])\n            rate = done / (time.perf_counter() - start)\n            print(f\"[{slug}] {done}/{len(df)} exemples | {rate:.2f} ex/s | exactitude cumulée {np.mean(verdicts == labels[:done]):.3f}\")\n            save_checkpoint(outputs, slug)\n    return pd.DataFrame(outputs), durations\n\n\n# Contrôle du mécanisme d'arrêt : un budget négatif coupe avant le premier exemple\nstopped_outputs, _ = run_with_budget(lambda row: {\"verdict\": 0}, calibration_df.head(3), budget_s=-1.0, slug=\"controle_arret\")\nassert len(stopped_outputs) == 0"
+  },
+  {
+   "section": "reference",
+   "type": "markdown",
+   "source": "### Vérifier l'appel sur un exemple réel\nAvant de lancer la boucle complète, on juge un seul exemple d'évaluation et on affiche le juge réellement utilisé. En phase publique, on montre aussi la sortie brute, ce qui permet de voir tout de suite si le modèle respecte le format demandé."
+  },
+  {
+   "section": "reference",
+   "type": "code",
+   "source": "probe_row = next(evaluation_df.itertuples(index=False))\nprobe = judge_generative(probe_row)\nif PHASE == \"public\":\n    print(f\"Juge génératif évalué : {MODEL_ID} ({COMPUTE_DEVICE}, {RUNTIME_INFO['précision']})\")\n    print(\"Sortie brute :\", repr(probe[\"raw_output\"]))\nelse:\n    print(\"Juge génératif évalué : service à la convention OpenAI (modèle fixé par l'environnement)\")\n    print(f\"Erreurs de service jusqu'ici : {len(SERVICE_ERRORS)}\")\npd.Series({key: probe[key] for key in (\"verdict\", \"confidence\", \"parse_failed\", \"truncated\")}, name=\"exemple test\").to_frame()"
+  },
+  {
+   "section": "reference",
+   "type": "markdown",
+   "source": "### Lancer le juge génératif sur le lot d'évaluation\nLe juge génératif n'a **aucun réglage** à faire sur le lot de calibration : sa confiance est celle qu'il écrit lui-même. Il ne tourne donc que sur le lot d'évaluation. On affiche ensuite le taux de sorties illisibles et le nombre d'erreurs de service."
+  },
+  {
+   "section": "reference",
+   "type": "code",
+   "source": "set_seed(SEED)\nreference_outputs, reference_durations = run_with_budget(\n    judge_generative, evaluation_df, TIME_BUDGET_GENERATIVE_S, \"juge_generatif\"\n)\nprint(f\"Sorties illisibles : {reference_outputs['parse_failed'].mean():.1%} \"\n      f\"| verdicts illisibles : {(reference_outputs['verdict'] == -1).mean():.1%} \"\n      f\"| erreurs de service : {len(SERVICE_ERRORS)}\")"
+  },
+  {
+   "section": "new_approach",
+   "type": "markdown",
+   "source": "### Principe : lire la décision au lieu de la générer\nCette approche reprend le **modèle de décision typé** de la source (section « comment ça marche », étapes 1 à 3) : une question fermée, deux options, et une probabilité par option obtenue en une seule passe. Pour chaque ordre de présentation $o$, on lit au dernier token du prompt les logits $\\ell_H^{(o)}$ et $\\ell_N^{(o)}$, puis on les combine :\n\n$$s = \\tfrac12 \\sum_{o} \\big(\\ell_H^{(o)} - \\ell_N^{(o)}\\big), \\qquad P(H) = \\sigma\\!\\left(\\frac{s - b}{T}\\right)$$\n\noù $\\sigma$ est la fonction logistique, $T$ une température et $b$ un décalage.\n\n**Écarts avec la source** :\n- le modèle est un LLM généraliste dont on lit les logits, et non un modèle entraîné pour la décision ;\n- la recalibration $(T, b)$ est un ajout ;\n- la cascade à trois modèles est remplacée par un simple **renvoi des 25 % de cas les moins sûrs**, dont on mesure la couverture.\n\nOn vérifie ici que chaque lettre tient en un seul token, puis on construit les deux prompts."
+  },
+  {
+   "section": "new_approach",
+   "type": "code",
+   "source": "from scipy.special import expit\n\nOPTION_ORDERS = [(\"H\", \"N\"), (\"N\", \"H\")]  # deux ordres de présentation, moyennés contre le biais de position\n\n\ndef option_token_ids() -> dict[str, int]:\n    \"\"\"Identifiant du token de chaque lettre d'option ; chaque lettre doit tenir en un seul token.\"\"\"\n    ids = {}\n    for letter in (\"H\", \"N\"):\n        pieces = tokenizer.encode(letter, add_special_tokens=False)\n        assert len(pieces) == 1, f\"L'option {letter} occupe {len(pieces)} tokens\"\n        ids[letter] = pieces[0]\n    return ids\n\n\nOPTION_IDS = option_token_ids()\n\n\ndef typed_sequences(row) -> tuple[list[list[int]], int, bool]:\n    \"\"\"Prompts tokenisés des deux ordres, longueur de leur préfixe commun et indicateur de troncature.\"\"\"\n    source, answer, truncated = truncate_inputs(row.source_text, row.answer)\n    sequences = [encode_prompt(build_messages(source, answer, order, TYPED_INSTRUCTION)) for order in OPTION_ORDERS]\n    shared = 0\n    while shared < min(map(len, sequences)) - 1 and sequences[0][shared] == sequences[1][shared]:\n        shared += 1\n    assert shared > 0, \"Les deux prompts doivent partager un préfixe\"\n    return sequences, shared, truncated\n\n\nprint(\"Tokens des options :\", OPTION_IDS)"
+  },
+  {
+   "section": "new_approach",
+   "type": "markdown",
+   "source": "### Une passe avant, avec un préfixe partagé\nLes deux ordres ne diffèrent qu'à la fin du prompt, dans le bloc des options. Le **préfixe commun** (consignes, documents, réponse) ne passe donc qu'une fois dans le réseau. Ses états intermédiaires sont gardés dans le **cache KV**, puis copiés pour chacune des deux fins. Le calcul coûte ainsi à peu près une passe au lieu de deux. Le score brut est la moyenne des deux écarts de logits $\\ell_H - \\ell_N$."
+  },
+  {
+   "section": "new_approach",
+   "type": "code",
+   "source": "@torch.inference_mode()\ndef option_log_odds(sequences: list[list[int]], shared: int) -> list[float]:\n    \"\"\"logit(H) − logit(N) au dernier token de chaque prompt ; le préfixe commun passe une seule fois (cache KV).\"\"\"\n    prefix = torch.tensor([sequences[0][:shared]], device=COMPUTE_DEVICE)\n    cache = model(input_ids=prefix, use_cache=True).past_key_values\n    values = []\n    for sequence in sequences:\n        suffix = torch.tensor([sequence[shared:]], device=COMPUTE_DEVICE)\n        # copie du cache : la seconde fin ne doit pas voir les tokens de la première\n        logits = model(input_ids=suffix, past_key_values=copy.deepcopy(cache), use_cache=True).logits[0, -1].float()\n        values.append(float(logits[OPTION_IDS[\"H\"]] - logits[OPTION_IDS[\"N\"]]))\n    return values\n\n\ndef judge_typed(row) -> dict:\n    \"\"\"Score brut de la décision typée : moyenne des log-odds des deux ordres (verdict provisoire au seuil 0).\"\"\"\n    sequences, shared, truncated = typed_sequences(row)\n    log_odds = option_log_odds(sequences, shared)\n    score = float(np.mean(log_odds))\n    return {\"score\": score, \"log_odds_order_hn\": log_odds[0], \"log_odds_order_nh\": log_odds[1],\n            \"verdict\": int(score > 0), \"truncated\": truncated}"
+  },
+  {
+   "section": "new_approach",
+   "type": "markdown",
+   "source": "### Contrôle : le cache ne change pas la mesure\nSur l'exemple réel déjà jugé plus haut, on compare les log-odds obtenus **avec le préfixe en cache** à ceux d'une **passe complète** sans cache. Un `assert` vérifie que l'écart reste sous une tolérance numérique, plus large en `float16`. On affiche aussi les probabilités brutes de chaque ordre, qui donnent une idée du **biais de position**."
+  },
+  {
+   "section": "new_approach",
+   "type": "code",
+   "source": "CACHE_TOLERANCE = 0.25 if MODEL_DTYPE == torch.float16 else 1e-2  # écart toléré sur les log-odds\n\n\n@torch.inference_mode()\ndef full_pass_log_odds(sequence: list[int]) -> float:\n    \"\"\"logit(H) − logit(N) d'une passe complète sans cache, pour contrôle.\"\"\"\n    logits = model(input_ids=torch.tensor([sequence], device=COMPUTE_DEVICE)).logits[0, -1].float()\n    return float(logits[OPTION_IDS[\"H\"]] - logits[OPTION_IDS[\"N\"]])\n\n\nprobe_sequences, probe_shared, _ = typed_sequences(probe_row)\ncached_values = option_log_odds(probe_sequences, probe_shared)\nfull_values = [full_pass_log_odds(sequence) for sequence in probe_sequences]\ncache_gap = max(abs(cached - full) for cached, full in zip(cached_values, full_values))\nassert cache_gap < CACHE_TOLERANCE, f\"Le cache modifie la mesure : écart {cache_gap:.3f}\"\nprint(f\"Décision typée évaluée : {MODEL_ID} ({COMPUTE_DEVICE}, {RUNTIME_INFO['précision']})\")\nprint(f\"Préfixe commun : {probe_shared} tokens sur {len(probe_sequences[0])} | écart cache / passe complète : {cache_gap:.2e}\")\npd.DataFrame({\n    \"ordre des options\": [\" puis \".join(order) for order in OPTION_ORDERS],\n    \"log-odds (cache)\": cached_values,\n    \"log-odds (passe complète)\": full_values,\n    \"P(H) brute\": expit(np.array(cached_values)),\n}).round(4)"
+  },
+  {
+   "section": "new_approach",
+   "type": "markdown",
+   "source": "### Contrôle : H et N sont bien le premier token de la réponse\nLes logits lus doivent être ceux du **premier token que l'assistant écrirait**. On vérifie deux choses sur l'exemple réel :\n- un `assert` contrôle que le prompt suivi de la lettre se tokenise exactement en « prompt + token de la lettre » (pas de fusion avec le saut de ligne du gabarit) ;\n- on affiche la **masse de probabilité** portée par H et N et les 5 tokens les plus probables. Une masse faible signale un modèle qui ne suit pas la consigne : l'écart H − N serait alors peu informatif."
+  },
+  {
+   "section": "new_approach",
+   "type": "code",
+   "source": "TOP_TOKENS = 5  # nombre de tokens les plus probables affichés\n\n\n@torch.inference_mode()\ndef next_token_distribution(sequence: list[int]) -> torch.Tensor:\n    \"\"\"Distribution (softmax sur tout le vocabulaire) du token qui suit le prompt.\"\"\"\n    logits = model(input_ids=torch.tensor([sequence], device=COMPUTE_DEVICE)).logits[0, -1].float()\n    return torch.softmax(logits, dim=-1)\n\n\nprobe_source, probe_answer, _ = truncate_inputs(probe_row.source_text, probe_row.answer)\nprobe_messages = build_messages(probe_source, probe_answer, OPTION_ORDERS[0], TYPED_INSTRUCTION)\nprobe_ids = encode_prompt(probe_messages)\nfor letter, token_id in OPTION_IDS.items():\n    with_letter = tokenizer(render_prompt(probe_messages) + letter, add_special_tokens=False)[\"input_ids\"]\n    assert with_letter == probe_ids + [token_id], f\"« {letter} » n'est pas le premier token de la réponse\"\nnext_probabilities = next_token_distribution(probe_ids)\noption_mass = float(next_probabilities[list(OPTION_IDS.values())].sum())\nprint(f\"Masse de probabilité sur H et N au premier token de réponse : {option_mass:.1%}\")\ntop = torch.topk(next_probabilities, TOP_TOKENS)\npd.DataFrame({\n    \"token\": [repr(tokenizer.decode([int(index)])) for index in top.indices],\n    \"probabilité\": top.values.cpu().numpy(),\n}).round(4)"
+  },
+  {
+   "section": "new_approach",
+   "type": "markdown",
+   "source": "### Scores bruts sur le lot de calibration\nLes probabilités brutes d'un LLM sont souvent **mal calibrées** : trop sûres d'elles, ou décalées vers l'une des lettres. On calcule donc d'abord le score brut $s$ sur le lot de calibration, qui doit être traité en entier."
+  },
+  {
+   "section": "new_approach",
+   "type": "code",
+   "source": "set_seed(SEED)\ntyped_calibration_raw, _ = run_with_budget(judge_typed, calibration_df, TIME_BUDGET_TYPED_S, \"typee_calibration\")\nassert len(typed_calibration_raw) == len(calibration_df), \"Le lot de calibration doit être traité en entier\""
+  },
+  {
+   "section": "new_approach",
+   "type": "markdown",
+   "source": "### Diagnostic des scores bruts, avant tout réglage\nAvant d'ajuster quoi que ce soit, on regarde si le score brut **porte un signal** :\n- pour chaque ordre d'options et pour leur moyenne : minimum, maximum, écart-type, part de scores positifs (préférence pour H) ;\n- l'**exactitude équilibrée au seuil 0** et l'**AUROC du score** sur le lot de calibration. Une AUROC proche de 0,5 indique un score sans signal ; sous 0,5, un signal inversé.\n\nUn `assert` arrête l'expérience si le score est quasi constant : aucune recalibration ne pourrait alors produire une mesure. Une AUROC proche de 0,5 annonce un juge que la condition d'éligibilité écartera."
+  },
+  {
+   "section": "new_approach",
+   "type": "code",
+   "source": "from sklearn.metrics import balanced_accuracy_score, roc_auc_score\n\nMIN_SCORE_STD = 1e-3  # écart-type minimal du score brut : en dessous, il est quasi constant\nSCORE_COLUMNS = {\"log_odds_order_hn\": \"ordre H puis N\", \"log_odds_order_nh\": \"ordre N puis H\",\n                 \"score\": \"moyenne des deux ordres\"}\n\n\ndef score_diagnostics(raw: pd.DataFrame, labels: np.ndarray) -> pd.DataFrame:\n    \"\"\"Distribution des scores bruts et pouvoir de séparation (BAcc au seuil 0, AUROC) pour chaque ordre.\"\"\"\n    rows = []\n    for column, name in SCORE_COLUMNS.items():\n        values = raw[column].to_numpy(dtype=float)\n        rows.append({\n            \"score\": name, \"min\": values.min(), \"max\": values.max(), \"écart-type\": values.std(),\n            \"part > 0 (%)\": 100 * float(np.mean(values > 0)),\n            \"BAcc au seuil 0\": balanced_accuracy_score(labels, (values > 0).astype(int)),\n            \"AUROC du score\": roc_auc_score(labels, values) if np.ptp(values) > 0 else float(\"nan\"),\n        })\n    return pd.DataFrame(rows).set_index(\"score\")\n\n\ncalibration_labels = calibration_df[\"label\"].to_numpy().astype(int)\ncalibration_diagnostics = score_diagnostics(typed_calibration_raw, calibration_labels)\ndisplay(calibration_diagnostics.round(3))\nCALIBRATION_SCORE_AUROC = float(calibration_diagnostics.loc[\"moyenne des deux ordres\", \"AUROC du score\"])\nscore_std = float(calibration_diagnostics.loc[\"moyenne des deux ordres\", \"écart-type\"])\nassert score_std > MIN_SCORE_STD, f\"Score brut quasi constant (écart-type {score_std:.2e}) : lecture des logits à revoir\"\nif not CALIBRATION_SCORE_AUROC > 0.5:\n    print(f\"Attention : AUROC du score brut {CALIBRATION_SCORE_AUROC:.3f} ≤ 0,5 sur la calibration, \"\n          \"le score ne sépare pas les classes (ou à l'envers) ; la température ira vers sa borne haute.\")"
+  },
+  {
+   "section": "new_approach",
+   "type": "markdown",
+   "source": "### Voir les scores bruts par classe\nL'histogramme superpose les scores bruts $s$ des réponses fidèles et infidèles du lot de calibration. Si les deux distributions se recouvrent entièrement, le modèle ne distingue pas les classes, quelle que soit la calibration. Si elles sont décalées, la température et le seuil peuvent en tirer parti."
+  },
+  {
+   "section": "new_approach",
+   "type": "code",
+   "source": "fig, ax = plt.subplots(figsize=(8, 4))\nscore_bins = np.linspace(float(typed_calibration_raw[\"score\"].min()), float(typed_calibration_raw[\"score\"].max()), 20)\nfor value, color, text in [(0, COLORS[\"good\"], \"fidèle\"), (1, COLORS[\"bad\"], \"infidèle\")]:\n    ax.hist(typed_calibration_raw[\"score\"][calibration_labels == value], bins=score_bins, alpha=0.6, color=color, label=text)\nax.axvline(0.0, color=COLORS[\"accent\"], linestyle=\":\", label=\"seuil brut s = 0\")\nax.set(title=\"Score brut de la décision typée (lot de calibration)\", xlabel=\"s = moyenne de logit(H) − logit(N)\",\n       ylabel=\"nombre de réponses\")\nax.legend()\nfig.tight_layout()\nsave_figure(fig, \"typed_raw_scores\", \"Scores bruts s par classe sur le lot de calibration : des distributions décalées \"\n            \"signalent un score informatif ; un recouvrement complet, un score sans signal.\")"
+  },
+  {
+   "section": "new_approach",
+   "type": "markdown",
+   "source": "### Température et décalage : une régression logistique régularisée et bornée\nOn ajuste $P(H) = \\sigma((s - b)/T)$ en minimisant la **log-vraisemblance négative** sur le lot de calibration, avec trois garde-fous :\n- **T bornée** entre 0,05 et 50 : une température infinie rendrait $P(H)$ constante, une température nulle la saturerait à 0 ou 1 ;\n- une **pénalité L2** sur la pente $1/T$ du score standardisé (comme une régression logistique classique), et un décalage $b$ limité à l'étendue des scores ;\n- un indicateur « T à une borne » : il signale un score sans signal (borne haute) ou trop tranché (borne basse).\n\nAttention : une **T très grande** aplatit $P(H)$ vers une constante. L'ECE devient alors basse **sans information** : c'est pourquoi l'évaluation compare aussi au prédicteur constant. L'optimiseur est **L-BFGS-B**, qui respecte ces bornes."
+  },
+  {
+   "section": "new_approach",
+   "type": "code",
+   "source": "from scipy.optimize import minimize\n\nTEMPERATURE_BOUNDS = (0.05, 50.0)  # bornes de T : au-delà, P(H) serait constante ou saturée\nSLOPE_RIDGE = 1.0  # pénalité L2 sur la pente standardisée, comme une régression logistique avec C = 1\n\n\ndef fit_temperature(scores: np.ndarray, labels: np.ndarray) -> tuple[float, float, bool]:\n    \"\"\"T et b de p = σ((s − b)/T) par régression logistique régularisée, T bornée ; rend aussi « T à une borne ».\"\"\"\n    scale = max(float(scores.std()), 1e-6)\n    log_bounds = (float(np.log(TEMPERATURE_BOUNDS[0])), float(np.log(TEMPERATURE_BOUNDS[1])))\n\n    def objective(params: np.ndarray) -> float:\n        \"\"\"Log-vraisemblance négative moyenne (forme stable) plus pénalité L2 sur la pente standardisée.\"\"\"\n        temperature = np.exp(params[0])\n        z = (scores - params[1]) / temperature\n        nll = np.mean(np.logaddexp(0.0, z) - labels * z)\n        return float(nll + 0.5 * SLOPE_RIDGE * (scale / temperature) ** 2 / len(scores))\n\n    bounds = [log_bounds, (float(scores.min()), float(scores.max()))]\n    start = np.array([float(np.clip(np.log(scale), *log_bounds)), float(np.median(scores))])\n    fit = minimize(objective, x0=start, method=\"L-BFGS-B\", bounds=bounds)\n    assert np.all(np.isfinite(fit.x)), f\"Ajustement de la température invalide : {fit.message}\"\n    at_bound = bool(min(abs(fit.x[0] - log_bounds[0]), abs(fit.x[0] - log_bounds[1])) < 1e-3)\n    return float(np.exp(fit.x[0])), float(fit.x[1]), at_bound\n\n\ndef to_probability(scores: np.ndarray, temperature: float, bias: float) -> np.ndarray:\n    \"\"\"Probabilité recalibrée P(H) à partir du score brut.\"\"\"\n    return expit((scores - bias) / temperature)"
+  },
+  {
+   "section": "new_approach",
+   "type": "markdown",
+   "source": "### Seuil strict et réglage sur la calibration\n- **Verdict H si $P(H) >$ seuil**, au sens strict : une probabilité égale au seuil donne N, ce qui empêche une probabilité constante de produire silencieusement « tout H ».\n- Les seuils candidats sont les **milieux** entre probabilités successives du lot de calibration, plus 0,5. On garde celui qui maximise l'exactitude équilibrée. En cas d'égalité, on prend le plus proche de 0,5, puis le plus bas.\n- Deux `assert` vérifient que $P(H)$ prend plusieurs valeurs. Aucune étiquette du lot d'évaluation n'intervient."
+  },
+  {
+   "section": "new_approach",
+   "type": "code",
+   "source": "def choose_threshold(probabilities: np.ndarray, labels: np.ndarray) -> float:\n    \"\"\"Seuil strict sur P(H) qui maximise la BAcc ; à égalité, le plus proche de 0,5, puis le plus bas.\"\"\"\n    values = np.unique(probabilities)\n    candidates = np.concatenate([(values[:-1] + values[1:]) / 2, [0.5]])\n    scored = [(balanced_accuracy_score(labels, (probabilities > t).astype(int)), -abs(t - 0.5), -t, t) for t in candidates]\n    return float(max(scored)[3])\n\n\ncalibration_scores = typed_calibration_raw[\"score\"].to_numpy(dtype=float)\nTEMPERATURE, BIAS, TEMPERATURE_AT_BOUND = fit_temperature(calibration_scores, calibration_labels)\ncalibration_probabilities = to_probability(calibration_scores, TEMPERATURE, BIAS)\nassert np.unique(calibration_probabilities).size > 1, \"P(H) constante sur la calibration : recalibration dégénérée\"\nTHRESHOLD = choose_threshold(calibration_probabilities, calibration_labels)\npd.Series({\n    \"température T\": TEMPERATURE, \"T à une borne (0,05 ou 50)\": TEMPERATURE_AT_BOUND,\n    \"décalage b\": BIAS, \"seuil strict sur P(H)\": THRESHOLD,\n    \"P(H) calibration : min\": float(calibration_probabilities.min()),\n    \"P(H) calibration : max\": float(calibration_probabilities.max()),\n    \"BAcc calibration (score brut, seuil 0)\": balanced_accuracy_score(calibration_labels, (calibration_scores > 0).astype(int)),\n    \"BAcc calibration (après réglage)\": balanced_accuracy_score(calibration_labels, (calibration_probabilities > THRESHOLD).astype(int)),\n}, name=\"valeur\").to_frame()"
+  },
+  {
+   "section": "new_approach",
+   "type": "markdown",
+   "source": "### Décision typée sur le lot d'évaluation\nOn applique au lot d'évaluation le modèle et les réglages figés. Le **verdict** est H si $P(H) >$ seuil. La **confiance** est la probabilité du verdict retenu : $P(H)$ pour un verdict H, $1 - P(H)$ pour un verdict N. Comme rien n'est généré, il n'y a jamais de sortie illisible. On affiche aussi la part de verdicts H et l'étendue des confiances : une confiance resserrée autour de 0,5 signale une probabilité aplatie."
+  },
+  {
+   "section": "new_approach",
+   "type": "code",
+   "source": "def typed_decisions(raw: pd.DataFrame, temperature: float, bias: float, threshold: float) -> pd.DataFrame:\n    \"\"\"Probabilité recalibrée, verdict au seuil strict et confiance = probabilité du verdict retenu.\"\"\"\n    p_unfaithful = to_probability(raw[\"score\"].to_numpy(dtype=float), temperature, bias)\n    verdicts = (p_unfaithful > threshold).astype(int)\n    return pd.DataFrame({\n        \"verdict\": verdicts,\n        \"confidence\": np.where(verdicts == 1, p_unfaithful, 1.0 - p_unfaithful),\n        \"p_unfaithful\": p_unfaithful,\n        \"parse_failed\": False,\n        \"truncated\": raw[\"truncated\"].to_numpy(),\n    })\n\n\nset_seed(SEED)\ntyped_raw, typed_durations = run_with_budget(judge_typed, evaluation_df, TIME_BUDGET_TYPED_S, \"typee_evaluation\")\ntyped_outputs = typed_decisions(typed_raw, TEMPERATURE, BIAS, THRESHOLD)\nassert typed_outputs[\"p_unfaithful\"].nunique() > 1, \"P(H) constante sur l'évaluation : mesure dégénérée\"\nprint(f\"Exemples jugés : {len(typed_outputs)} | part de verdicts H : {typed_outputs['verdict'].mean():.1%} \"\n      f\"| confiance de {typed_outputs['confidence'].min():.3f} à {typed_outputs['confidence'].max():.3f}\")"
+  },
+  {
+   "section": "evaluation",
+   "type": "markdown",
+   "source": "### Les mêmes exemples pour les deux approches\nSi un budget de temps a coupé l'une des boucles, on ne garde que les exemples **atteints par les deux approches**. Ce sont les premiers d'un lot déjà mélangé, donc toujours un tirage au hasard. Un `assert` exige au moins 100 exemples évalués, ou tout le lot s'il est plus petit."
+  },
+  {
+   "section": "evaluation",
+   "type": "code",
+   "source": "n_evaluated = min(len(reference_outputs), len(typed_outputs))\nrequired = min(MIN_EVAL_EXAMPLES, len(evaluation_df))\nassert n_evaluated >= required, f\"Seulement {n_evaluated} exemples évalués (minimum {required}) : comparaison non concluante\"\nevaluated_df = evaluation_df.iloc[:n_evaluated].reset_index(drop=True)\ny_true = evaluated_df[\"label\"].to_numpy().astype(int)\nreference_eval = reference_outputs.iloc[:n_evaluated].reset_index(drop=True)\ntyped_eval = typed_outputs.iloc[:n_evaluated].reset_index(drop=True)\npd.Series({\n    \"exemples évalués\": n_evaluated,\n    \"dont infidèles\": int(y_true.sum()),\n    \"exemples tronqués (%)\": round(100 * float(typed_eval[\"truncated\"].mean()), 1),\n}, name=\"valeur\").to_frame()"
+  },
+  {
+   "section": "evaluation",
+   "type": "markdown",
+   "source": "### Métriques de qualité du verdict\n- **Exactitude équilibrée (BAcc)** : moyenne du taux de détection des réponses infidèles et du taux de bonnes décisions sur les réponses fidèles. Elle vaut 0,5 pour un juge qui répond au hasard.\n- **Taux de faux négatifs** : part des réponses infidèles laissées passer.\n\nUn verdict illisible (−1) n'appartient à aucune classe : il compte donc toujours comme une erreur."
+  },
+  {
+   "section": "evaluation",
+   "type": "code",
+   "source": "def balanced_accuracy(labels: np.ndarray, verdicts: np.ndarray) -> float:\n    \"\"\"Moyenne des taux de bonnes décisions par classe présente ; un verdict illisible (−1) est une erreur.\"\"\"\n    recalls = [np.mean(verdicts[labels == value] == value) for value in np.unique(labels)]\n    return float(np.mean(recalls)) if recalls else float(\"nan\")\n\n\ndef false_negative_rate(labels: np.ndarray, verdicts: np.ndarray) -> float:\n    \"\"\"Part des réponses infidèles que le juge ne signale pas.\"\"\"\n    positives = labels == 1\n    return float(np.mean(verdicts[positives] != 1)) if positives.any() else float(\"nan\")"
+  },
+  {
+   "section": "evaluation",
+   "type": "markdown",
+   "source": "### Métriques de qualité de la confiance\n- **ECE** : on range les décisions par confiance en 10 intervalles, puis on fait la moyenne, pondérée par les effectifs, de l'écart $|\\text{taux de bonnes décisions} - \\text{confiance moyenne}|$.\n- **Score de Brier** : $\\frac1n\\sum_i (P_i(H) - y_i)^2$.\n- **Brier skill score** : $1 - \\text{Brier}/\\text{Brier}_{\\text{constant}}$, où le prédicteur constant donne toujours $P(H)$ = part d'infidèles du lot de calibration. Il vaut 0 pour une probabilité sans information et devient négatif si l'on fait pire.\n- **conf-AUROC** : probabilité qu'une bonne décision ait une confiance plus haute qu'une erreur. 0,5 signifie que la confiance ne sert à rien.\n\nQuand la confiance est **constante**, l'ECE et la conf-AUROC sont **non définies** (`None`), pas 0 ni 0,5."
+  },
+  {
+   "section": "evaluation",
+   "type": "code",
+   "source": "ECE_BINS = 10  # intervalles de confiance de largeur 0,1 (ECE et diagramme de fiabilité)\nHIGH_CONFIDENCE = 0.9  # seuil de « grande confiance » repris de l'étude source\nCALIBRATION_PREVALENCE = float(calibration_df[\"label\"].mean())  # P(H) du prédicteur constant de référence\n\n\ndef confidence_bins(confidence: np.ndarray) -> np.ndarray:\n    \"\"\"Numéro d'intervalle (0 à ECE_BINS − 1) de chaque confiance.\"\"\"\n    edges = np.linspace(0.0, 1.0, ECE_BINS + 1)\n    return np.clip(np.digitize(confidence, edges[1:-1], right=True), 0, ECE_BINS - 1)\n\n\ndef expected_calibration_error(confidence: np.ndarray, correct: np.ndarray) -> float:\n    \"\"\"Moyenne pondérée de |taux de bonnes décisions − confiance moyenne| ; NaN si la confiance est constante.\"\"\"\n    if len(confidence) == 0 or np.ptp(confidence) == 0:\n        return float(\"nan\")\n    bins = confidence_bins(confidence)\n    gaps = [np.mean(bins == b) * abs(correct[bins == b].mean() - confidence[bins == b].mean())\n            for b in range(ECE_BINS) if np.any(bins == b)]\n    return float(np.sum(gaps))\n\n\ndef brier_score(p_unfaithful: np.ndarray, labels: np.ndarray) -> float:\n    \"\"\"Erreur quadratique moyenne entre P(infidèle) et l'étiquette 0/1.\"\"\"\n    return float(np.mean((p_unfaithful - labels) ** 2))\n\n\ndef brier_skill(p_unfaithful: np.ndarray, labels: np.ndarray) -> float:\n    \"\"\"1 − Brier / Brier du prédicteur constant (prévalence de calibration) ; ≤ 0 : pas mieux qu'une constante.\"\"\"\n    constant = brier_score(np.full(len(labels), CALIBRATION_PREVALENCE), labels)\n    return float(1.0 - brier_score(p_unfaithful, labels) / constant) if constant > 0 else float(\"nan\")\n\n\ndef confidence_auroc(confidence: np.ndarray, correct: np.ndarray) -> float:\n    \"\"\"Probabilité qu'une bonne décision ait une confiance plus haute qu'une erreur ; NaN si confiance ou issue constante.\"\"\"\n    if len(confidence) == 0 or np.ptp(confidence) == 0 or correct.min() == correct.max():\n        return float(\"nan\")\n    return float(roc_auc_score(correct, confidence))"
+  },
+  {
+   "section": "evaluation",
+   "type": "markdown",
+   "source": "### Renvoi des cas douteux\n- **Renvoi à un second avis** : le seuil est le quantile 25 % des confiances sur le lot évalué. Comme dans la source, il se calcule **sans étiquette**.\n- Seuls les cas *strictement* au-dessus du seuil sont gardés. Une confiance qui prend souvent la même valeur (« 0,9 » écrit à chaque fois) fait donc chuter la **couverture**, et la BAcc après renvoi devient non définie si plus rien n'est gardé.\n- Ce tri n'a de sens que pour un juge **éligible** (voir plus bas) : trier un juge au hasard revient à trier au hasard.\n\n`approach_arrays` rassemble en tableaux numpy tout ce dont les métriques ont besoin pour une approche."
+  },
+  {
+   "section": "evaluation",
+   "type": "code",
+   "source": "N_BOOTSTRAP = 1000  # rééchantillonnages pour les intervalles de confiance\nDEFERRAL_FRACTION = 0.25  # part visée des cas les moins sûrs renvoyés à un second avis\n\n\ndef deferral_mask(confidence: np.ndarray) -> np.ndarray:\n    \"\"\"Cas gardés : confiance strictement au-dessus du quantile 25 % (seuil calculé sans étiquette).\"\"\"\n    return confidence > np.quantile(confidence, DEFERRAL_FRACTION)\n\n\ndef approach_arrays(outputs: pd.DataFrame) -> dict[str, np.ndarray]:\n    \"\"\"Tableaux numpy d'une approche : verdicts, confiance, P(infidèle), justesse, échecs, cas gardés.\"\"\"\n    verdicts = outputs[\"verdict\"].to_numpy().astype(int)\n    confidence = outputs[\"confidence\"].to_numpy().astype(float)\n    return {\n        \"verdicts\": verdicts, \"confidence\": confidence,\n        \"p_unfaithful\": outputs[\"p_unfaithful\"].to_numpy().astype(float),\n        \"correct\": (verdicts == y_true).astype(float),\n        \"parse_failed\": outputs[\"parse_failed\"].to_numpy().astype(float),\n        \"kept\": deferral_mask(confidence),\n    }"
+  },
+  {
+   "section": "evaluation",
+   "type": "markdown",
+   "source": "### Un dictionnaire de métriques commun\nChaque métrique est une fonction de deux arguments : les tableaux d'une approche, et des **indices** d'exemples. Le bootstrap pourra ainsi les recalculer sur n'importe quel rééchantillonnage. On y trouve :\n- la **BAcc après renvoi**, mesurée sur les seuls cas gardés ;\n- le **Brier skill score**, qui compare la probabilité au prédicteur constant ;\n- le **taux d'échec d'analyse**, sans objet pour la décision typée, qui ne génère rien : il vaudra `None` pour elle.\n\nLes libellés lisibles de chaque clé sont regroupés dans `METRIC_LABELS`."
+  },
+  {
+   "section": "evaluation",
+   "type": "code",
+   "source": "# Chaque métrique reçoit les tableaux d'une approche et des indices d'exemples (rééchantillonnés par le bootstrap)\nMETRICS = {\n    \"balanced_accuracy\": lambda a, i: balanced_accuracy(y_true[i], a[\"verdicts\"][i]),\n    \"false_negative_rate\": lambda a, i: false_negative_rate(y_true[i], a[\"verdicts\"][i]),\n    \"expected_calibration_error\": lambda a, i: expected_calibration_error(a[\"confidence\"][i], a[\"correct\"][i]),\n    \"brier_score\": lambda a, i: brier_score(a[\"p_unfaithful\"][i], y_true[i]),\n    \"brier_skill_score\": lambda a, i: brier_skill(a[\"p_unfaithful\"][i], y_true[i]),\n    \"conf_auroc\": lambda a, i: confidence_auroc(a[\"confidence\"][i], a[\"correct\"][i]),\n    \"parse_failure_rate\": lambda a, i: float(a[\"parse_failed\"][i].mean()),\n    \"coverage_at_25pct_deferral\": lambda a, i: float(a[\"kept\"][i].mean()),\n    \"balanced_accuracy_after_deferral\": lambda a, i: balanced_accuracy(y_true[i][a[\"kept\"][i]], a[\"verdicts\"][i][a[\"kept\"][i]]),\n}\nMETRIC_LABELS = {\n    \"balanced_accuracy\": \"Exactitude équilibrée\",\n    \"false_negative_rate\": \"Taux de faux négatifs\",\n    \"expected_calibration_error\": \"ECE (calibration)\",\n    \"brier_score\": \"Score de Brier\",\n    \"brier_skill_score\": \"Brier skill (vs prédicteur constant)\",\n    \"conf_auroc\": \"conf-AUROC\",\n    \"parse_failure_rate\": \"Taux de sorties illisibles\",\n    \"coverage_at_25pct_deferral\": \"Couverture après renvoi de 25 %\",\n    \"balanced_accuracy_after_deferral\": \"Exactitude équilibrée après renvoi\",\n}\nreference_arrays = approach_arrays(reference_eval)\ntyped_arrays = approach_arrays(typed_eval)\nAPPROACH_VIEWS = [(\"Juge génératif\", reference_arrays, COLORS[\"reference\"]), (\"Décision typée\", typed_arrays, COLORS[\"new\"])]"
+  },
+  {
+   "section": "evaluation",
+   "type": "markdown",
+   "source": "### Intervalles de confiance par bootstrap\nLe **bootstrap** consiste à retirer au hasard, avec remise, autant d'exemples que le lot en contient, à recalculer la métrique, et à répéter l'opération 1 000 fois. L'intervalle à 95 % montre à quel point le chiffre dépend de l'échantillon. On passe à `bootstrap_ci` les **indices** des exemples : chaque tirage recalcule ainsi n'importe quelle métrique (confiance, justesse, renvoi) sur les mêmes exemples. Une métrique non définie (NaN) est enregistrée comme `None`."
+  },
+  {
+   "section": "evaluation",
+   "type": "code",
+   "source": "def evaluate(arrays: dict, not_applicable: tuple = ()) -> tuple[dict, dict]:\n    \"\"\"Valeur et IC à 95 % (bootstrap) de chaque métrique ; None si sans objet ou non définie.\"\"\"\n    indices = np.arange(n_evaluated)\n    metrics, ci95 = {}, {}\n    for key, metric_fn in METRICS.items():\n        if key in not_applicable:\n            metrics[key] = None\n            continue\n        value, low, high = bootstrap_ci(\n            indices, indices, lambda sampled, _same, fn=metric_fn: fn(arrays, np.asarray(sampled, dtype=int)),\n            n=N_BOOTSTRAP, seed=SEED,\n        )\n        metrics[key] = float(value) if np.isfinite(value) else None\n        if metrics[key] is not None and np.isfinite(low) and np.isfinite(high):\n            ci95[key] = [float(low), float(high)]\n    return metrics, ci95\n\n\nreference_metrics, reference_ci = evaluate(reference_arrays)\ntyped_metrics, typed_ci = evaluate(typed_arrays, not_applicable=(\"parse_failure_rate\",))\npd.DataFrame({\"Juge génératif\": reference_metrics, \"Décision typée\": typed_metrics}).round(4)"
+  },
+  {
+   "section": "evaluation",
+   "type": "markdown",
+   "source": "### Condition d'éligibilité : chaque juge fait-il mieux que le hasard ?\nUne ECE basse ou une conf-AUROC haute ne veulent rien dire si le verdict ne porte **aucun signal** : une probabilité aplatie autour de 0,5 est « bien calibrée » sans rien savoir. Un juge est donc **éligible** seulement si la **borne basse** de l'IC à 95 % de son exactitude équilibrée dépasse 0,5.\n- Si l'un des juges ne l'est pas, les critères de calibration, la conf-AUROC et le renvoi des cas douteux sont **non concluants**.\n- Le **Brier skill** proche de 0 confirme une probabilité qui ne fait pas mieux qu'une constante."
+  },
+  {
+   "section": "evaluation",
+   "type": "code",
+   "source": "ELIGIBILITY_FLOOR = 0.5  # exactitude équilibrée d'un juge qui répond au hasard\n\n\ndef is_eligible(ci: dict) -> bool:\n    \"\"\"Vrai si la borne basse de l'IC à 95 % de la BAcc dépasse strictement le hasard.\"\"\"\n    low = ci.get(\"balanced_accuracy\", [float(\"nan\"), float(\"nan\")])[0]\n    return bool(np.isfinite(low) and low > ELIGIBILITY_FLOOR)\n\n\ndef eligibility_note(eligible: bool) -> str:\n    \"\"\"Phrase enregistrée avec les résultats : statut d'éligibilité et sa conséquence.\"\"\"\n    if eligible:\n        return \"juge éligible (BAcc au-dessus du hasard, IC compris)\"\n    return \"juge NON éligible : BAcc non distincte du hasard, ECE, conf-AUROC et renvoi non interprétables\"\n\n\nREFERENCE_ELIGIBLE = is_eligible(reference_ci)\nTYPED_ELIGIBLE = is_eligible(typed_ci)\nBOTH_ELIGIBLE = REFERENCE_ELIGIBLE and TYPED_ELIGIBLE\neligibility_rows = []\nfor name, metrics, ci, eligible in [(\"Juge génératif\", reference_metrics, reference_ci, REFERENCE_ELIGIBLE),\n                                    (\"Décision typée\", typed_metrics, typed_ci, TYPED_ELIGIBLE)]:\n    low, high = ci.get(\"balanced_accuracy\", [float(\"nan\"), float(\"nan\")])\n    eligibility_rows.append({\"juge\": name, \"BAcc\": metrics[\"balanced_accuracy\"], \"IC bas\": low, \"IC haut\": high,\n                             \"Brier skill\": metrics[\"brier_skill_score\"], \"éligible\": eligible})\ndisplay(pd.DataFrame(eligibility_rows).set_index(\"juge\").round(3))\nif not BOTH_ELIGIBLE:\n    print(\"Au moins un juge n'est pas distinct du hasard : la comparaison de calibration est NON CONCLUANTE.\")"
+  },
+  {
+   "section": "evaluation",
+   "type": "markdown",
+   "source": "### Enregistrer les résultats\nOn enregistre, pour chaque approche, les métriques, leurs intervalles et les **latences par exemple** : la médiane (p50) et le 95e centile (p95), en millisecondes. Pour la décision typée, la latence couvre les deux ordres d'options. En phase interne, celle du juge génératif inclut l'aller-retour vers le service. Les notes gardent la trace du matériel, de la précision, des réglages, du diagnostic des scores bruts et du **statut d'éligibilité** de chaque juge."
+  },
+  {
+   "section": "evaluation",
+   "type": "code",
+   "source": "def latency_summary(durations: list[float]) -> dict[str, float]:\n    \"\"\"p50 et p95 des durées (ms) des exemples évalués, en float Python.\"\"\"\n    stats = latency_stats(list(durations[:n_evaluated]))\n    if isinstance(stats, dict):\n        return {key: float(value) for key, value in stats.items()}\n    return {\"p50\": float(stats[0]), \"p95\": float(stats[1])}\n\n\nruntime_note = \", \".join(f\"{key} {value}\" for key, value in RUNTIME_INFO.items())\ntruncated_share = 100 * float(typed_eval[\"truncated\"].mean())\nreference_judge = f\"{MODEL_ID} local, génération gloutonne\" if PHASE == \"public\" else \"service LLM de l'environnement, sortie JSON\"\ntyped_note = (f\"{runtime_note} ; deux ordres d'options moyennés, préfixe en cache ; T={TEMPERATURE:.3f} \"\n              f\"(borne atteinte : {TEMPERATURE_AT_BOUND}), b={BIAS:.3f}, seuil strict={THRESHOLD:.3f} ; \"\n              f\"AUROC du score brut sur la calibration={CALIBRATION_SCORE_AUROC:.3f} ({len(calibration_df)} exemples) ; \"\n              f\"{eligibility_note(TYPED_ELIGIBLE)}.\")\nresults = save_results({\n    \"primary_metric\": \"balanced_accuracy\", \"direction\": \"max\", \"metric_labels\": METRIC_LABELS,\n    \"dataset\": {**DATASET_INFO, \"n_examples\": int(n_evaluated)},\n    \"approaches\": [\n        {\"name\": \"Juge génératif (verdict + confiance verbalisée)\", \"role\": \"reference\",\n         \"metrics\": reference_metrics, \"ci95\": reference_ci, \"latency_ms\": latency_summary(reference_durations),\n         \"notes\": f\"{reference_judge} ; {n_evaluated} exemples évalués ; {truncated_share:.0f} % d'entrées tronquées (plafond de {MAX_INPUT_TOKENS} tokens) ; \"\n                  f\"{eligibility_note(REFERENCE_ELIGIBLE)}.\"},\n        {\"name\": \"Décision typée P(H)/P(N) recalibrée\", \"role\": \"new\",\n         \"metrics\": typed_metrics, \"ci95\": typed_ci, \"latency_ms\": latency_summary(typed_durations),\n         \"notes\": typed_note},\n    ],\n})\nresults_table(results)"
+  },
+  {
+   "section": "evaluation",
+   "type": "markdown",
+   "source": "### Vue d'ensemble\nLa figure de synthèse montre, pour chaque approche, l'exactitude équilibrée, l'ECE, la conf-AUROC et le Brier skill, avec leurs intervalles à 95 %. Pour l'ECE, une barre plus basse est meilleure. **Lire d'abord l'exactitude équilibrée** : si son intervalle touche 0,5, les trois autres barres ne disent rien d'utile."
+  },
+  {
+   "section": "evaluation",
+   "type": "code",
+   "source": "plot_comparison(\n    results,\n    metrics=[\"balanced_accuracy\", \"expected_calibration_error\", \"conf_auroc\", \"brier_skill_score\"],\n    caption=(\"Juge génératif contre décision typée, sur les mêmes exemples. Exactitude équilibrée, conf-AUROC et Brier skill : \"\n             \"plus haut est mieux ; ECE : plus bas est mieux. Traits : IC à 95 % (bootstrap). Si l'IC de l'exactitude \"\n             \"équilibrée contient 0,5, le juge est au hasard et ECE, conf-AUROC et Brier skill ne sont pas interprétables.\"),\n)"
+  },
+  {
+   "section": "analysis",
+   "type": "markdown",
+   "source": "### Les écarts sont-ils réels ? Tests appariés\nLes deux approches jugent les **mêmes exemples**, on compare donc exemple par exemple :\n- **test de McNemar** : il ne regarde que les cas où une seule des deux approches a raison. Si elles se valent, ces cas se répartissent à parts égales (test binomial exact) ;\n- **bootstrap apparié** : on retire les mêmes exemples pour les deux approches et on mesure l'intervalle de la *différence* (décision typée − génératif).\n\nCes intervalles servent ensuite à trancher les critères de l'hypothèse."
+  },
+  {
+   "section": "analysis",
+   "type": "code",
+   "source": "from scipy.stats import binomtest\n\nreference_correct = reference_arrays[\"correct\"].astype(bool)\ntyped_correct = typed_arrays[\"correct\"].astype(bool)\nonly_reference = int((reference_correct & ~typed_correct).sum())\nonly_typed = int((typed_correct & ~reference_correct).sum())\ndiscordant = only_reference + only_typed\nmcnemar_p = binomtest(only_typed, discordant, 0.5).pvalue if discordant > 0 else 1.0\nindices = np.arange(n_evaluated)\n\n\ndef paired_difference(key: str) -> tuple[float, float, float]:\n    \"\"\"Différence (typée − générative) d'une métrique et son IC à 95 % par bootstrap apparié.\"\"\"\n    fn = METRICS[key]\n    return bootstrap_ci(indices, indices, lambda s, _same: fn(typed_arrays, np.asarray(s, dtype=int))\n                        - fn(reference_arrays, np.asarray(s, dtype=int)), n=N_BOOTSTRAP, seed=SEED)\n\n\nPAIRED = {key: paired_difference(key) for key in\n          (\"balanced_accuracy\", \"expected_calibration_error\", \"conf_auroc\", \"brier_score\")}\ndisplay(pd.DataFrame(\n    [{\"métrique\": METRIC_LABELS[key], \"écart typée − générative\": value, \"IC 95 % bas\": low, \"IC 95 % haut\": high}\n     for key, (value, low, high) in PAIRED.items()]\n).set_index(\"métrique\").round(4))\nprint(f\"McNemar : {only_typed} cas où seule la décision typée a raison, {only_reference} où seul le génératif a raison, p = {mcnemar_p:.3g}\")"
+  },
+  {
+   "section": "analysis",
+   "type": "markdown",
+   "source": "### Confronter l'hypothèse, sous condition d'éligibilité\nLes trois critères sont tranchés sur les **intervalles appariés**, pas sur les seules valeurs ponctuelles :\n- **non-infériorité** : borne basse de l'écart de BAcc ≥ −2 points (tolérance `BACC_TOLERANCE`) ;\n- **calibration** : ECE typée ≤ 70 % de l'ECE générative **et** borne haute de l'écart d'ECE < 0 ;\n- **classement** : borne basse de l'écart de conf-AUROC > 0.\n\nSi un juge n'est pas éligible, chaque critère est **non concluant**, quelle que soit sa valeur."
+  },
+  {
+   "section": "analysis",
+   "type": "code",
+   "source": "BACC_TOLERANCE = 0.02  # baisse d'exactitude équilibrée tolérée par l'hypothèse : 2 points\nECE_REDUCTION = 0.30  # baisse relative d'ECE visée par l'hypothèse\n\n\ndef is_finite(*values) -> bool:\n    \"\"\"Vrai si toutes les valeurs sont définies et finies.\"\"\"\n    return all(value is not None and np.isfinite(value) for value in values)\n\n\ndef criterion(condition: bool | None) -> str:\n    \"\"\"Statut d'un critère : non concluant sans juges éligibles, non tranché si une métrique manque.\"\"\"\n    if not BOTH_ELIGIBLE:\n        return \"non concluant (au moins un juge au niveau du hasard)\"\n    if condition is None:\n        return \"non tranché (métrique non définie)\"\n    return \"atteint\" if condition else \"non atteint\"\n\n\n_, bacc_low, _ = PAIRED[\"balanced_accuracy\"]\n_, _, ece_high = PAIRED[\"expected_calibration_error\"]\n_, auroc_low, _ = PAIRED[\"conf_auroc\"]\nece_reference, ece_typed = reference_metrics[\"expected_calibration_error\"], typed_metrics[\"expected_calibration_error\"]\nHYPOTHESIS_CRITERIA = {\n    \"BAcc non inférieure (borne basse de l'écart apparié ≥ −2 points)\":\n        criterion(bool(bacc_low >= -BACC_TOLERANCE) if is_finite(bacc_low) else None),\n    \"ECE inférieure d'au moins 30 % (et écart apparié < 0)\":\n        criterion(bool(ece_typed <= (1 - ECE_REDUCTION) * ece_reference and ece_high < 0)\n                  if is_finite(ece_reference, ece_typed, ece_high) else None),\n    \"conf-AUROC supérieure (borne basse de l'écart apparié > 0)\":\n        criterion(bool(auroc_low > 0) if is_finite(auroc_low) else None),\n}\nif not BOTH_ELIGIBLE:\n    HYPOTHESIS_VERDICT = \"Test non concluant : au moins un juge ne fait pas mieux que le hasard ; aucune conclusion sur la calibration ni sur le tri du trafic.\"\nelif all(status == \"atteint\" for status in HYPOTHESIS_CRITERIA.values()):\n    HYPOTHESIS_VERDICT = \"Hypothèse soutenue : les trois critères sont atteints, intervalles appariés compris.\"\nelse:\n    HYPOTHESIS_VERDICT = \"Hypothèse non soutenue : au moins un critère n'est pas atteint.\"\nprint(HYPOTHESIS_VERDICT)\npd.Series(HYPOTHESIS_CRITERIA, name=\"statut\").to_frame()"
+  },
+  {
+   "section": "analysis",
+   "type": "markdown",
+   "source": "### Comparer à une référence triviale : le prédicteur constant\nUn juge qui répond toujours $P(H)$ = part d'infidèles du lot de calibration n'apprend rien. Pourtant son ECE est presque nulle sur un lot équilibré, car sa confiance (≈ 0,5) égale son taux de réussite (≈ 0,5). Si l'ECE ou le Brier d'un juge ne fait pas nettement mieux que cette constante, sa « bonne calibration » ne vient que d'une probabilité aplatie. L'ECE du prédicteur constant se calcule sur un seul intervalle."
+  },
+  {
+   "section": "analysis",
+   "type": "code",
+   "source": "def constant_judge_metrics(prevalence: float, labels: np.ndarray) -> dict:\n    \"\"\"Juge trivial : toujours la même probabilité P(H) = prévalence de calibration, donc le même verdict.\"\"\"\n    verdict = int(prevalence > 0.5)\n    confidence = max(prevalence, 1.0 - prevalence)\n    correct = (labels == verdict).astype(float)\n    return {\"BAcc\": balanced_accuracy(labels, np.full(len(labels), verdict)),\n            \"ECE\": abs(float(correct.mean()) - confidence),  # un seul intervalle de confiance\n            \"Brier\": brier_score(np.full(len(labels), prevalence), labels),\n            \"confiance min\": confidence, \"confiance max\": confidence}\n\n\nbaseline_rows = {\"Prédicteur constant\": constant_judge_metrics(CALIBRATION_PREVALENCE, y_true)}\nfor name, arrays, _ in APPROACH_VIEWS:\n    baseline_rows[name] = {\n        \"BAcc\": balanced_accuracy(y_true, arrays[\"verdicts\"]),\n        \"ECE\": expected_calibration_error(arrays[\"confidence\"], arrays[\"correct\"]),\n        \"Brier\": brier_score(arrays[\"p_unfaithful\"], y_true),\n        \"confiance min\": float(arrays[\"confidence\"].min()), \"confiance max\": float(arrays[\"confidence\"].max()),\n    }\npd.DataFrame.from_dict(baseline_rows, orient=\"index\").round(4)"
+  },
+  {
+   "section": "analysis",
+   "type": "markdown",
+   "source": "### Diagramme de fiabilité\nÀ gauche, chaque point regroupe des décisions de confiance voisine : en abscisse leur confiance moyenne, en ordonnée leur taux réel de bonnes décisions, avec une taille proportionnelle à l'effectif. Un juge **bien calibré** suit la diagonale ; un point situé **sous** la diagonale signale une confiance trop haute. Un juge au hasard dont toutes les confiances sont proches de 0,5 tombe aussi sur la diagonale, mais **en un seul point** : il est calibré sans rien savoir. À droite, l'histogramme des confiances montre si le juge sait **nuancer**."
+  },
+  {
+   "section": "analysis",
+   "type": "code",
+   "source": "def reliability_points(confidence: np.ndarray, correct: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:\n    \"\"\"Confiance moyenne, taux de bonnes décisions et effectif de chaque intervalle non vide.\"\"\"\n    bins = confidence_bins(confidence)\n    present = [b for b in range(ECE_BINS) if np.any(bins == b)]\n    mean_confidence = np.array([confidence[bins == b].mean() for b in present])\n    accuracy = np.array([correct[bins == b].mean() for b in present])\n    counts = np.array([np.sum(bins == b) for b in present])\n    return mean_confidence, accuracy, counts\n\n\nfig, axes = plt.subplots(1, 2, figsize=(12, 4.5))\naxes[0].plot([0, 1], [0, 1], linestyle=\"--\", color=\"grey\", label=\"calibration parfaite\")\nfor name, arrays, color in APPROACH_VIEWS:\n    mean_confidence, accuracy, counts = reliability_points(arrays[\"confidence\"], arrays[\"correct\"])\n    axes[0].plot(mean_confidence, accuracy, marker=\"o\", color=color, label=name)\n    axes[0].scatter(mean_confidence, accuracy, s=20 + 6 * counts, color=color, alpha=0.3)\n    axes[1].hist(arrays[\"confidence\"], bins=np.linspace(0, 1, 21), alpha=0.55, color=color, label=name)\naxes[0].set(title=\"Diagramme de fiabilité\", xlabel=\"confiance moyenne de l'intervalle\",\n            ylabel=\"taux de bonnes décisions\", xlim=(0, 1), ylim=(0, 1.02))\naxes[0].legend()\naxes[1].axvline(HIGH_CONFIDENCE, color=COLORS[\"accent\"], linestyle=\":\", label=\"confiance 0,9\")\naxes[1].set(title=\"Distribution des confiances\", xlabel=\"confiance dans le verdict\", ylabel=\"nombre de décisions\")\naxes[1].legend()\nfig.tight_layout()\nsave_figure(fig, \"reliability\", \"Gauche : taux réel de bonnes décisions selon la confiance affichée (sous la diagonale = \"\n            \"confiance excessive ; taille des points = effectif). Droite : distribution des confiances de chaque juge ; \"\n            \"des confiances toutes proches de 0,5 signalent une probabilité aplatie, sans information.\")"
+  },
+  {
+   "section": "analysis",
+   "type": "markdown",
+   "source": "### Erreurs commises avec une grande confiance, et résultats par segment\nL'étude source rapporte que le juge génératif commet la majorité de ses erreurs avec une confiance d'au moins 0,9. On mesure ici la même chose. On découpe ensuite l'exactitude équilibrée par **segment** (tâche en phase publique, thème en phase interne) et selon que l'entrée a été **tronquée** ou non. Avec quelques dizaines d'exemples par segment, ces chiffres donnent une tendance, pas une conclusion."
+  },
+  {
+   "section": "analysis",
+   "type": "code",
+   "source": "high_rows = []\nfor name, arrays, _ in APPROACH_VIEWS:\n    high = arrays[\"confidence\"] >= HIGH_CONFIDENCE\n    errors = arrays[\"correct\"] == 0\n    high_rows.append({\n        \"approche\": name,\n        \"décisions à c ≥ 0,9 (%)\": 100 * float(high.mean()),\n        \"erreurs (n)\": int(errors.sum()),\n        \"erreurs commises à c ≥ 0,9 (%)\": 100 * float((high & errors).sum()) / max(int(errors.sum()), 1),\n    })\ndisplay(pd.DataFrame(high_rows).set_index(\"approche\").round(1))\n\n\ndef segment_table(groups: pd.Series) -> pd.DataFrame:\n    \"\"\"Effectifs et exactitude équilibrée des deux approches pour chaque valeur de `groups`.\"\"\"\n    rows = []\n    for value, positions in groups.groupby(groups).groups.items():\n        idx = np.asarray(positions, dtype=int)\n        rows.append({\"groupe\": value, \"exemples\": len(idx), \"infidèles\": int(y_true[idx].sum()),\n                     \"BAcc génératif\": balanced_accuracy(y_true[idx], reference_arrays[\"verdicts\"][idx]),\n                     \"BAcc typée\": balanced_accuracy(y_true[idx], typed_arrays[\"verdicts\"][idx])})\n    return pd.DataFrame(rows).set_index(\"groupe\").round(3)\n\n\ndisplay(segment_table(evaluated_df[\"segment\"]))\nsegment_table(typed_eval[\"truncated\"].map({True: \"entrée tronquée\", False: \"entrée complète\"}))"
+  },
+  {
+   "section": "analysis",
+   "type": "markdown",
+   "source": "### Matrices de confusion\nChaque matrice croise l'étiquette humaine (lignes) avec le verdict du juge (colonnes). La colonne « illisible » ne concerne que le juge génératif. La case *infidèle → fidèle* contient les **faux négatifs**, c'est-à-dire les hallucinations laissées passer : c'est l'erreur la plus coûteuse quand le juge sert de filtre. Un juge qui répond presque toujours la même lettre remplit une seule colonne."
+  },
+  {
+   "section": "analysis",
+   "type": "code",
+   "source": "fig, axes = plt.subplots(1, 2, figsize=(11, 4))\nfor ax, (name, arrays, color) in zip(axes, APPROACH_VIEWS):\n    matrix = np.array([[int(np.sum((y_true == truth) & (arrays[\"verdicts\"] == verdict))) for verdict in (0, 1, -1)]\n                       for truth in (0, 1)])\n    ax.imshow(matrix, cmap=\"Blues\", vmin=0)\n    for (i, j), value in np.ndenumerate(matrix):\n        ax.text(j, i, str(value), ha=\"center\", va=\"center\", fontsize=12,\n                color=\"white\" if value > matrix.max() / 2 else \"black\")\n    ax.set_xticks([0, 1, 2], [\"fidèle\", \"infidèle\", \"illisible\"])\n    ax.set_yticks([0, 1], [\"fidèle\", \"infidèle\"])\n    ax.set_title(name, color=color)\n    ax.set(xlabel=\"verdict du juge\", ylabel=\"étiquette humaine\")\n    ax.grid(False)\nfig.tight_layout()\nsave_figure(fig, \"confusion\", \"Matrices de confusion (nombre de réponses). Ligne « infidèle », colonne « fidèle » : \"\n            \"hallucinations non détectées (faux négatifs). Colonne « illisible » : sorties du juge génératif non analysables.\")"
+  },
+  {
+   "section": "analysis",
+   "type": "markdown",
+   "source": "### Contrôle positif : le juge voit-il une erreur grossière ?\nPour savoir si un échec vient du **modèle** ou du **protocole**, on soumet les deux juges, avec exactement le même code, à des cas **faciles** :\n- des extraits courts et synthétiques (`make_fake_data`) dont la réponse est fidèle, ou contient une valeur modifiée ou une phrase inventée ;\n- les entrées sont courtes, donc jamais tronquées ;\n- la décision typée garde les réglages (T, b, seuil) appris sur RAGTruth.\n\nUn budget de temps borne chaque boucle. Le contrôle est synthétique et ne contient aucune donnée réelle."
+  },
+  {
+   "section": "analysis",
+   "type": "code",
+   "source": "N_CONTROL = by_scale(reduced=20, full=80)  # exemples synthétiques du contrôle positif\nTIME_BUDGET_CONTROL_S = by_scale(reduced=90, full=180)  # budget de chaque juge sur le contrôle (secondes)\n\ncontrol_df = clean_private(make_fake_data(N_CONTROL)).sample(frac=1.0, random_state=SEED).reset_index(drop=True)\nset_seed(SEED)\ncontrol_reference, _ = run_with_budget(judge_generative, control_df, TIME_BUDGET_CONTROL_S, \"controle_generatif\")\ncontrol_typed_raw, _ = run_with_budget(judge_typed, control_df, TIME_BUDGET_CONTROL_S, \"controle_typee\")\ncontrol_typed = typed_decisions(control_typed_raw, TEMPERATURE, BIAS, THRESHOLD)\npd.Series({\n    \"exemples de contrôle\": len(control_df),\n    \"dont infidèles\": int(control_df[\"label\"].sum()),\n    \"jugés (génératif)\": len(control_reference),\n    \"jugés (typée)\": len(control_typed),\n}, name=\"valeur\").to_frame()"
+  },
+  {
+   "section": "analysis",
+   "type": "markdown",
+   "source": "### Diagnostic : hasard partout, ou seulement sur la vraie tâche ?\nLe tableau donne, pour chaque juge, l'exactitude équilibrée avec son IC à 95 % sur RAGTruth, selon que l'entrée est **complète** ou **tronquée** (à l'échelle complète, seul le premier groupe existe), et sur le **contrôle positif**. L'**AUROC du score** ($P(H)$) mesure la séparation des classes sans dépendre du seuil choisi.\n- Contrôle réussi mais RAGTruth au hasard : le protocole fonctionne, la tâche dépasse ce modèle.\n- Contrôle raté : lecture des options ou modèle à revoir.\n- À l'échelle complète, rien n'étant tronqué, un résultat au hasard ne s'explique plus par la coupe."
+  },
+  {
+   "section": "analysis",
+   "type": "code",
+   "source": "def bacc_interval(labels: np.ndarray, verdicts: np.ndarray) -> tuple[float, float, float]:\n    \"\"\"BAcc et IC à 95 % par bootstrap ; NaN si le groupe ne contient pas les deux classes.\"\"\"\n    if np.unique(labels).size < 2:\n        return float(\"nan\"), float(\"nan\"), float(\"nan\")\n    return bootstrap_ci(labels, verdicts, balanced_accuracy, n=N_BOOTSTRAP, seed=SEED)\n\n\ndef diagnostic_row(group: str, judge: str, labels: np.ndarray, verdicts: np.ndarray, scores: np.ndarray) -> dict:\n    \"\"\"Effectif, BAcc avec IC et AUROC du score P(H) d'un juge sur un groupe d'exemples.\"\"\"\n    value, low, high = bacc_interval(labels, verdicts)\n    separable = np.unique(labels).size == 2 and np.ptp(scores) > 0\n    return {\"groupe\": group, \"juge\": judge, \"exemples\": len(labels), \"BAcc\": value, \"IC bas\": low,\n            \"IC haut\": high, \"AUROC du score\": roc_auc_score(labels, scores) if separable else float(\"nan\")}\n\n\ncomplete = ~typed_eval[\"truncated\"].to_numpy(dtype=bool)\ncontrol_labels = control_df[\"label\"].to_numpy().astype(int)\ndiagnostic_rows = []\nfor name, arrays, _ in APPROACH_VIEWS:\n    for group, mask in [(\"RAGTruth, entrée complète\", complete), (\"RAGTruth, entrée tronquée\", ~complete)]:\n        if mask.any():  # un groupe vide n'a ni ligne ni barre\n            diagnostic_rows.append(diagnostic_row(group, name, y_true[mask], arrays[\"verdicts\"][mask],\n                                                  arrays[\"p_unfaithful\"][mask]))\nfor name, outputs in [(\"Juge génératif\", control_reference), (\"Décision typée\", control_typed)]:\n    diagnostic_rows.append(diagnostic_row(\"contrôle positif\", name, control_labels[:len(outputs)],\n                                          outputs[\"verdict\"].to_numpy().astype(int),\n                                          outputs[\"p_unfaithful\"].to_numpy(dtype=float)))\ndiagnostics = pd.DataFrame(diagnostic_rows)\ndiagnostics.set_index([\"groupe\", \"juge\"]).round(3)"
+  },
+  {
+   "section": "analysis",
+   "type": "markdown",
+   "source": "### Voir le diagnostic\nUne barre par juge et par groupe : l'exactitude équilibrée, avec son intervalle à 95 %. Le trait horizontal marque le **hasard** (0,5). Une barre dont l'intervalle traverse ce trait indique un juge qui ne détecte rien sur ce groupe. Un groupe vide (aucune entrée tronquée, par exemple) n'a pas de barre."
+  },
+  {
+   "section": "analysis",
+   "type": "code",
+   "source": "fig, ax = plt.subplots(figsize=(10, 4.5))\ngroups = list(dict.fromkeys(diagnostics[\"groupe\"]))\npositions = np.arange(len(groups))\nfor offset, (name, _, color) in zip((-0.2, 0.2), APPROACH_VIEWS):\n    part = diagnostics[diagnostics[\"juge\"] == name].set_index(\"groupe\").reindex(groups)\n    values = part[\"BAcc\"].to_numpy(dtype=float)\n    errors = np.vstack([values - part[\"IC bas\"].to_numpy(dtype=float), part[\"IC haut\"].to_numpy(dtype=float) - values])\n    ax.bar(positions + offset, values, width=0.4, color=color, label=name)\n    ax.errorbar(positions + offset, values, yerr=np.clip(np.nan_to_num(errors), 0, None), fmt=\"none\",\n                ecolor=\"black\", capsize=4)\nax.axhline(ELIGIBILITY_FLOOR, color=COLORS[\"accent\"], linestyle=\"--\", label=\"hasard (0,5)\")\nax.set_xticks(positions, groups)\nax.set(title=\"Exactitude équilibrée par groupe : modèle ou protocole ?\", xlabel=\"groupe d'exemples\",\n       ylabel=\"exactitude équilibrée\", ylim=(0, 1.05))\nax.legend()\nfig.tight_layout()\nsave_figure(fig, \"diagnostic_groups\", \"Exactitude équilibrée (IC à 95 %) de chaque juge sur RAGTruth, \"\n            \"et sur un contrôle positif d'erreurs grossières. Au-dessus du trait : mieux que le hasard. \"\n            \"Contrôle réussi et RAGTruth au hasard : la tâche dépasse le modèle, le protocole n'est pas en cause.\")"
+  },
+  {
+   "section": "analysis",
+   "type": "markdown",
+   "source": "### Exemples d'erreurs (phase publique seulement)\nVoici les erreurs de chaque approche commises avec la **plus grande confiance**. Leur lecture aide à distinguer trois cas : une erreur d'annotation possible, une information coupée par la troncature, ou une vraie faiblesse du juge. En phase interne, aucun contenu n'est affiché."
+  },
+  {
+   "section": "analysis",
+   "type": "code",
+   "source": "if PHASE == \"public\":\n    pd.set_option(\"display.max_colwidth\", 320)\n    for name, arrays, _ in APPROACH_VIEWS:\n        errors = evaluated_df.assign(verdict=arrays[\"verdicts\"], confidence=arrays[\"confidence\"].round(3),\n                                     truncated=typed_eval[\"truncated\"])[arrays[\"correct\"] == 0]\n        print(f\"\\n{name} : erreurs les plus confiantes\")\n        shown = errors.sort_values(\"confidence\", ascending=False).head(3)\n        display(shorten(shown, 300)[[\"segment\", \"label\", \"verdict\", \"confidence\", \"truncated\", \"source_text\", \"answer\"]])"
+  },
+  {
+   "section": "analysis",
+   "type": "markdown",
+   "source": "### À retenir\n- **Éligibilité d'abord** : si la borne basse de l'IC de l'exactitude équilibrée d'un juge ne dépasse pas 0,5, ce juge ne détecte rien. L'expérience est alors **non concluante** : ni l'ECE, ni la conf-AUROC, ni le renvoi des 25 % de cas douteux ne justifient un tri du trafic, même s'ils paraissent meilleurs. Une probabilité aplatie (température élevée, Brier skill proche de 0, ECE comparable à celle du prédicteur constant, aucune décision à c ≥ 0,9) est « calibrée » sans information.\n- **Modèle ou protocole** : si le contrôle positif est nettement au-dessus de 0,5 alors que RAGTruth reste au hasard, la lecture des logits et l'analyse du texte fonctionnent, et c'est la tâche (erreurs subtiles, français traduit, entrées longues) qui dépasse ce modèle. Si le contrôle échoue aussi, il faut revoir le prompt ou les lettres d'options avant toute mesure. Aucune entrée n'étant tronquée à l'échelle complète, la coupe n'explique plus un résultat au hasard.\n- **Suite en cas d'échec** : essayer un modèle plus grand (7 Md ou plus, au-delà de ce qu'un T4 en float16 traite dans le temps imparti), et la version anglaise d'origine du même jeu, pour isoler l'effet de la traduction.\n- **Si les deux juges sont éligibles** : les critères appariés (non-infériorité à −2 points, ECE −30 %, conf-AUROC plus haute) tranchent l'hypothèse, et la part d'erreurs à c ≥ 0,9 dit jusqu'où se fier aux verdicts « sûrs ».\n- **Portée** : à l'échelle réduite, un substitut de 0,5 Md sur une centaine d'exemples valide le protocole, pas la conclusion. Sur les données internes, l'écart mêle l'approche et le modèle du service."
+  }
+ ],
+ "resume_simple": "Un assistant qui répond à partir de documents peut inventer ou contredire ce qu'ils disent. On demande alors souvent à un autre modèle de langue de rendre un verdict écrit, accompagné d'une confiance qu'il formule lui-même. Ici, on teste une variante plus simple : on ne laisse pas le modèle écrire, on lit directement la probabilité qu'il donne aux deux réponses possibles (« hallucination » ou « fidèle »), puis on la corrige sur un petit lot d'exemples. La comparaison, faite sur les mêmes réponses en français annotées par des humains, indique si cette lecture directe détecte aussi bien les erreurs tout en donnant une confiance plus fiable. Si c'est le cas, elle pourrait servir de premier filtre peu coûteux. Elle ne compte que si les deux juges font mieux que le hasard.",
+ "lecture_des_metriques": [
+  {
+   "cle": "balanced_accuracy",
+   "libelle": "Exactitude équilibrée",
+   "explication": "Moyenne du taux de réponses infidèles détectées et du taux de réponses fidèles reconnues ; 0,5 correspond au hasard.",
+   "sens": "max"
+  },
+  {
+   "cle": "false_negative_rate",
+   "libelle": "Taux de faux négatifs",
+   "explication": "Part des réponses infidèles que le juge laisse passer comme fidèles.",
+   "sens": "min"
+  },
+  {
+   "cle": "expected_calibration_error",
+   "libelle": "ECE (calibration)",
+   "explication": "Écart moyen entre la confiance affichée et le taux réel de bonnes décisions, par tranche de confiance.",
+   "sens": "min"
+  },
+  {
+   "cle": "brier_score",
+   "libelle": "Score de Brier",
+   "explication": "Erreur quadratique moyenne entre la probabilité d'infidélité annoncée et l'étiquette réelle (0 ou 1).",
+   "sens": "min"
+  },
+  {
+   "cle": "brier_skill_score",
+   "libelle": "Brier skill (vs prédicteur constant)",
+   "explication": "Gain du score de Brier par rapport à un juge qui annonce toujours la même probabilité ; 0 signifie aucune information.",
+   "sens": "max"
+  },
+  {
+   "cle": "conf_auroc",
+   "libelle": "conf-AUROC",
+   "explication": "Probabilité qu'une bonne décision reçoive une confiance plus haute qu'une erreur ; 0,5 signifie une confiance inutile.",
+   "sens": "max"
+  },
+  {
+   "cle": "parse_failure_rate",
+   "libelle": "Taux de sorties illisibles",
+   "explication": "Part des sorties du juge génératif dont le verdict ou la confiance n'a pas pu être lu (sans objet pour la décision typée).",
+   "sens": "min"
+  },
+  {
+   "cle": "coverage_at_25pct_deferral",
+   "libelle": "Couverture après renvoi de 25 %",
+   "explication": "Part des cas gardés une fois écartés ceux dont la confiance ne dépasse pas le quart inférieur.",
+   "sens": "max"
+  },
+  {
+   "cle": "balanced_accuracy_after_deferral",
+   "libelle": "Exactitude équilibrée après renvoi",
+   "explication": "Exactitude équilibrée calculée sur les seuls cas gardés, après renvoi des moins sûrs à un second avis.",
+   "sens": "max"
+  }
+ ],
+ "glossaire": [
+  {
+   "terme": "RAG",
+   "definition": "Génération augmentée par récupération : l'assistant répond en s'appuyant sur des documents retrouvés pour la question."
+  },
+  {
+   "terme": "Hallucination / réponse infidèle",
+   "definition": "Réponse qui contredit les documents fournis ou y ajoute une information absente."
+  },
+  {
+   "terme": "Logit",
+   "definition": "Score brut que le modèle attribue à chaque token avant de le convertir en probabilité."
+  },
+  {
+   "terme": "Décision typée",
+   "definition": "Lecture directe des probabilités de deux réponses possibles (ici H et N) en une seule passe, sans générer de texte."
+  },
+  {
+   "terme": "Température (recalibration)",
+   "definition": "Facteur qui étire ou resserre les scores du modèle pour que la probabilité annoncée corresponde mieux aux fréquences réelles."
+  },
+  {
+   "terme": "Calibration / ECE",
+   "definition": "Un juge est calibré si, parmi ses verdicts donnés à 80 %, environ 80 % sont justes ; l'ECE mesure l'écart à cet idéal."
+  },
+  {
+   "terme": "Bootstrap",
+   "definition": "Rééchantillonnage au hasard, avec remise, des exemples évalués, pour voir à quel point un chiffre dépend de l'échantillon."
+  },
+  {
+   "terme": "Test de McNemar",
+   "definition": "Test apparié qui compare deux juges en ne regardant que les exemples où un seul des deux a raison."
+  },
+  {
+   "terme": "Cache KV",
+   "definition": "Mémoire des calculs déjà faits sur le début d'un prompt, réutilisée pour ne pas les refaire."
+  },
+  {
+   "terme": "Contrôle positif",
+   "definition": "Jeu de cas volontairement faciles (erreurs grossières) qu'un juge utile doit réussir, pour savoir si un échec vient du modèle ou du protocole."
+  }
+ ],
+ "protocole": "On tire, avec la graine, un échantillon du split test de RAGTruth traduit en français, à parts égales entre chaque couple tâche × classe (650 exemples à l'échelle complète), sans aucune entrée tronquée (plafond de 4 096 tokens). Il est découpé en un lot de calibration (150 exemples) et un lot d'évaluation (500 exemples), les mêmes pour les deux approches. L'étiquette vaut 1 (infidèle) si la réponse contient au moins un passage halluciné annoté. Le juge génératif écrit un verdict et une confiance sans aucun réglage. La décision typée lit logit(H) − logit(N) sur les deux ordres d'options, puis la température, le décalage et le seuil sont ajustés sur le seul lot de calibration. On mesure l'exactitude équilibrée (métrique principale), le taux de faux négatifs, l'ECE, le Brier, le Brier skill, la conf-AUROC, le taux de sorties illisibles et la couverture et l'exactitude après renvoi des 25 % de cas les moins sûrs. Les IC à 95 % viennent d'un bootstrap (1 000 tirages) ; la comparaison utilise un test de McNemar et un bootstrap apparié, sous une condition d'éligibilité (borne basse de la BAcc > 0,5).",
+ "ecarts_sandbox": "À l'échelle réduite, Qwen/Qwen2.5-0.5B-Instruct en float32 sur CPU remplace Qwen/Qwen2.5-3B-Instruct en float16 sur GPU. L'échantillon passe à 150 exemples (40 pour la calibration, 110 pour l'évaluation), les prompts sont tronqués à 384 tokens alors qu'ils restent entiers à l'échelle complète, le contrôle positif compte 20 exemples au lieu de 80 et les budgets de temps sont plus courts. Ces chiffres valident le protocole, pas la conclusion.",
+ "limites": [
+  "RAGTruth est traduit automatiquement et contient des réponses de LLM de 2023, aux erreurs souvent grossières, dans des domaines éloignés des services financiers.",
+  "À l'échelle complète, aucune entrée n'est tronquée. À l'échelle réduite, les prompts sont coupés à 384 tokens : ces chiffres ne valident que la mécanique.",
+  "Le juge génératif ne reçoit qu'un ordre d'options, alors que la décision typée moyenne les deux ordres.",
+  "Avec 500 exemples d'évaluation, l'intervalle apparié couvre environ ±3 points : une différence de 2 points d'exactitude équilibrée reste difficile à trancher, et les résultats par segment ne donnent qu'une tendance.",
+  "En phase interne, le juge génératif passe par le modèle du service de l'environnement cible : l'écart mêle alors l'approche et le modèle."
+ ]
+}

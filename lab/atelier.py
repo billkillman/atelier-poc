@@ -693,14 +693,15 @@ class Atelier:
         sont pas rejoués ; la revue finale, si : elle doit voir la nouvelle échelle complète. Le 2026-10-30, chaque essai
         de l'échelle complète de joey-1 repassait par plus d'une heure de génération et de sandbox. Avec une `correction`
         (défaut que seule une relecture humaine a vu), le code est corrigé d'abord et l'échelle réduite rejouée, comme
-        toute correction ; les itérations permises repartent de là."""
+        toute correction ; les itérations permises repartent de là. Elle seule permet de repartir d'un POC en échec, du
+        dernier code écrit : le 2026-10-31, 2 h de travail tenaient à une erreur de type à la dernière itération."""
         run = self.c.get("reprise_run")
         if not run:
             return None
         dossiers = sorted(TRAVAIL_REPRIS.glob(f"*/{self.jour}/{self.sid}"))
         etat = read_json(dossiers[0] / "etat.json", None) if dossiers else None
-        if not etat or etat.get("statut") != "valide":
-            raise SystemExit(f"reprise impossible : dossier de travail du run {run} absent, ou POC non validé dans le sandbox")
+        if not etat or (etat.get("statut") != "valide" and not self.c.get("correction")):
+            raise SystemExit(f"reprise impossible : dossier de travail du run {run} absent, ou POC non validé sans correction")
         source, k = dossiers[0], len(etat["iterations"])
         shutil.copytree(source / "etapes", self.r.etapes, dirs_exist_ok=True, ignore=shutil.ignore_patterns(f"revue_{k}.json"))
         for nom in ("execute_publique.ipynb", "requirements_sandbox.txt"):

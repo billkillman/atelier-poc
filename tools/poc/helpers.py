@@ -820,7 +820,8 @@ def plot_comparison(results: dict, metrics: list[str] | None = None, name: str =
         errors = [[0, 0]] * len(values)
         cis = [(a.get("ci95") or {}).get(key) for a in shown]
         if any(cis):
-            errors = [[v - ci[0], ci[1] - v] if ci else [0, 0] for v, ci in zip(values, cis)]
+            # Une métrique biaisée (ECE) peut sortir de son intervalle bootstrap : barre nulle de ce côté, jamais négative.
+            errors = [[max(v - ci[0], 0), max(ci[1] - v, 0)] if ci else [0, 0] for v, ci in zip(values, cis)]
         bars = ax.bar(range(len(values)), values, color=colors, yerr=list(zip(*errors)), capsize=5)
         ax.bar_label(bars, labels=[f"{v:.3g}" for v in values], padding=3, fontsize=10)
         ax.set_xticks(range(len(values)), [n if len(n) <= 18 else n[:17] + "…" for n in names], rotation=15, ha="right")

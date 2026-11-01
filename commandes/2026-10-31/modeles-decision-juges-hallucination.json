@@ -279,9 +279,9 @@
   ],
   "metrique_principale": "balanced_accuracy",
   "sens": "max",
-  "protocole": "Échantillon stratifié de 500 exemples du split test (250 fidèles / 250 infidèles quand possible) : 150 pour la calibration (température, seuil), 350 pour l'évaluation, même découpage pour les deux approches. Verdict binaire : infidèle si labels non vide. IC à 95 % par bootstrap (1 000 rééchantillonnages), test de McNemar apparié sur les verdicts, bootstrap apparié sur les différences d'ECE. Résultats aussi par task_type. Le seuil de décision de la décision typée est choisi pour équilibrer sensibilité et spécificité sur le lot de calibration. Seule la phase d'inférence est exécutée, aucun entraînement.",
+  "protocole": "Échantillon de 650 exemples du split test, à parts égales entre chaque couple tâche × classe : 150 pour la calibration (température, seuil), 500 pour l'évaluation, même découpage pour les deux approches. Verdict binaire : infidèle si labels non vide. IC à 95 % par bootstrap (1 000 rééchantillonnages), test de McNemar apparié sur les verdicts, bootstrap apparié sur les différences d'ECE. Résultats aussi par task_type. Le seuil de décision de la décision typée est choisi pour équilibrer sensibilité et spécificité sur le lot de calibration. Seule la phase d'inférence est exécutée, aucun entraînement.",
   "niveau_sandbox": "reduit",
-  "adaptation_sandbox": "Substitut Qwen/Qwen2.5-0.5B-Instruct (même famille) sur CPU, 120 exemples (40 calibration, 80 évaluation) et entrées tronquées à 512 tokens. Échelle complète sur T4 en fp16 : 500 exemples × ~800 tokens ≈ 400 k tokens par passe ; passe typée (×2 ordres) ≈ 800 k tokens ÷ 700 tok/s ≈ 19 min, plus le juge génératif (prefill 400 k tokens ≈ 10 min + décodage) ; trop long, donc le second ordre n'est calculé que sur l'évaluation (350) et les entrées sont tronquées à 768 tokens, soit ≈ 30 min au total avec chargement ; limites : le juge génératif ne reçoit qu'un ordre.",
+  "adaptation_sandbox": "Substitut Qwen/Qwen2.5-0.5B-Instruct (même famille) sur CPU, 150 exemples (40 calibration, 110 évaluation) et entrées tronquées à 384 tokens. Échelle complète sur T4 en fp16 : aucune entrée tronquée (plafond de 4 096 tokens), environ 2 s par exemple pour le juge génératif et 1 s pour la décision typée, soit environ 35 min avec le chargement ; le juge génératif ne reçoit qu'un ordre d'options.",
   "dependances": [],
   "phase2": {
    "donnees": [
@@ -329,7 +329,7 @@
    ],
    "preparation": "Extraire les journaux de génération RAG (contexte récupéré, question, réponse) sur une période représentative, échantillonner par thème avec sur-échantillonnage des réponses à faible score de pertinence, faire annoter par des experts métier le caractère fidèle ou non, puis geler les lots calibration et évaluation."
   },
-  "duree_estimee_minutes": 300,
+  "duree_estimee_minutes": 35,
   "analyse_materiel": "Un LLM de 3 Md de paramètres lisant ~400 k tokens par passe est trop lent sur 2 cœurs CPU (plusieurs heures) et dépasse 1 Md : GPU nécessaire.",
   "type_exemples": "courts"
  },
@@ -403,5 +403,7 @@
    "sdk": "claude",
    "modele": "claude-sonnet-5-5"
   }
- }
+ },
+ "reprise_run": 41236941377,
+ "correction": "Protocole revu avant lancement : entrées entières à l'échelle complète, échantillon stratifié par tâche et par classe, 500 exemples d'évaluation. Le code joint a été répété dans le sandbox sur toutes ses branches."
 }
