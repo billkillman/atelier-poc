@@ -94,6 +94,70 @@
    "tentatives": 1
   },
   {
+   "jour": "2026-10-31",
+   "sujet_id": "modeles-decision-juges-hallucination",
+   "depot": "20261031_typed_decision_rag_faithfulness_judge",
+   "titre": "Un petit LLM en décision typée (P(oui)/P(non)) juge-t-il la fidélité d'une réponse RAG en français aussi bien qu'un même LLM en verdict génératif, avec une meilleure calibration ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "complete",
+   "materiel": "GPU T4 (Google Colab)",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "gpu",
+    "raison_materiel": "Qwen/Qwen2.5-3B-Instruct (3.1 Md de paramètres) trop gros pour le CPU du sandbox",
+    "raison": ""
+   },
+   "iterations": 4,
+   "metrique_principale": "balanced_accuracy",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "Juge génératif (verdict + confiance verbalisée)",
+     "role": "reference",
+     "valeur": 0.519488311812989,
+     "ic95": [
+      0.48859321680898443,
+      0.5484759221311475
+     ]
+    },
+    {
+     "nom": "Décision typée P(H)/P(N) recalibrée",
+     "role": "nouvelle",
+     "valeur": 0.5982095713531417,
+     "ic95": [
+      0.5553435114503817,
+      0.6427540068344805
+     ]
+    }
+   ],
+   "n_exemples": 500,
+   "jeu": "KRLabsOrg/ragtruth-fr-translated",
+   "synthese": "balanced_accuracy : Décision typée P(H)/P(N) recalibrée 0,598 contre 0,519 pour Juge génératif (verdict + confiance verbalisée) (500 exemples, GPU T4 (Google Colab)).",
+   "conclusion": "À l'échelle complète (500 exemples, T4, modèle de 3 Md, entrées non tronquées), la décision typée atteint une BAcc de 0,598 (IC 0,555–0,643), seulement un peu au-dessus du hasard, contre 0,519 (IC 0,489–0,548) pour le juge génératif, qui n'est pas éligible. Les deux sont loin des 82,6 de la source sur RAGTruth en anglais. L'ECE de 0,034 de la décision typée reflète une probabilité aplatie (Brier skill 0,04, aucune confiance ≥ 0,9), alors que le génératif est très sûr de lui à tort (75 % de ses erreurs à confiance ≥ 0,9). L'hypothèse (à 2 points, ECE −30 %) n'est donc pas testable ici. Aucun de ces juges ne convient comme filtre à ce stade.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non",
+   "en_bref": "Test non concluant : le juge génératif ne fait pas mieux que le hasard, et la décision typée à peine mieux. Sa bonne calibration apparente vient d'une probabilité aplatie, non d'une détection fiable.",
+   "libelle_metrique": "Exactitude équilibrée",
+   "reserves": [
+    "Le juge génératif est ici au niveau du hasard : l'avantage de la décision typée vient en partie d'une référence faible. Ce n'est pas la comparaison de la source avec un LLM juge performant.",
+    "Cette décision typée laisse passer environ un tiers des réponses infidèles et sa confiance est quasi plate. Sa bonne ECE ne prouve pas une confiance fiable, et ce juge ne convient pas comme filtre.",
+    "Il ne faut pas conclure que la décision typée est mieux calibrée : le test était non concluant parce que la référence ne détecte rien."
+   ],
+   "duree_minutes": 60.0,
+   "consommation": {
+    "claude:poc_revue:modeles-decision-juges-hallucination": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 77.7,
+     "cout_equivalent_usd": 0.6341,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261031_typed_decision_rag_faithfulness_judge",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-10-30",
    "sujet_id": "baseten-joey-1-decision-model",
    "depot": "20261030_typed_decision_model_camembert_hierarchical_intent",
