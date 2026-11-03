@@ -2,6 +2,34 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-03",
+   "sujet_id": "modeles-decision-distillation-flide-applications",
+   "depot": "20261103_decision_model_camembert_intents",
+   "titre": "Un modèle de décision typé (Open-Jev-2B) égale-t-il un encodeur CamemBERT fine-tuné sur 77 intentions françaises proches, en exactitude et en calibration ?",
+   "statut": "echec",
+   "iterations": 3,
+   "raison": "la phase publique a échoué",
+   "cause": "methode",
+   "duree_minutes": 59.2,
+   "consommation": {
+    "claude:poc_code:modeles-decision-distillation-flide-applications": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1571.2,
+     "cout_equivalent_usd": 4.0584,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:modeles-decision-distillation-flide-applications": {
+     "appels": 4,
+     "echecs": 0,
+     "secondes": 1231.1,
+     "cout_equivalent_usd": 4.9245,
+     "recherches_web": 0
+    }
+   },
+   "tentatives": 1
+  },
+  {
    "jour": "2026-10-31",
    "sujet_id": "tabulaire-fondation-calibration-explicabilite",
    "depot": "20261031_tabular_foundation_credit_calibration",
