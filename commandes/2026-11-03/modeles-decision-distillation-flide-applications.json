@@ -1,0 +1,427 @@
+{
+ "version": 1,
+ "jour": "2026-11-03",
+ "sujet_id": "modeles-decision-distillation-flide-applications",
+ "depot": "20261103_decision_model_camembert_intents",
+ "fiche": {
+  "sujet_id": "modeles-decision-distillation-flide-applications",
+  "titre": "Modèles de décision : un moteur d'inférence jusqu'à 9,5 fois plus rapide et un reranker distillé, sans preuve indépendante ni en français",
+  "en_une_phrase": "Quatre préprints du même écosystème (Jev) montrent des modèles de décision rapides et calibrés, servis par un moteur exact (Flide) ; mesures des auteurs seulement, en anglais, sans évaluation indépendante.",
+  "probleme": "Les modèles de décision répondent par une probabilité sur des options, sans générer de texte. Mais les moteurs d'inférence (vLLM, SGLang) sont conçus pour la génération : ils recalculent le contexte partagé à chaque question ou déforment les probabilités.",
+  "comment_ca_marche": "**Flide** traite une requête comme un arbre : un contexte commun (le tronc) et plusieurs questions (les branches).\n\n1. Le contexte et toutes les questions sont alignés dans un seul flux de jetons, traité en une passe GPU.\n2. Dans les couches d'attention, un masque empêche une question de voir les autres questions.\n3. Dans les couches récurrentes (Gated DeltaNet, qui résument tout le passé en un état de taille fixe), chaque question repart de l'état exact du contexte, sans le copier.\n4. Un jeu de graphes GPU pré-enregistrés, piloté par des index, évite de relancer des milliers d'opérations.\n\nChaque réponse équivaut, en arithmétique exacte, à un appel isolé. **DecisionRank** distille un LLM professeur : on trie les scores de l'élève, le professeur évalue ce classement, et l'on aligne leurs choix.",
+  "demarche_experimentale": "Flide : un GPU H200, Qwen3.5 (0,8B à 27B) et Gemma 4, jeux RACE, QuALITY, MultiRC et Decision Index, comparé à vLLM, SGLang et vllm-jev. DecisionRank : reranking TREC DL, BEIR, BRIGHT. Défauts : 5 cas industriels.",
+  "resultats": [
+   {
+    "metrique": "Latence / débit de Flide (plus bas / plus haut = mieux)",
+    "valeur": "jusqu'à 9,5× moins de latence, 8,5× plus de débit",
+    "comparaison": "meilleur des moteurs de référence (vLLM, SGLang)",
+    "conditions": "un H200 ; Qwen3.5 et Gemma 4 ; plusieurs questions par contexte",
+    "citation": "achieving up to 9.5 times lower latency and 8.5 times higher throughput than the best baseline"
+   },
+   {
+    "metrique": "Décisions inversées par rapport à la référence float32 (plus bas = mieux)",
+    "valeur": "max 2,3 % (Flide) contre jusqu'à 29 % (multi-item scoring)",
+    "comparaison": "multi-item scoring de SGLang, qui insère un séparateur avant chaque question",
+    "conditions": "toutes tailles et charges, seuil de décision 0,5",
+    "citation": "the delimiter method flips up to 29 percent of categorical decisions, compared to a maximum of 2.3 percent for Flide"
+   },
+   {
+    "metrique": "DecisionRank : nDCG@10 et vitesse",
+    "valeur": "1,7B > professeur 27B ; 8B 24,5× plus rapide",
+    "comparaison": "professeur génératif 27B ; reranker listwise DirectRank-8B",
+    "conditions": "top-100 BM25, TREC DL19–23, anglais",
+    "citation": "Even at 1.7B parameters, DecisionRank surpasses its 27B generative teacher on TREC DL19–23."
+   }
+  ],
+  "limites": [
+   "Tout vient des auteurs (préprints non relus) ; Flide est comparé à des moteurs configurés par eux, sur un seul GPU H200. Aucune reproduction indépendante.",
+   "Évaluation en anglais seulement (RACE, TREC, BRIGHT) : rien sur le français, ni sur des classes proches et hiérarchisées de type interne.",
+   "Écosystème jeune : dépôt Flide à 8 étoiles, jeux de test restreints (256 requêtes sur RACE et QuALITY) ; les gains de Flide sont faibles avec une seule question par contexte sur de gros modèles."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "×9,5",
+    "libelle": "latence réduite au maximum par Flide face à vLLM et SGLang (plusieurs questions par contexte)"
+   },
+   {
+    "valeur": "×24,5",
+    "libelle": "vitesse du reranker DecisionRank 8B face à un reranker génératif listwise 8B, TREC DL"
+   },
+   {
+    "valeur": "13/15",
+    "libelle": "configurations où la calibration réduit le score de Brier en inspection visuelle"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Flide répond jusqu'à 9,5 fois plus vite que vLLM et SGLang selon ses auteurs.",
+    "citation": "Flide answers queries up to 9.5 times faster than vLLM and SGLang while staying closest to a float32 reference in total variation distance."
+   },
+   {
+    "affirmation": "Le multi-item scoring (séparateur avant chaque question) déforme les décisions : jusqu'à 29 % inversées contre 2,3 % max pour Flide.",
+    "citation": "the delimiter method flips up to 29 percent of categorical decisions, compared to a maximum of 2.3 percent for Flide"
+   },
+   {
+    "affirmation": "Sur Open-Jev, Flide dépasse vllm-jev, le moteur écrit pour ces modèles.",
+    "citation": "Flide outperforms both baselines across all configurations, achieving roughly threefold speedups on short inputs"
+   },
+   {
+    "affirmation": "DecisionRank 1,7B surpasse son professeur génératif 27B sur TREC DL19–23 ; le 8B est 24,5 fois plus rapide que son équivalent listwise sur TREC DL.",
+    "citation": "At 8B, it outperforms its generative listwise counterpart while running 24.5× faster on TREC DL and 16.7× faster on BRIGHT."
+   },
+   {
+    "affirmation": "En inspection visuelle avec 2 images de référence par classe, Jev et Clef-Flash dépassent CLIP, et la calibration réduit le score de Brier dans 13 configurations sur 15.",
+    "citation": "our calibration approach reduces the Brier score in 13 of the 15 model-application configurations"
+   },
+   {
+    "affirmation": "Flide est publié sous licence Apache-2.0 (dépôt créé le 2026-10-24, 8 étoiles).",
+    "citation": "OmniJev/Flide — licence Apache-2.0, étoiles 8, cree_le 2026-10-24 (métadonnées GitHub fournies)"
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision (System One)",
+    "definition": "Modèle qui ne génère pas de texte : il renvoie en une passe une probabilité pour chaque option d'une question fermée."
+   },
+   {
+    "terme": "Jev",
+    "definition": "Famille de modèles de décision de TypeSafe AI ; Open-Jev en est une version à poids ouverts."
+   },
+   {
+    "terme": "Distillation on-policy",
+    "definition": "Entraîner un petit modèle sur ses propres prédictions, évaluées par un modèle professeur, plutôt que sur des réponses figées."
+   },
+   {
+    "terme": "Reranker",
+    "definition": "Modèle qui réordonne les documents trouvés par une première recherche selon leur pertinence pour la question."
+   },
+   {
+    "terme": "Gated DeltaNet",
+    "definition": "Couche récurrente qui résume tout le texte lu en un état de taille fixe, au lieu de l'attention classique."
+   },
+   {
+    "terme": "Distance de variation totale (TV)",
+    "definition": "Écart entre deux distributions de probabilités : plus bas = plus proche de la référence."
+   },
+   {
+    "terme": "Score de Brier",
+    "definition": "Erreur quadratique d'une probabilité prédite : plus bas = mieux calibrée."
+   },
+   {
+    "terme": "Calibration",
+    "definition": "Qualité d'une probabilité : quand le modèle annonce 80 %, il doit avoir raison environ 8 fois sur 10."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Flide: Accelerating Decision Inference with Exact State Forking",
+    "url": "https://arxiv.org/abs/2610.42148",
+    "type": "primaire",
+    "date": "2026-10-30"
+   },
+   {
+    "titre": "DecisionRank: On-Policy Distillation for Decision-Model Rerankers",
+    "url": "https://arxiv.org/abs/2610.42128",
+    "type": "primaire",
+    "date": "2026-10-30"
+   },
+   {
+    "titre": "Beyond CLIP: Calibrated (Few-Shot) Defect Detection With System One Decision Models",
+    "url": "https://arxiv.org/abs/2610.41199",
+    "type": "primaire",
+    "date": "2026-10-30"
+   },
+   {
+    "titre": "EDU-Jev: Training System-One Decision Models for Education",
+    "url": "https://arxiv.org/abs/2610.41079",
+    "type": "primaire",
+    "date": "2026-10-29"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-10-30",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un modèle de décision typé (Open-Jev-2B) égale-t-il un encodeur CamemBERT fine-tuné sur 77 intentions françaises proches, en exactitude et en calibration ?",
+  "hypothese": "Sur une présélection de 8 intentions candidates, Open-Jev-2B en zero-shot atteint au moins 90 % du macro_f1 de CamemBERT-base fine-tuné sur tout le train, le dépasse quand il y a 5 exemples ou moins par classe, et obtient un expected_calibration_error inférieur ou égal (≤ 0,05).",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné",
+   "description": "Classifieur d'encodeur CamemBERT-base avec tête linéaire sur 77 classes, fine-tuné sur le train complet et sur des sous-échantillons de 5 et 20 exemples par classe.",
+   "implementation": "transformers AutoModelForSequenceClassification (almanach/camembert-base), AdamW lr 3e-5, 5 époques, max_length 64, batch 32, fp16 sur GPU ; probabilités par softmax, calibration mesurée sans recalibrage puis avec température ajustée sur 10 % du train. Évalué sur le test complet de l'échantillon et aussi restreint à la présélection de 8 candidats.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Open-Jev-2B (modèle de décision typé)",
+   "description": "Modèle de décision qui rend une probabilité par option (question de type choice) sans générer de texte ; une présélection de 8 intentions par un retriever dense est soumise comme options avec leur description.",
+   "implementation": "Installation depuis le dépôt Git du chargeur (git+https://github.com/Zefan-Cai/Open-Jev@bd4118882f733574a3250a4b65fe4d884130c08b, extra train pour transformers et peft) ; téléchargement de ZefanCai/Open-Jev-2B (adaptateur LoRA et tête scalaire) et du modèle de base Qwen/Qwen3.5-2B à la révision épinglée dans package/checkpoint/model.json ; lancement du serveur jev.server en sous-processus (--batch-size 1, --no-prefix-cache) et appels à /v1/systemone avec state = texte français, criteria = nom lisible de l'intention issu de mteb/banking77. Présélection : sentence-transformers avec intfloat/multilingual-e5-small, top-8 par similarité texte/étiquette. Le moteur Flide n'est pas utilisé (CUDA/H200), donc le gain de vitesse annoncé n'est pas évalué ; la latence mesurée est celle du serveur Open-Jev. En sandbox (SCALE reduced), le modèle de base est remplacé par Qwen/Qwen3.5-0.8B sans l'adaptateur Open-Jev-2B (incompatible avec cette taille) : seule la chaîne de code est validée.",
+   "modeles_hf": [
+    "ZefanCai/Open-Jev-2B",
+    "Qwen/Qwen3.5-2B",
+    "intfloat/multilingual-e5-small"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen3.5-0.8B"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "utterance (texte), label (entier) ; noms de classes via mteb/banking77 (label, label_text)",
+   "representativite": "Requêtes françaises de services financiers avec 77 intentions fines et proches : reproduit la difficulté de classes sémantiquement voisines, et permet une courbe par exemples par classe.",
+   "ecarts_donnees_reelles": "Traduction automatique de l'anglais et non français natif ; jeu plat à 77 classes (niveau supérieur approximé par préfixe des noms, utilisé seulement pour mesurer la cohérence de famille) ; requêtes courtes, sans e-mail ni pièce jointe ; licence non précisée sur le Hub (original CC BY 4.0) ; Open-Jev est évalué avec des descriptions d'options en anglais.",
+   "jeux_explores": [
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "10 003 train / 3 080 test, français, 77 intentions proches du domaine financier.",
+     "decision": "retenu",
+     "raison": "Seul jeu chargeable réunissant français, domaine financier et classes nombreuses et proches ; licence à confirmer."
+    },
+    {
+     "nom": "mteb/banking77",
+     "url": "https://huggingface.co/datasets/mteb/banking77",
+     "acces": "hub_libre",
+     "adequation": "Version anglaise avec noms de classes lisibles (label_text).",
+     "decision": "retenu",
+     "raison": "Utilisé comme table des noms et descriptions d'options ; non utilisé comme jeu d'évaluation."
+    },
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "Français, 60 intentions, hiérarchie scénario→intention à deux niveaux.",
+     "decision": "ecarte",
+     "raison": "Domaine assistant domestique, classes peu proches, scores saturés ; gardé pour une suite sur la cohérence hiérarchique."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "~113 intentions déséquilibrées en français.",
+     "decision": "ecarte",
+     "raison": "Étiquettes entières sans noms, licence inconnue, domaine assistant."
+    },
+    {
+     "nom": "mteb/eurlex-multilingual",
+     "url": "https://huggingface.co/datasets/mteb/eurlex-multilingual",
+     "acces": "hub_libre",
+     "adequation": "Documents juridiques longs, multi-label à 21 classes.",
+     "decision": "ecarte",
+     "raison": "Multi-label, textes très longs, hors sujet intentions courtes."
+    },
+    {
+     "nom": "nlpaueb/multi_eurlex",
+     "url": "https://huggingface.co/datasets/nlpaueb/multi_eurlex",
+     "acces": "telechargement_libre",
+     "adequation": "Hiérarchie EUROVOC à plusieurs niveaux.",
+     "decision": "ecarte",
+     "raison": "Non servi en parquet (viewer invalide) et script de chargement requis."
+    },
+    {
+     "nom": "mteb/AlloprofReranking",
+     "url": "https://huggingface.co/datasets/mteb/AlloprofReranking",
+     "acces": "hub_libre",
+     "adequation": "Reranking français, licence cc-by-nc-sa-4.0.",
+     "decision": "ecarte",
+     "raison": "Concerne DecisionRank, dont aucun poids n'est publié ; non commercial."
+    }
+   ]
+  },
+  "metriques": [
+   "macro_f1",
+   "accuracy",
+   "expected_calibration_error",
+   "brier_score",
+   "shortlist_recall_at_8",
+   "family_consistency_rate",
+   "latency_ms_per_example"
+  ],
+  "metrique_principale": "macro_f1",
+  "sens": "max",
+  "protocole": "Test : échantillon stratifié de 400 exemples du split test (échelle complète) ; 120 à l'échelle réduite, sans réduire en dessous de 100. Présélection top-8 par multilingual-e5-small ; recall@8 rapporté comme plafond commun. Référence : CamemBERT entraîné avec 5, 20 exemples par classe et train complet (3 budgets), même test. Open-Jev : zero-shot, sans entraînement, un seul appel par exemple, options présentées dans un ordre aléatoire fixé. Comparaisons : macro_f1 et exactitude sur le test complet et sur les cas où la bonne classe est dans la présélection ; ECE (15 bins) et Brier ; intervalle de confiance bootstrap (1000 rééchantillonnages) et test de McNemar apparié ; taux de cohérence de famille (préfixe du nom de classe) pour les erreurs ; latence par exemple.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Qwen/Qwen3.5-2B (2,27 Md de paramètres) dépasse la limite CPU de 1 Md : le sandbox utilise Qwen/Qwen3.5-0.8B (873 M) comme base, sans l'adaptateur Open-Jev-2B (propre à la base 2B) ; il ne valide donc que le code (serveur, appels, parsing des probabilités, métriques), les scores du substitut n'ont pas de valeur de comparaison et sont marqués comme tels. 100 exemples, présélection réduite à 5 candidats (≈100 × 5 × 120 = 60 000 tokens) ; si le serveur échoue ou dépasse le temps, la cellule consigne l'échec et ne produit que la référence. Référence : camembert-base sur 1 époque et sous-échantillon de 1000 textes. Coût GPU complet : 400 exemples × 8 candidats × ~120 tokens ≈ 384 000 tokens ÷ 700 tok/s ≈ 9 min, plus ~15 min pour trois entraînements CamemBERT et le chargement, soit ~25 à 30 min (budget 45). Limite : le test complet de 3 080 exemples ou les 77 options complètes coûteraient plusieurs heures et sont écartés.",
+  "dependances": [
+   "git+https://github.com/Zefan-Cai/Open-Jev@bd4118882f733574a3250a4b65fe4d884130c08b",
+   "peft",
+   "requests"
+  ],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte du client (message, e-mail nettoyé), anonymisé"
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif de premier niveau (étiquette humaine)"
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif (étiquette humaine)"
+    },
+    {
+     "colonne": "reason_description",
+     "type": "string",
+     "description": "Description courte de chaque classe, utilisée comme critère du modèle de décision"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception pour le découpage temporel"
+    }
+   ],
+   "volume_conseille": "20 000 à 50 000 textes étiquetés, au moins 30 par sous-motif pour les classes retenues, test d'au moins 3 000 textes.",
+   "metriques_metier": "macro_f1 et exactitude par sous-motif et par motif, taux d'incohérence motif/sous-motif, ECE par classe, part de textes traités automatiquement à un seuil de confiance donné, latence p95 par texte, coût par 1 000 textes.",
+   "garde_fous": "Aucun texte brut ne quitte l'environnement cible ; modèle servi localement, sans API externe ; revue de conformité avant toute décision automatisée ; pas de conclusion sur les classes de moins de 30 exemples de test.",
+   "prescriptions": [
+    "Au moins 30 exemples de test par sous-motif évalué ; regrouper ou exclure les classes plus rares et les rapporter à part.",
+    "Étiquettes humaines relues sur un échantillon de 500 textes par deux annotateurs, avec accord inter-annotateurs (kappa de Cohen) supérieur à 0,7.",
+    "Découpage temporel : entraînement sur les périodes anciennes, test sur les 2 à 3 derniers mois, sans doublons ni fils de discussion partagés entre les parties.",
+    "Fournir pour chaque classe une description rédigée par les métiers ; les noms seuls dégradent le modèle de décision.",
+    "Textes courts de moins de 4 000 tokens ; pièces jointes exclues ou réduites à leur texte extrait.",
+    "Anonymisation préalable (noms, IBAN, numéros de carte, adresses) et exclusion des textes de clients sous protection particulière.",
+    "Reproduire les budgets de 5, 20 exemples par classe et complet pour mesurer l'écart à budget égal."
+   ],
+   "preparation": "Extraire d'un outil de gestion de demandes les textes avec leurs motif et sous-motif validés, joindre les descriptions de classes de la taxonomie, filtrer les doublons et les textes vides, puis échantillonner de façon stratifiée par sous-motif sur 12 mois en conservant la distribution naturelle pour le test."
+  },
+  "duree_estimee_minutes": 150,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "ZefanCai/Open-Jev-2B": {
+    "id": "ZefanCai/Open-Jev-2B",
+    "sha": "0c7aa498b1627be8da4acf34c863ff0ee0a92785",
+    "tache": null,
+    "bibliotheque": "peft",
+    "parametres": null,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "Qwen/Qwen3.5-2B": {
+    "id": "Qwen/Qwen3.5-2B",
+    "sha": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+    "tache": "image-text-to-text",
+    "bibliotheque": "transformers",
+    "parametres": 2274069824,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "intfloat/multilingual-e5-small": {
+    "id": "intfloat/multilingual-e5-small",
+    "sha": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+    "tache": "sentence-similarity",
+    "bibliotheque": "sentence-transformers",
+    "parametres": 117654272,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "af",
+     "am",
+     "ar",
+     "as",
+     "az",
+     "be",
+     "bg",
+     "bn"
+    ]
+   },
+   "Qwen/Qwen3.5-0.8B": {
+    "id": "Qwen/Qwen3.5-0.8B",
+    "sha": "2fc06364715b967f1860aea9cf38778875588b17",
+    "tache": "image-text-to-text",
+    "bibliotheque": "transformers",
+    "parametres": 873438784,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "label": "Value",
+    "utterance": "Value"
+   },
+   "exemple": {
+    "label": 0,
+    "utterance": "S'il vous plaît, aidez-moi avec ma carte.  Il ne s'activera pas."
+   },
+   "lignes": {
+    "train": 10003,
+    "test": 3080
+   }
+  },
+  "paquets": {
+   "git+https://github.com/Zefan-Cai/Open-Jev@bd4118882f733574a3250a4b65fe4d884130c08b": {
+    "depot": "Zefan-Cai/Open-Jev",
+    "commit": "bd4118882f733574a3250a4b65fe4d884130c08b"
+   },
+   "peft": {
+    "paquet": "peft",
+    "derniere_version": "0.21.2",
+    "licence": "Apache",
+    "auteur": "The HuggingFace team",
+    "source": "https://github.com/huggingface/peft"
+   },
+   "requests": {
+    "paquet": "requests",
+    "derniere_version": "2.34.2",
+    "licence": "Apache-2.0",
+    "auteur": "Kenneth Reitz <me@kennethreitz.org>",
+    "source": "https://github.com/psf/requests"
+   }
+  }
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
