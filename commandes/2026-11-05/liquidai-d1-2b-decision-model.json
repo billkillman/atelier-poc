@@ -1,0 +1,385 @@
+{
+ "version": 1,
+ "jour": "2026-11-05",
+ "sujet_id": "liquidai-d1-2b-decision-model",
+ "depot": "20261105_d1_decision_model_camembert_banking77",
+ "fiche": {
+  "sujet_id": "liquidai-d1-2b-decision-model",
+  "titre": "LiquidAI d1-2B : un modèle de 1,9 Md qui rend des décisions calibrées en une passe, mais interdit aux grandes entreprises",
+  "en_une_phrase": "d1-2B classe, extrait et note en une seule passe, sans générer de texte, avec des probabilités. Benchmarks de l'éditeur, français non mesuré, licence commerciale fermée aux entreprises de plus de 10 M$ de revenu.",
+  "probleme": "Un LLM génératif répond à une question de classification en produisant du texte : c'est lent, difficile à calibrer et à parser. Un classifieur fine-tuné est rapide mais figé sur ses classes. d1 vise un intermédiaire : réponse typée avec probabilités, en une passe.",
+  "comment_ca_marche": "1. On fournit un « état » (texte, JSON, images ou vidéo) et une liste de questions nommées, chacune avec un type : oui/non, choix parmi des options décrites, score ordonné, texte, nombre, date, boîte autour d'un objet.\n2. Le modèle lit l'état et les questions (16 à la fois par défaut) en **une seule passe avant**, sans produire de jetons (« tokens », les unités de texte d'un LLM).\n3. Il renvoie pour chaque question une réponse typée avec ses probabilités. Pour les valeurs extraites, il ajoute l'emplacement dans le texte (« span »). Pour un nombre, il donne la médiane et un intervalle (p10, p90).\n4. Une valeur est jugée absente si la probabilité de présence est inférieure à 0,5. Le seuil de décision reste à calibrer sur ses propres données.",
+  "demarche_experimentale": "L'éditeur compare quatre de ses modèles ouverts d1 sur les mêmes items, avec le même scoring, sur des benchmarks de décision et de vision (images : 1 000 lignes au plus par jeu). Aucun modèle d'un autre éditeur n'est comparé.",
+  "resultats": [
+   {
+    "metrique": "Moyenne des benchmarks de vision (plus haut = mieux)",
+    "valeur": "70,2",
+    "comparaison": "d1-3B : 65,4 ; d1-Omni-2B : 67,7",
+    "conditions": "Moyenne simple des benchmarks publics communs aux quatre modèles, mesurée par l'éditeur",
+    "citation": "Average | 70.2 | 42.8 | 67.7 | 65.4"
+   },
+   {
+    "metrique": "Tableau interne de plus de 100 benchmarks (plus haut = mieux)",
+    "valeur": "63,2",
+    "comparaison": "d1-3B : 58,8",
+    "conditions": "Benchmarks publics et privés choisis par l'éditeur",
+    "citation": "Our board (over a hundred public and private benchmarks) | 63.2 | – | 61.8 | 58.8"
+   },
+   {
+    "metrique": "Latence d'une décision (plus bas = mieux)",
+    "valeur": "5,7 ms",
+    "comparaison": "3,8 ms sur AMD MI325X ; 18,6 ms sur Apple M5 Pro",
+    "conditions": "Une question, bf16, après compilation, médiane de 20 appels",
+    "citation": "NVIDIA H100 PCIe | 5.7 ms | 7.6 ms | 52 ms"
+   }
+  ],
+  "limites": [
+   "Tous les chiffres viennent de l'éditeur, sur ses propres benchmarks. Aucune comparaison avec un encodeur BERT ni un autre SLM : le gain réel face à CamemBERT est inconnu.",
+   "Aucun score en français, aucune évaluation sur ~300 classes hiérarchiques. Les auteurs notent que la fiabilité baisse au-delà de 64K tokens et que les questions riches en connaissances favorisent les gros modèles.",
+   "Licence : usage commercial non licencié au-dessus de 10 M$ de revenu annuel. Le modèle exige aussi `trust_remote_code=True`, risque à encadrer en contexte des services financiers."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "5,7 ms",
+    "libelle": "par décision, une question, sur GPU NVIDIA H100 (mesure éditeur)"
+   },
+   {
+    "valeur": "1,92 Md",
+    "libelle": "paramètres du modèle, contre 3 Md pour d1-3B, qu'il devance en moyenne"
+   },
+   {
+    "valeur": "10 M$",
+    "libelle": "seuil de revenu annuel au-delà duquel l'usage commercial n'est pas licencié"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "d1-2B renvoie des réponses calibrées en une passe, sans générer de tokens.",
+    "citation": "It returns calibrated answers in one forward pass, without generating tokens."
+   },
+   {
+    "affirmation": "Le modèle compte 1,92 Md de paramètres.",
+    "citation": "Parameters | 1.92B"
+   },
+   {
+    "affirmation": "Selon l'éditeur, d1-2B devance d1-3B en moyenne avec moins des deux tiers de sa taille.",
+    "citation": "ahead of d1-3B at under two thirds of its size."
+   },
+   {
+    "affirmation": "La latence est de 5,7 ms par décision sur H100 (une question).",
+    "citation": "NVIDIA H100 PCIe | 5.7 ms | 7.6 ms | 52 ms"
+   },
+   {
+    "affirmation": "L'usage commercial n'est pas licencié au-delà de 10 M$ de revenu annuel.",
+    "citation": "Commercial use by a Legal Entity above the threshold is \"not licensed under this Agreement.\""
+   },
+   {
+    "affirmation": "La fiabilité baisse au-delà d'environ 64K tokens.",
+    "citation": "answers get less reliable past about 64K tokens of state."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision",
+    "definition": "Modèle qui ne génère pas de texte mais renvoie une réponse typée (choix, score, probabilité) à des questions posées sur une entrée."
+   },
+   {
+    "terme": "Passe avant (forward pass)",
+    "definition": "Un seul calcul à travers le réseau, de l'entrée à la sortie, sans boucle de génération token par token."
+   },
+   {
+    "terme": "Calibration",
+    "definition": "Propriété d'une probabilité qui correspond à la fréquence réelle : quand le modèle dit 80 %, il a raison environ 8 fois sur 10."
+   },
+   {
+    "terme": "Span",
+    "definition": "Passage exact du texte source d'où la valeur extraite a été lue, utile pour la traçabilité."
+   },
+   {
+    "terme": "trust_remote_code",
+    "definition": "Option de chargement qui exécute du code fourni avec le modèle ; à auditer avant tout usage en environnement sensible."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "LiquidAI/d1-2B (fiche Hugging Face)",
+    "url": "https://huggingface.co/LiquidAI/d1-2B",
+    "type": "primaire",
+    "date": "2026-10-24"
+   },
+   {
+    "titre": "LiquidAI/d1-2B, fichier LICENSE",
+    "url": "https://huggingface.co/LiquidAI/d1-2B/blob/main/LICENSE",
+    "type": "primaire",
+    "date": ""
+   }
+  ],
+  "date_publication": {
+   "date": "2026-10-24",
+   "source": "huggingface.co"
+  }
+ },
+ "plan": {
+  "titre": "Un modèle de décision calibré en une passe (d1-2B) rejoint-il un CamemBERT fine-tuné sur 77 intentions françaises proches ?",
+  "hypothese": "Sans aucun entraînement, d1-2B atteint au moins 80 % du macro-F1 d'un CamemBERT-base fine-tuné sur toutes les étiquettes (plafond) et dépasse CamemBERT à 5 exemples par classe ; son ECE après calibration par température est inférieure à 0,05 ; sa latence par décision reste sous 100 ms sur T4.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné",
+   "description": "Classifieur à tête linéaire sur almanach/camembert-base, entraîné sur toutes les étiquettes et à budgets réduits (5 et 20 exemples par classe).",
+   "implementation": "transformers AutoModelForSequenceClassification, lr 3e-5, 8 époques au plus avec arrêt sur validation tirée du train, batch 32, max_len 64 ; calibration par température sur validation ; mêmes budgets sous-échantillonnés stratifiés.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "d1-2B décision typée zéro-shot",
+   "description": "Modèle de décision qui lit la requête et une question à choix multiples avec descriptions d'options en une passe, et renvoie une probabilité par option sans générer de texte.",
+   "implementation": "transformers>=5.19 avec trust_remote_code=True : AutoModel.from_pretrained('LiquidAI/d1-2B', dtype=bfloat16), model.system_one_batch sur une question choice dont 'criteria' associe chaque libellé de classe (noms de mteb/banking77, soulignés remplacés par espaces) à une courte description ; lecture de 'probabilities', calibration par température sur validation, mesure de latence par décision. Sandbox : d1-omni-600M (même famille, 587 M).",
+   "modeles_hf": [
+    "LiquidAI/d1-2B"
+   ],
+   "modeles_hf_sandbox": [
+    "LiquidAI/d1-omni-600M"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "utterance, label (noms via mteb/banking77)",
+   "representativite": "Requêtes françaises de services financiers, 77 classes fines et voisines, volume suffisant pour tracer la performance du classifieur selon le nombre d'exemples par classe.",
+   "ecarts_donnees_reelles": "Pas d'arbre motif/sous-motif, requêtes courtes traduites automatiquement, 77 classes au lieu de ~300, aucun e-mail ni pièce jointe, licence de la traduction non précisée ; d1 est utilisé sans description détaillée des classes.",
+   "jeux_explores": [
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "77 intentions proches en français, 10 003 train, 3 080 test.",
+     "decision": "retenu",
+     "raison": "Meilleur proxy interne français chargeable pour classes nombreuses et proches."
+    },
+    {
+     "nom": "mteb/banking77",
+     "url": "https://huggingface.co/datasets/mteb/banking77",
+     "acces": "hub_libre",
+     "adequation": "Noms des intentions à présenter comme options.",
+     "decision": "retenu",
+     "raison": "Les étiquettes entières de banking77_fr n'ont pas de nom."
+    },
+    {
+     "nom": "DeepPavlov/clinc150_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/clinc150_fr",
+     "acces": "hub_libre",
+     "adequation": "150 classes, splits propres.",
+     "decision": "ecarte",
+     "raison": "Sans noms de classes ni arbre ; domaines non financiers."
+    },
+    {
+     "nom": "SetFit/amazon_massive_intent_fr-FR",
+     "url": "https://huggingface.co/datasets/SetFit/amazon_massive_intent_fr-FR",
+     "acces": "hub_libre",
+     "adequation": "Arbre à deux niveaux, libellés présents.",
+     "decision": "ecarte",
+     "raison": "Déjà utilisé par l'expérience antérieure, domaine hors services financiers."
+    },
+    {
+     "nom": "Mouwiya/cfpb-consumer-complaints",
+     "url": "https://huggingface.co/datasets/Mouwiya/cfpb-consumer-complaints",
+     "acces": "hub_libre",
+     "adequation": "Arbre profond de réclamations.",
+     "decision": "ecarte",
+     "raison": "Anglais, 16,6 M de lignes sans split fixe."
+    },
+    {
+     "nom": "Trustworthy-Software/BCS-dataset",
+     "url": "https://github.com/Trustworthy-Software/BCS-dataset",
+     "acces": "telechargement_libre",
+     "adequation": "Support interne en français, 28 intentions.",
+     "decision": "ecarte",
+     "raison": "Environ 1 000 exemples, licence absente, format Markdown, hors Hub."
+    }
+   ]
+  },
+  "metriques": [
+   "macro_f1",
+   "accuracy",
+   "expected_calibration_error",
+   "brier_score",
+   "latency_ms_per_decision",
+   "macro_f1_at_5_labels_per_class",
+   "macro_f1_at_20_labels_per_class"
+  ],
+  "metrique_principale": "macro_f1",
+  "sens": "max",
+  "protocole": "Test : 800 énoncés stratifiés du split test. Validation tirée du train (10 %) pour l'arrêt, la température et le seuil. CamemBERT entraîné à 5 exemples/classe, 20 exemples/classe et sur tout le train ; d1 sans entraînement, évalué sur les mêmes énoncés. Courbe de macro_f1 selon exemples par classe avec d1 en ligne horizontale. IC à 95 % par bootstrap, test de McNemar apparié d1 contre CamemBERT plafond. Classes les plus rares et confusions entre classes voisines rapportées à part. ECE avec 15 intervalles avant et après calibration.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "d1-2B (bf16 3,8 Go) trop lent sur CPU : substitut LiquidAI/d1-omni-600M, 20 classes de banking77_fr, 100 énoncés de test (≈150 tokens chacun), CamemBERT 1 époque sur un sous-ensemble. Calcul GPU complet : 800 énoncés × 1 passe × ≈450 tokens (77 libellés) = 360 k tokens ÷ 700 tok/s ≈ 9 min, plus latence, chargement et 3 entraînements CamemBERT (≈8 min) : environ 20 min dans les 45.",
+  "dependances": [
+   "transformers>=5.19",
+   "torchvision",
+   "pillow"
+  ],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Corps du message client, anonymisé."
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif validé par un humain."
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif validé par un humain."
+    },
+    {
+     "colonne": "sub_reason_description",
+     "type": "string",
+     "description": "Définition courte du sous-motif, fournie à d1 comme description d'option."
+    },
+    {
+     "colonne": "received_at",
+     "type": "timestamp",
+     "description": "Date de réception."
+    }
+   ],
+   "volume_conseille": "Au moins 10 000 messages étiquetés, dont 20 par sous-motif, et 1 000 en test.",
+   "metriques_metier": "Macro-F1 et exactitude au niveau sous-motif et motif, erreurs de parent, ECE, latence p95 par décision, taux de messages envoyés en revue sous un seuil de confiance.",
+   "garde_fous": "Licence du modèle à faire valider par la conformité avant tout usage au-delà de l'évaluation ; trust_remote_code uniquement sur code figé et audité, sans accès réseau ; aucune donnée envoyée à un service externe.",
+   "prescriptions": [
+    "Au moins 20 exemples étiquetés par sous-motif et 5 par classe rare pour tracer la courbe.",
+    "Fournir pour chaque sous-motif une description validée par le métier (utilisée par d1).",
+    "Étiquettes relues par deux annotateurs, accord inter-annotateurs reporté.",
+    "Découpage temporel : test sur la période la plus récente.",
+    "Garder la distribution naturelle des classes dans le test, sans rééquilibrage.",
+    "Anonymiser noms, IBAN et numéros de carte ; exclure les messages à données sensibles.",
+    "Mesurer la latence sur le matériel cible, sous charge réaliste."
+   ],
+   "preparation": "Extraire les messages entrants avec motif et sous-motif validés depuis la source de gestion des demandes, nettoyer signatures et citations, dédoublonner, échantillonner par sous-motif en respectant la période, puis anonymiser et séparer par date."
+  },
+  "duree_estimee_minutes": 30,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "LiquidAI/d1-2B": {
+    "id": "LiquidAI/d1-2B",
+    "sha": "652f920e544ea37f81e4b0ce89b81d4ed0da90b1",
+    "tache": "image-text-to-text",
+    "bibliotheque": "transformers",
+    "parametres": 1918181888,
+    "licence": "other",
+    "code_distant": true,
+    "langues": [
+     "en",
+     "ar",
+     "zh",
+     "fr",
+     "de",
+     "it",
+     "ja",
+     "ko"
+    ]
+   },
+   "LiquidAI/d1-omni-600M": {
+    "id": "LiquidAI/d1-omni-600M",
+    "sha": "02b55d7076f15129e59ab3f94783f32c4b088674",
+    "tache": "image-text-to-text",
+    "bibliotheque": "transformers",
+    "parametres": 587161089,
+    "licence": "other",
+    "code_distant": true,
+    "langues": [
+     "en",
+     "de",
+     "es",
+     "fr",
+     "it",
+     "nl",
+     "pl",
+     "pt"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "label": "Value",
+    "utterance": "Value"
+   },
+   "exemple": {
+    "label": 0,
+    "utterance": "S'il vous plaît, aidez-moi avec ma carte.  Il ne s'activera pas."
+   },
+   "lignes": {
+    "train": 10003,
+    "test": 3080
+   }
+  },
+  "paquets": {
+   "transformers>=5.19": {
+    "paquet": "transformers",
+    "derniere_version": "5.22.1",
+    "licence": "Apache 2.0 License",
+    "auteur": "The Hugging Face team (past and future) with the help of all",
+    "source": "https://github.com/huggingface/transformers"
+   },
+   "torchvision": {
+    "paquet": "torchvision",
+    "derniere_version": "0.29.2",
+    "licence": "BSD",
+    "auteur": "PyTorch Core Team",
+    "source": "https://github.com/pytorch/vision"
+   },
+   "pillow": {
+    "paquet": "pillow",
+    "derniere_version": "13.0.0",
+    "licence": "",
+    "auteur": "Jeffrey 'Alex' Clark <aclark@aclark.net>",
+    "source": "https://python-pillow.org"
+   }
+  }
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

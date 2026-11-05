@@ -1,0 +1,412 @@
+{
+ "version": 1,
+ "jour": "2026-11-05",
+ "sujet_id": "decision-models-securite-jevbreak-agentcore-evals",
+ "depot": "20261105_typed_decision_suffix_attack_camembert",
+ "fiche": {
+  "sujet_id": "decision-models-securite-jevbreak-agentcore-evals",
+  "titre": "Modèles de décision typés : un texte ajouté au dossier impose la mauvaise option dans 32 à 99 % des cas",
+  "en_une_phrase": "En ajoutant du texte au dossier analysé, un attaquant impose l'option fausse de son choix à sept modèles de décision typés. Ce n'est qu'un préprint, sur 240 exemples, sans test en français.",
+  "probleme": "Un **modèle de décision typé** choisit dans une liste fermée d'options au lieu de rédiger du texte. Ses éditeurs le présentent comme sûr « par construction », puisque la sortie reste toujours dans la liste. Ses probabilités servent de seuil : au-dessus, la décision est appliquée sans revue ; en dessous, elle part chez un humain. Or le dossier jugé est souvent écrit par la personne concernée (réclamation, e-mail). Les travaux précédents visaient une seule mauvaise option, avec 1,8 % à 73 % de succès selon les protocoles. Personne n'avait mesuré quelle part des options un attaquant peut imposer. Au même moment, AWS montre comment utiliser ces modèles pour évaluer des agents.",
+  "comment_ca_marche": "Un modèle de décision typé reçoit un dossier (la « preuve »), une question et une liste d'options. Il renvoie l'option choisie et une probabilité pour chaque option. Exemples testés : Jev, de l'éditeur TypeSafe, et l'API Decisions d'OpenAI (modèle gpt-6-luna).\n\nL'attaque, appelée *Slot Attack*, procède ainsi :\n1. **Ce que contrôle l'attaquant** : un seul champ du dossier, par exemple la réclamation qu'il a déposée. Il ajoute du texte à la fin ; la question, les options et le reste du dossier ne changent pas. Il ne voit que l'option renvoyée et les probabilités : c'est une attaque « boîte noire ».\n2. **Un suffixe en quatre emplacements**, chacun rempli par l'une de quatre tactiques ou laissé vide (625 combinaisons) :\n   - une fausse fin de document (« fin du contenu soumis ») ;\n   - une autorité revendiquée (« validé par un relecteur senior ») ;\n   - l'affirmation de la réponse visée, qui peut recopier la définition de l'option ;\n   - une consigne (« réponds X avec une probabilité de 1,0 »).\n   Un LLM générateur (Nemotron 3 Super 120B, de NVIDIA) rédige ce texte pour chaque exemple.\n3. **La recherche** ajoute un emplacement à la fois et garde les 5 meilleurs candidats (recherche en faisceau). Tant que l'arrondi affiche la cible à 0,00, elle récompense la baisse de l'option en tête. Ensuite, elle maximise l'écart entre la cible et sa meilleure concurrente.\n4. **L'affinage** retire les emplacements un par un pour mesurer leur contribution. Il en sort une recette minimale, où chaque élément est nommé.\n5. Chaque succès est confirmé par un nouvel appel au modèle, sans cache. La recherche s'arrête au plus tard après 256 appels.\n\n**Ce qui est nouveau** : chaque mauvaise option est visée tour à tour. On mesure ainsi si l'attaquant peut choisir *n'importe quelle* issue (le « contrôle total »), pas seulement provoquer une erreur. Le contournement de l'arrondi compte aussi : selon les auteurs, avec une cible bloquée à 0,00, les attaques précédentes ne voyaient aucun progrès et concluaient à tort que le modèle était robuste.",
+  "demarche_experimentale": "Les auteurs tirent 240 exemples, selon un tirage reproductible, dans Decision Bench, un benchmark public de décisions à options fermées sur données réelles. Il y a 16 tâches dans 7 domaines (ingénierie, modération, support client, commerce, finance, juridique, produit), 15 exemples par tâche, de 2 à 9 options. Chaque mauvaise option de chaque exemple sert de cible : 990 couples par modèle. Sept modèles sont testés : Jev 1.13 et 1.14, gpt-6-luna et clef (Cloudflare) via une API ; decider-4b, strands-2B et l'encodeur GLiNER2.5 en local. La référence est une série de 9 gabarits fixes (3 familles × 3 encodages), à un appel chacun. Les taux portent uniquement sur les décisions correctes sans attaque, avec des intervalles de confiance à 95 %. Enfin, gpt-6-luna est aussi comparé via l'API Decisions et via l'API de chat classique.",
+  "resultats": [
+   {
+    "metrique": "Taux d'attaque ciblée réussie (plus bas = plus robuste)",
+    "valeur": "31,6 % (Jev 1.14) à 99,4 % (GLiNER2.5)",
+    "comparaison": "6,3 à 33,1 % avec un gabarit fixe (3 à 8 fois moins)",
+    "conditions": "990 cibles par modèle, décisions d'abord correctes",
+    "citation": "Using the model’s returned probabilities to guide the Slot Attack raises the targeted success to 31.6 to 99.4%, or 3.0 to 8.0 times each system’s fixed-template mean."
+   },
+   {
+    "metrique": "Contrôle total : toutes les mauvaises options imposables sur un exemple",
+    "valeur": "20,2 % (Jev 1.14), 77,2 % (gpt-6-luna), 98,1 % (GLiNER2.5)",
+    "comparaison": "decider-4b 58,5 %",
+    "conditions": "Exemples correctement décidés sans attaque",
+    "citation": "On gpt-6-luna and GLiNER2.5, the adversary holds full control of 77.2 and 98.1% of clean-correct records, respectively, and decider-4b cedes full control on 58.5%."
+   },
+   {
+    "metrique": "Précision sous attaque (plus haut = mieux)",
+    "valeur": "Jev 1.14 : 0,396 ; gpt-6-luna : 0,017 ; GLiNER2.5 : 0",
+    "comparaison": "Sans attaque : 0,992 ; 0,950 ; 0,650",
+    "conditions": "240 exemples, l'attaquant essaie chaque mauvaise option",
+    "citation": "JEV 1.14, the most accurate model in the set, falls from 0.992 to 0.396, while gpt-6-luna falls from 0.950 to 0.017 and GLiNER2.5 reaches 0.000"
+   },
+   {
+    "metrique": "Décisions confiantes détournées qui restent au-dessus du seuil 0,85",
+    "valeur": "0,3 à 4,9 % (Jev, strands-2B, clef)",
+    "comparaison": "Environ 1 sur 5 (decider-4b, gpt-6-luna) ; environ 9 sur 10 (GLiNER2.5)",
+    "conditions": "Seuil de revue humaine à 0,85",
+    "citation": "On JEV 1.13, JEV 1.14, strands-2B and clef, most hijacked answers fall below 0.85 and would be routed for review, so only between 0.3 and 4.9% of confident decisions can be steered past the queue."
+   },
+   {
+    "metrique": "Même modèle, API différente (taux d'attaque ciblée réussie)",
+    "valeur": "88,2 % (API Decisions) contre 76,5 % (chat)",
+    "comparaison": "59,9 % en chat avec raisonnement",
+    "conditions": "gpt-6-luna ; comparaison mêlant plusieurs facteurs",
+    "citation": "At reasoning effort none, moving from Decisions to chat lowers targeted ASR from 88.2 to 76.5 percent and full control from 77.2 to 45.2%; adding reasoning reduces these further, to 59.9 and 33.1%."
+   },
+   {
+    "metrique": "Coût d'une attaque réussie",
+    "valeur": "17 à 72 appels médians, 0,0020 à 0,0201 $",
+    "comparaison": "Campagne complète sur 7 modèles : 32,27 $",
+    "conditions": "Générateur et appels au modèle inclus",
+    "citation": "a successful flip takes a median of 17 to 72 model calls depending on the system, at a cost between $0.0020 and $0.0201, and the campaign against all seven systems cost $32.27 in total."
+   }
+  ],
+  "limites": [
+   "Les auteurs le reconnaissent : 240 exemples, soit 15 par tâche. Les taux décrivent cet échantillon et cette procédure, pas un déploiement réel. GLiNER2.5 (65 % de bonnes réponses sans attaque) se compare mal aux autres.",
+   "Aucune tâche ni évaluation en français n'est mentionnée.",
+   "Les suffixes affichent ouvertement la réponse visée : la menace porte sur les décisions sans relecture humaine. Aucune défense, comme le filtrage des entrées, n'est évaluée. Le code de Slot Attack n'est pas publié.",
+   "Le billet d'AWS est une communication d'éditeur sans chiffres. Sa procédure de validation (accord avec des annotateurs, calibration) ignore la robustesse aux attaques. Le préprint n'est pas relu par des pairs."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "31,6 à 99,4 %",
+    "libelle": "Attaques ciblées réussies sur des décisions d'abord correctes, selon le modèle"
+   },
+   {
+    "valeur": "0,992 → 0,396",
+    "libelle": "Précision de Jev 1.14, le modèle le plus robuste, sans puis sous attaque"
+   },
+   {
+    "valeur": "32,27 $",
+    "libelle": "Coût total de la campagne d'attaque contre les sept modèles"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Slot Attack impose l'option fausse choisie dans 31,6 à 99,4 % des décisions d'abord correctes, soit 3 à 8 fois plus qu'un gabarit fixe.",
+    "citation": "Using the model’s returned probabilities to guide the Slot Attack raises the targeted success to 31.6 to 99.4%, or 3.0 to 8.0 times each system’s fixed-template mean."
+   },
+   {
+    "affirmation": "Jev 1.14, le modèle le plus précis, passe de 0,992 à 0,396 de précision sous attaque ; gpt-6-luna tombe à 0,017.",
+    "citation": "JEV 1.14, the most accurate model in the set, falls from 0.992 to 0.396, while gpt-6-luna falls from 0.950 to 0.017 and GLiNER2.5 reaches 0.000"
+   },
+   {
+    "affirmation": "Une fausse validation ajoutée à une consigne fait passer le succès de l'attaque sur gpt-6-luna de 1,2 % à 68,2 %.",
+    "citation": "That addition is worth 67.0 points on gpt-6-luna, raising targeted ASR from 1.2 to 68.2%, and 16.7 points on JEV 1.13."
+   },
+   {
+    "affirmation": "Un test fondé sur « ignore previous instructions » ferait passer Jev et gpt-6-luna pour presque immunisés.",
+    "citation": "a robustness evaluation built from the phrase “ignore previous instructions”, the canonical prompt-injection probe, rates JEV and gpt-6-luna at between 1.2 and 2.1% and would report them as very nearly immune."
+   },
+   {
+    "affirmation": "Même en échouant, les attaques font passer 66 à 91 % des décisions confiantes sous le seuil de 0,85, ce qui permet de saturer la file de revue humaine.",
+    "citation": "Failed attacks nonetheless push between 66 and 91% of attacked confident decisions below 0.85, so an adversary unable to steer a decision can still flood the review queue"
+   },
+   {
+    "affirmation": "La robustesse ne progresse pas de façon régulière d'une version à l'autre : 107 points d'attaque ne cassent que Jev 1.13 et 57 ne cassent que Jev 1.14.",
+    "citation": "but 107 were broken only on JEV 1.13 and 57 only on JEV 1.14 (McNemar χ2=15.2). The newer version withstands slightly over a hundred attacks to which its predecessor fell while acquiring fifty-seven new failures"
+   },
+   {
+    "affirmation": "AWS recommande de valider un évaluateur à base de modèle de décision sur un échantillon étiqueté de son propre trafic avant d'en faire une barrière de mise en production.",
+    "citation": "Before you gate a release on a decision-model evaluator, validate it the same way you’d validate any new measurement, against a labeled sample of your own traffic."
+   },
+   {
+    "affirmation": "Strands Decider 2B est sous licence Apache-2.0 et c'est un adaptateur LoRA sur Qwen3.5-2B-Base.",
+    "citation": "a LoRA adapter on `Qwen/Qwen3.5-2B-Base` plus a small readout head."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision typé",
+    "definition": "Modèle qui ne génère pas de texte libre : il choisit une option dans une liste fixée par l'appelant et renvoie une probabilité pour chaque option."
+   },
+   {
+    "terme": "Taux d'attaque ciblée réussie",
+    "definition": "Part des décisions d'abord correctes que l'attaquant amène exactement vers la mauvaise option qu'il a choisie à l'avance. Plus bas = plus robuste."
+   },
+   {
+    "terme": "Contrôle total",
+    "definition": "Part des exemples sur lesquels chaque mauvaise option peut être imposée, dans des attaques séparées : l'attaquant choisit alors librement l'issue."
+   },
+   {
+    "terme": "Seuil de confiance",
+    "definition": "Probabilité minimale au-dessus de laquelle une décision est appliquée automatiquement ; en dessous, elle est envoyée en revue humaine."
+   },
+   {
+    "terme": "Attaque boîte noire",
+    "definition": "Attaque qui n'utilise que les sorties du modèle (option et probabilités), sans accès à ses poids, à ses gradients ni à ses données d'entraînement."
+   },
+   {
+    "terme": "Injection de prompt",
+    "definition": "Texte placé dans une donnée traitée par le modèle pour détourner son comportement, par exemple une consigne ou une fausse validation."
+   },
+   {
+    "terme": "Recherche en faisceau",
+    "definition": "Méthode de recherche qui, à chaque étape, ne garde que les k meilleurs candidats (ici 5) avant de les prolonger."
+   },
+   {
+    "terme": "LLM-as-a-judge",
+    "definition": "Usage d'un LLM généraliste pour noter la réponse d'un autre système selon une grille, avec une justification rédigée."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "JevBreak: Your Model, Their Decision (arXiv 2611.03759)",
+    "url": "https://arxiv.org/abs/2611.03759",
+    "type": "primaire",
+    "date": "2026-11-02"
+   },
+   {
+    "titre": "Use decision models with Amazon Bedrock AgentCore Evaluations",
+    "url": "https://aws.amazon.com/blogs/machine-learning/use-decision-models-with-amazon-bedrock-agentcore-evaluations/",
+    "type": "primaire",
+    "date": "2026-11-04"
+   },
+   {
+    "titre": "Fiche du modèle StrandsAgents/strands-decider-2B-qwen3.5-v1-2610 (Hugging Face)",
+    "url": "https://huggingface.co/StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "type": "primaire",
+    "date": ""
+   },
+   {
+    "titre": "Dépôt atlanai/decision-bench (GitHub)",
+    "url": "https://github.com/atlanai/decision-bench",
+    "type": "primaire",
+    "date": "2026-11-03"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-02",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un encodeur fine-tuné résiste-t-il mieux qu'un modèle de décision typé à un suffixe ajouté au texte, en français ?",
+  "hypothese": "Sur des requêtes françaises à classes voisines, le modèle de décision typé (Strands Decider 2B) subit au moins 30 % d'attaques ciblées réussies avec recherche guidée par probabilités (contre moins de 10 % avec gabarits fixes), tandis que le CamemBERT fine-tuné reste sous 15 % ; la recherche guidée multiplie le taux par au moins 2 pour les deux modèles.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné",
+   "description": "Classifieur à tête linéaire sur almanach/camembert-base, fine-tuné sur les requêtes étiquetées ; probabilités softmax exposées à l'attaquant comme pour le modèle typé.",
+   "implementation": "transformers AutoModelForSequenceClassification, max_len 96, lr 3e-5, 5 époques à l'échelle complète, batch 32, sélection sur un split de validation tiré du train ; calibration par température sur validation.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Strands Decider 2B + Slot Attack en français",
+   "description": "Modèle de décision typé (adaptateur LoRA sur Qwen3.5-2B-Base) qui renvoie une probabilité par option en une passe, attaqué par un suffixe en quatre emplacements (fausse fin de document, autorité, affirmation de la cible, consigne) cherché en faisceau avec les probabilités renvoyées.",
+   "implementation": "Installation par pip install strands-decider (PyPI, compte strands-agents, dépôt strands-labs/strands-decider) puis StrandsDeciderModel.load du modèle ; question de type choice, état = requête client (+ suffixe), options = libellés de classes issus de mteb/banking77 (aligner label→nom, vérifier sur échantillon). Slot Attack réimplémenté sans LLM générateur : fragments français écrits à la main (4 tactiques par emplacement, 9 gabarits fixes traduits comme référence), faisceau de largeur 5, au plus 20 appels par cible, récompense = baisse de la tête puis écart cible/concurrente. Même attaque appliquée au CamemBERT. En sandbox : lecture de probabilités sur les jetons de lettres d'options avec Qwen3.5-0.8B-Base (zéro-shot) à la place du décideur.",
+   "modeles_hf": [
+    "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "Qwen/Qwen3.5-2B-Base"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen3.5-0.8B-Base"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "utterance, label (noms de classes via mteb/banking77)",
+   "representativite": "Requêtes françaises de clients de services financiers, classes fines et voisines (cartes, virements) : cadre où une option voisine est une cible plausible pour un attaquant ; permet d'entraîner l'encodeur et d'attaquer les deux modèles sur les mêmes textes.",
+   "ecarts_donnees_reelles": "Requêtes courtes traduites automatiquement (les e-mails réels sont plus longs et bruités, donc plus d'espace pour un suffixe), pas d'arbre motif/sous-motif, sous-ensemble de 20 classes voisines pour tenir le budget de calcul, suffixes écrits à la main et non générés par LLM, licence de la traduction non précisée (original CC BY 4.0).",
+   "jeux_explores": [
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "Français, 77 intentions proches, 10 003 train et 3 080 test.",
+     "decision": "retenu",
+     "raison": "Seul jeu chargeable réunissant français, domaine financier, classes proches et volume pour entraîner un encodeur."
+    },
+    {
+     "nom": "mteb/banking77",
+     "url": "https://huggingface.co/datasets/mteb/banking77",
+     "acces": "hub_libre",
+     "adequation": "Fournit les noms d'intentions utilisés comme options.",
+     "decision": "retenu",
+     "raison": "Nécessaire pour présenter des options lisibles au modèle de décision."
+    },
+    {
+     "nom": "atlanai/decision-bench",
+     "url": "https://huggingface.co/datasets/atlanai/decision-bench",
+     "acces": "hub_libre",
+     "adequation": "Benchmark de l'étude, 1 071 lignes en anglais, SUP-1 et SUP-2 proches de la réclamation.",
+     "decision": "ecarte",
+     "raison": "Anglais, 7 à 8 options plates, une trentaine de lignes par tâche : impossible d'entraîner un encodeur."
+    },
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "Arbre à deux niveaux en français.",
+     "decision": "ecarte",
+     "raison": "Domaine assistant vocal, énoncés très courts ; déjà exploité par une expérience antérieure."
+    },
+    {
+     "nom": "hvgupta1/cfpb-bank-complaints-benchmark",
+     "url": "https://huggingface.co/datasets/hvgupta1/cfpb-bank-complaints-benchmark",
+     "acces": "hub_libre",
+     "adequation": "Réclamations longues réelles, hiérarchie produit → problème.",
+     "decision": "ecarte",
+     "raison": "Anglais, texte masqué ; ne permet pas de tester l'encodeur français."
+    },
+    {
+     "nom": "CFPB/consumer-finance-complaints",
+     "url": "https://huggingface.co/datasets/CFPB/consumer-finance-complaints",
+     "acces": "hub_libre",
+     "adequation": "Arbre profond de réclamations financières.",
+     "decision": "ecarte",
+     "raison": "Jeu à script de chargement, non servi en parquet ; anglais."
+    }
+   ]
+  },
+  "metriques": [
+   "targeted_attack_success_rate",
+   "fixed_template_attack_success_rate",
+   "accuracy_under_attack",
+   "clean_accuracy",
+   "clean_macro_f1",
+   "hijacked_above_threshold_rate",
+   "review_flood_rate",
+   "expected_calibration_error"
+  ],
+  "metrique_principale": "targeted_attack_success_rate",
+  "sens": "min",
+  "protocole": "Banking77 fr restreint à 20 classes voisines (cartes, virements, prélèvements) pour limiter la longueur du prompt. Split validation tiré du train. CamemBERT entraîné sur le train restreint. Évaluation propre sur le test restreint (macro_f1, accuracy, ECE) ; l'attaque porte sur 100 exemples du test correctement décidés par les deux modèles, avec 2 cibles par exemple choisies parmi les classes les plus proches (voisines selon la matrice de confusion du CamemBERT). Comparaison : sans attaque, 9 gabarits fixes traduits, Slot Attack guidé (faisceau 5, 20 appels max par cible, succès reconfirmé sans cache). Suffixe ajouté en fin de texte ; en variante, un emplacement de début. Seuil de confiance 0,85 pour les décisions détournées confiantes et l'inondation de la file de revue. IC à 95 % par bootstrap sur les exemples ; test de McNemar apparié entre modèles sur les mêmes couples exemple-cible.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Strands Decider 2B ne tient pas en CPU (fp32 8 Go > 6,2 Go de RAM, plus de 20 s par passe) : substitut Qwen/Qwen3.5-0.8B-Base en lecture zéro-shot de probabilités sur lettres d'options, même code d'attaque. Sandbox : 10 classes, 100 exemples, gabarits fixes et faisceau de 3 appels max seulement, CamemBERT 1 époque sur quelques centaines d'exemples. Calcul GPU complet : 100 exemples × 2 cibles × ≈25 appels (9 gabarits + 16 de recherche) = 5 000 appels × ≈200 tokens = 1 M tokens ÷ 700 tok/s ≈ 24 min, plus 3 min d'évaluation propre, chargement et entraînement de l'encodeur (≈3 min) : environ 32 min dans les 45 min ; si la mesure dépasse, réduire à 80 exemples (dit dans les limites).",
+  "dependances": [
+   "strands-decider"
+  ],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Corps du message client à router, anonymisé."
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif validé par un humain."
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif validé par un humain."
+    },
+    {
+     "colonne": "received_at",
+     "type": "timestamp",
+     "description": "Date de réception, pour le découpage temporel."
+    }
+   ],
+   "volume_conseille": "Au moins 5 000 messages étiquetés pour entraîner l'encodeur et 200 messages bien routés pour l'attaque ; au moins 20 exemples par sous-motif visé.",
+   "metriques_metier": "Taux d'attaques ciblées réussies, part de décisions détournées au-dessus du seuil de revue, taux de saturation de la file de revue, exactitude propre et sous attaque par sous-motif.",
+   "garde_fous": "Suffixes d'attaque jamais injectés dans un système de production ; exécution en environnement isolé, sans envoi des textes à un service externe ; résultats rejoués à chaque changement de modèle ou de version.",
+   "prescriptions": [
+    "Étiquettes motif/sous-motif relues par au moins deux annotateurs, accord inter-annotateurs reporté.",
+    "Au moins 200 messages correctement routés par les deux modèles pour mesurer l'attaque.",
+    "Choisir les cibles parmi les sous-motifs voisins réellement confondus.",
+    "Découpage temporel : entraînement sur la période ancienne, attaque sur la plus récente.",
+    "Traduire ou rédiger les gabarits en français et ajouter des suffixes propres au canal e-mail (signature, citation de message).",
+    "Anonymiser noms, IBAN, numéros de carte avant extraction ; exclure les messages contenant des données de santé.",
+    "Fixer un seuil de confiance de revue avant le test, à partir de la calibration sur validation."
+   ],
+   "preparation": "Extraire les messages entrants routés et validés sur une période représentative depuis la source de gestion des demandes, joindre les motifs et sous-motifs validés, filtrer les doublons, les messages vides et les pièces jointes seules. Échantillonner de façon stratifiée par sous-motif, puis anonymiser. Séparer entraînement, validation et test par date."
+  },
+  "duree_estimee_minutes": 35,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610": {
+    "id": "StrandsAgents/strands-decider-2B-qwen3.5-v1-2610",
+    "sha": "216d1ccb46a9e9b036eb9187b248db98480f77d4",
+    "tache": "text-classification",
+    "bibliotheque": "peft",
+    "parametres": null,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "Qwen/Qwen3.5-2B-Base": {
+    "id": "Qwen/Qwen3.5-2B-Base",
+    "sha": "b1485b2fa6dfa1287294f269f5fb618e03d52d7c",
+    "tache": "image-text-to-text",
+    "bibliotheque": "transformers",
+    "parametres": 2274069824,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "Qwen/Qwen3.5-0.8B-Base": {
+    "id": "Qwen/Qwen3.5-0.8B-Base",
+    "sha": "dc7cdfe2ee4154fa7e30f5b51ca41bfa40174e68",
+    "tache": "image-text-to-text",
+    "bibliotheque": "transformers",
+    "parametres": 873438784,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "label": "Value",
+    "utterance": "Value"
+   },
+   "exemple": {
+    "label": 0,
+    "utterance": "S'il vous plaît, aidez-moi avec ma carte.  Il ne s'activera pas."
+   },
+   "lignes": {
+    "train": 10003,
+    "test": 3080
+   }
+  },
+  "paquets": {
+   "strands-decider": {
+    "paquet": "strands-decider",
+    "derniere_version": "0.2.0",
+    "licence": "",
+    "auteur": "",
+    "source": ""
+   }
+  }
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
