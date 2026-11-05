@@ -3,6 +3,34 @@
  "pocs": [
   {
    "jour": "2026-11-05",
+   "sujet_id": "liquidai-d1-2b-decision-model",
+   "depot": "20261105_d1_decision_model_camembert_banking77",
+   "titre": "Un modèle de décision calibré en une passe (d1-2B) rejoint-il un CamemBERT fine-tuné sur 77 intentions françaises proches ?",
+   "statut": "echec",
+   "iterations": 3,
+   "raison": "la phase publique a échoué",
+   "cause": "methode",
+   "duree_minutes": 33.1,
+   "consommation": {
+    "claude:poc_code:liquidai-d1-2b-decision-model": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1025.4,
+     "cout_equivalent_usd": 3.5556,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:liquidai-d1-2b-decision-model": {
+     "appels": 3,
+     "echecs": 0,
+     "secondes": 917.7,
+     "cout_equivalent_usd": 4.0213,
+     "recherches_web": 0
+    }
+   },
+   "tentatives": 1
+  },
+  {
+   "jour": "2026-11-05",
    "sujet_id": "decision-models-securite-jevbreak-agentcore-evals",
    "depot": "20261105_typed_decision_suffix_attack_camembert",
    "titre": "Un encodeur fine-tuné résiste-t-il mieux qu'un modèle de décision typé à un suffixe ajouté au texte, en français ?",
