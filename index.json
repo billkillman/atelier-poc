@@ -2,6 +2,34 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-05",
+   "sujet_id": "decision-models-securite-jevbreak-agentcore-evals",
+   "depot": "20261105_typed_decision_suffix_attack_camembert",
+   "titre": "Un encodeur fine-tuné résiste-t-il mieux qu'un modèle de décision typé à un suffixe ajouté au texte, en français ?",
+   "statut": "echec",
+   "iterations": 3,
+   "raison": "la phase publique a échoué",
+   "cause": "methode",
+   "duree_minutes": 31.3,
+   "consommation": {
+    "claude:poc_code:decision-models-securite-jevbreak-agentcore-evals": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 820.8,
+     "cout_equivalent_usd": 2.17,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:decision-models-securite-jevbreak-agentcore-evals": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 700.4,
+     "cout_equivalent_usd": 2.5112,
+     "recherches_web": 0
+    }
+   },
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-03",
    "sujet_id": "modeles-decision-distillation-flide-applications",
    "depot": "20261103_decision_model_camembert_intents",
