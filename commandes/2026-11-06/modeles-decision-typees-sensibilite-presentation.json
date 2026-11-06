@@ -1,0 +1,349 @@
+{
+ "version": 1,
+ "jour": "2026-11-06",
+ "sujet_id": "modeles-decision-typees-sensibilite-presentation",
+ "depot": "20261106_typed_decision_presentation_sensitivity_camembert",
+ "fiche": {
+  "sujet_id": "modeles-decision-typees-sensibilite-presentation",
+  "titre": "Modèles de décision typés : un audit de 702 000 jugements montre qu'ils changent d'avis selon la présentation",
+  "en_une_phrase": "Jev, Clef Flash et Perplexity Decider changent de choix quand on déplace les options ou ajoute un avis de lecteurs.",
+  "probleme": "Les modèles de décision typés renvoient un choix, un score ou une probabilité, sans texte généré ni explication. On ignore si leurs jugements dépendent de détails de présentation sans rapport avec le contenu : ordre, étiquettes, mentions d'autorité, formulation de la question.",
+  "comment_ca_marche": "Les auteurs construisent un audit contrôlé : les textes évalués ne changent jamais, seule la présentation varie.\n\n1. Ils tirent 1 500 items par jeu de données, soit six jeux (humour, utilité de réponses, qualité de résumés), en choix entre deux textes ou en note.\n2. Ils interrogent les trois modèles via l'API Decisions d'OpenRouter (passerelle d'accès à des modèles).\n3. Ils varient une caractéristique à la fois : ordre des options, étiquettes A/B ou 1/2, source annoncée (IA ou humain), avis de lecteurs (80 % contre 20 %), question « le meilleur » ou « le pire », grille de notation.\n4. Un contrôle sans information compare l'effet du simple ajout de métadonnées.\n5. Ils comparent la probabilité, le texte choisi et l'accord avec les annotateurs humains, et mesurent la variation sur des appels répétés à l'identique.",
+  "demarche_experimentale": "Trois modèles (Jev, Clef Flash de Cloudflare, Perplexity Decider v1.1), six jeux anglophones, 1 500 items chacun, 702 000 jugements. Références humaines multi-annotateurs, intervalles de confiance tenant compte des dépendances, correction des comparaisons multiples (Benjamini–Yekutieli).",
+  "resultats": [
+   {
+    "metrique": "Changement du texte choisi si on inverse les avis de lecteurs (humour)",
+    "valeur": "Perplexity 40,40 % ; Jev 22,00 % ; Clef 10,13 %",
+    "comparaison": "Appels identiques répétés : 0,08 % (Perplexity), 3,15 % (Jev), 3,02 % (Clef)",
+    "conditions": "UKP Humor, 1 500 paires par modèle",
+    "citation": "reversing reader endorsements changes Perplexity's selected humor text on 40.40% of pairs"
+   },
+   {
+    "metrique": "Effet de position de Jev sur les résumés (points de probabilité)",
+    "valeur": "−6,11 [−6,95 ; −5,26]",
+    "comparaison": "Clef proche de zéro ; Perplexity −0,4 (non significatif)",
+    "conditions": "Comparaisons OpenAI, effet moyenné sur le facteur étiquette",
+    "citation": "Jev favors second position across all tasks; its first-position effect reaches -6.11 [-6.95, -5.26] pp on summaries"
+   },
+   {
+    "metrique": "Accord avec les humains sur les résumés, cadrage « rejet » (Clef)",
+    "valeur": "−23,36 points",
+    "comparaison": "Par rapport à la question « meilleur texte »",
+    "conditions": "OpenAI comparisons, 1 451 paires à préférence stricte",
+    "citation": "rejection framing reduces Clef's summary agreement with human preferences by 23.36 points"
+   }
+  ],
+  "limites": [
+   "Trois modèles, trois tâches subjectives en anglais (humour, utilité, résumés) : aucune classification à classes nombreuses ni français (limite reconnue par les auteurs).",
+   "Les références humaines sont des agrégats fixes, avec dépendances résiduelles entre annotateurs ; la comparaison aux juges LLM classiques repose sur la littérature, pas sur des tests appariés (auteurs).",
+   "Préprint non relu ; les grilles alternatives changent aussi les descriptions, et les avis de lecteurs sont fabriqués : l'effet dépend de la formulation testée."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "40,40 %",
+    "libelle": "des paires humour où Perplexity change de texte choisi quand on inverse les avis de lecteurs"
+   },
+   {
+    "valeur": "−6,11 pts",
+    "libelle": "effet de la première position sur la probabilité de Jev, résumés (second favorisé)"
+   },
+   {
+    "valeur": "−23,36 pts",
+    "libelle": "accord de Clef Flash avec les humains sur les résumés si on demande le pire texte"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "L'audit porte sur 702 000 jugements, trois modèles, six jeux et 9 000 items.",
+    "citation": "Across six datasets with 9,000 multiply annotated humor, helpfulness, and summarization items, we collect 702,000 judgments"
+   },
+   {
+    "affirmation": "Inverser les avis de lecteurs change le texte choisi par Perplexity sur 40,40 % des paires d'humour.",
+    "citation": "reversing reader endorsements changes Perplexity's selected humor text on 40.40% of pairs"
+   },
+   {
+    "affirmation": "Jev favorise la seconde position sur les trois tâches de choix.",
+    "citation": "Jev favors second position across all tasks; its first-position effect reaches -6.11 [-6.95, -5.26] pp on summaries"
+   },
+   {
+    "affirmation": "Les formats de notation décalent les niveaux de scores tout en préservant largement les classements.",
+    "citation": "Thus high rank association can coexist with shifts in absolute ratings, with the extent of rank preservation varying by configuration."
+   },
+   {
+    "affirmation": "Le cadrage par rejet réduit l'accord de Clef avec les humains, qui choisit parfois le même texte comme meilleur et pire.",
+    "citation": "Clef selects the same text as both more and less helpful on 67.73% of all pairs"
+   },
+   {
+    "affirmation": "L'étude est limitée à trois tâches subjectives en anglais.",
+    "citation": "The study compares three typed decision models across three English-language tasks."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision typé",
+    "definition": "Modèle qui ne génère pas de texte mais renvoie une réponse typée : choix parmi des options, score ou probabilité."
+   },
+   {
+    "terme": "Jev",
+    "definition": "Modèle de décision typé de TypeSafe AI, publié le 15 septembre 2026 selon l'étude."
+   },
+   {
+    "terme": "Clef Flash",
+    "definition": "Modèle de décision typé de Cloudflare, audité dans l'étude."
+   },
+   {
+    "terme": "Perplexity Decider",
+    "definition": "Modèle de décision typé de Perplexity AI (v1.1), audité dans l'étude."
+   },
+   {
+    "terme": "Biais de position",
+    "definition": "Tendance à favoriser une option selon son rang d'affichage (première ou seconde), indépendamment de son contenu."
+   },
+   {
+    "terme": "Points de pourcentage (pp)",
+    "definition": "Écart absolu entre deux pourcentages : passer de 50 % à 56 % fait 6 pp."
+   },
+   {
+    "terme": "Corrélation de rang (Spearman)",
+    "definition": "Mesure si deux notations classent les items dans le même ordre, de −1 à 1 ; plus haut = classement plus proche."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Presentation Sensitivity in Typed Decision Models for Subjective Text Evaluation",
+    "url": "https://arxiv.org/abs/2611.06384",
+    "type": "primaire",
+    "date": "2026-11-04"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-04",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un décideur typé (choix parmi options, probabilité lue) est-il aussi précis et aussi stable qu'un CamemBERT fine-tuné quand on change l'ordre, les étiquettes ou le texte annexe ?",
+  "hypothese": "Sur 77 intentions françaises proches, un décideur typé ouvert (Qwen3-1.7B, choix parmi 10 candidats) atteint au plus 5 points d'accuracy de moins que CamemBERT fine-tuné, mais change de décision sur plus de 5 % des exemples quand l'ordre des options est permuté, alors que CamemBERT a 0 % par construction.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné",
+   "description": "Classifieur d'intentions à 77 classes, tête de classification sur CamemBERT-base, entraîné sur le jeu d'entraînement complet. Déterministe, insensible à l'ordre des classes.",
+   "implementation": "transformers AutoModelForSequenceClassification, almanach/camembert-base, 3 époques, lr 3e-5, batch 32, longueur max 64, 10 % du train en validation pour choisir l'époque ; évaluation sur sous-échantillon fixe du test.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Décideur typé ouvert sur candidats",
+   "description": "Proxy ouvert d'un modèle de décision typé : un LLM instruct reçoit le texte et 10 options étiquetées, et rend la distribution de probabilité sur le symbole de l'option (réponse typée, sans texte généré). Les 10 candidats viennent du top-10 de CamemBERT. On mesure précision, calibration et changement de décision sous permutation.",
+   "implementation": "transformers AutoModelForCausalLM en bfloat16, prompt de choix, une seule passe avant, softmax sur les logits des symboles A–J (ou 0–9) au dernier token ; chat template sans mode réflexion. Variantes : ordre par rang, ordre inversé, ordre aléatoire, étiquettes chiffres, texte annexe neutre ajouté. Noms de classes issus de mteb/banking77 (label_text, anglais, underscores remplacés par espaces). Les services typés propriétaires ne sont pas testés : seul leur principe l'est.",
+   "modeles_hf": [
+    "Qwen/Qwen3-1.7B"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen3-0.6B"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "llmaas"
+  },
+  "jeu_public": {
+   "hub_id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "utterance, label (entier ; noms de classes via mteb/banking77, colonnes label et label_text, config default)",
+   "representativite": "Requêtes françaises de clients, 77 intentions fines et proches (carte, virement, frais) : le plus proche substitut public de la classification à nombreuses classes proches, avec effectifs suffisants pour fine-tuner un encodeur.",
+   "ecarts_donnees_reelles": "Une seule couche d'intentions (pas d'arbre motif/sous-motif) ; traduction automatique ; textes courts sans e-mails ni pièces jointes ; 77 classes contre ~300 ; noms de classes en anglais ; licence du jeu non précisée sur le Hub (original CC BY 4.0) ; le décideur typé est un proxy ouvert, pas Jev ni Clef.",
+   "jeux_explores": [
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "10 003 + 3 080 requêtes françaises internes, 77 intentions proches.",
+     "decision": "retenu",
+     "raison": "Seul jeu français, interne, à classes proches, chargeable et assez gros pour fine-tuner CamemBERT."
+    },
+    {
+     "nom": "mteb/banking77",
+     "url": "https://huggingface.co/datasets/mteb/banking77",
+     "acces": "hub_libre",
+     "adequation": "Version anglaise avec label_text, licence MIT.",
+     "decision": "retenu",
+     "raison": "Utilisé uniquement pour les noms de classes à présenter comme options ; pas comme jeu d'évaluation."
+    },
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "60 intentions françaises en arbre à 2 niveaux (apache-2.0).",
+     "decision": "ecarte",
+     "raison": "Domaine hors entreprise et classes plus séparables ; à garder pour une suite sur la cohérence hiérarchique."
+    },
+    {
+     "nom": "DeepPavlov/clinc150_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/clinc150_fr",
+     "acces": "hub_libre",
+     "adequation": "150 classes françaises, étiquettes entières sans noms.",
+     "decision": "ecarte",
+     "raison": "Pas de noms de classes ni de licence affichée ; table de correspondance à reconstituer."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "~113 intentions déséquilibrées en français.",
+     "decision": "ecarte",
+     "raison": "Licence unknown, pas de noms de classes, domaine assistant vocal."
+    },
+    {
+     "nom": "BenGaia/avis-clients",
+     "url": "https://huggingface.co/datasets/BenGaia/avis-clients",
+     "acces": "hub_libre",
+     "adequation": "15 000 avis français notés de 1 à 10.",
+     "decision": "ecarte",
+     "raison": "Ne teste que la notation, pas la classification à classes nombreuses."
+    },
+    {
+     "nom": "DecisionBench",
+     "url": "https://www.deeplearning.ai/the-batch/models-built-to-do-one-thing-well",
+     "acces": "sur_demande",
+     "adequation": "43 tâches de décision typée, calibration incluse, selon ses promoteurs.",
+     "decision": "ecarte",
+     "raison": "Aucun jeu téléchargeable confirmé ; à suivre."
+    }
+   ]
+  },
+  "metriques": [
+   "accuracy",
+   "macro_f1",
+   "permutation_flip_rate",
+   "expected_calibration_error",
+   "top10_candidate_recall"
+  ],
+  "metrique_principale": "permutation_flip_rate",
+  "sens": "min",
+  "protocole": "Train de banking77_fr découpé 90/10 (entraînement/validation) pour CamemBERT. Test : sous-échantillon aléatoire fixe de 500 exemples (150 en échelle réduite). Candidats : top-10 de CamemBERT par probabilité ; le rappel du top-10 est rapporté (plafond du décideur). Le décideur est évalué sur 5 présentations : ordre par rang, ordre inversé, ordre aléatoire, étiquettes chiffres, texte annexe neutre. permutation_flip_rate = part des exemples dont le choix change d'une présentation à l'autre ; aussi accuracy par présentation, accuracy min/max, ECE de la probabilité du choix, macro_f1 et comparaison à CamemBERT sur les mêmes exemples (McNemar apparié). Intervalles de confiance par bootstrap.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Échelle réduite : Qwen3-0.6B à la place de Qwen3-1.7B, 600 exemples d'entraînement CamemBERT sur 1 époque, 150 exemples de test, 3 présentations. Coût GPU à l'échelle complète : 5 passes × 500 exemples × ~300 tokens = 750 000 tokens, soit ~18 min à 700 tok/s (le 1,7 Md est plus rapide qu'un 2-3 Md) ; plus ~6 min de fine-tuning CamemBERT et le chargement, soit moins de 45 min.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte du message ou de la demande client, anonymisé"
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif de premier niveau (étiquette de référence)"
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif (étiquette de référence, feuille de l'arbre)"
+    },
+    {
+     "colonne": "sub_reason_description",
+     "type": "string",
+     "description": "Libellé ou description courte du sous-motif, présentée comme option au décideur"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception, pour le découpage temporel"
+    }
+   ],
+   "volume_conseille": "20 000 textes étiquetés, au moins 30 par sous-motif, et 3 000 textes de test.",
+   "metriques_metier": "Taux de routage correct au niveau sous-motif, cohérence motif/sous-motif, part de décisions modifiées par une permutation des options, ECE.",
+   "garde_fous": "Ne pas retenir un décideur typé dont le taux de changement sous permutation dépasse un seuil validé avec les métiers ; garder CamemBERT en référence ; aucune donnée client hors environnement cible.",
+   "prescriptions": [
+    "Étiquettes issues d'une annotation double avec accord inter-annotateurs (kappa) mesuré sur au moins 500 textes.",
+    "Au moins 30 textes par sous-motif dans l'entraînement et 10 dans le test ; classes rares rapportées à part.",
+    "Découpage temporel : test sur la période la plus récente, sans chevauchement de clients avec l'entraînement.",
+    "Anonymiser noms, IBAN, numéros de carte et adresses avant toute extraction.",
+    "Fournir un libellé et une description française par sous-motif, identiques pour tous les modèles.",
+    "Exclure les textes multi-motifs non tranchés et les messages automatiques.",
+    "Couvrir au moins 12 mois pour inclure la saisonnalité."
+   ],
+   "preparation": "Extraire les demandes entrantes traitées sur la période, joindre le motif et sous-motif validés par le conseiller ou le contrôle qualité, filtrer les textes vides ou automatiques, anonymiser, puis échantillonner de façon stratifiée par sous-motif en conservant la distribution naturelle dans le test."
+  },
+  "duree_estimee_minutes": 75,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "Qwen/Qwen3-1.7B": {
+    "id": "Qwen/Qwen3-1.7B",
+    "sha": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 2031739904,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "Qwen/Qwen3-0.6B": {
+    "id": "Qwen/Qwen3-0.6B",
+    "sha": "c1899de289a04d12100db370d81485cdf75e47ca",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 751632384,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "label": "Value",
+    "utterance": "Value"
+   },
+   "exemple": {
+    "label": 0,
+    "utterance": "S'il vous plaît, aidez-moi avec ma carte.  Il ne s'activera pas."
+   },
+   "lignes": {
+    "train": 10003,
+    "test": 3080
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
