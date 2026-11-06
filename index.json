@@ -2,6 +2,86 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-06",
+   "sujet_id": "modeles-decision-typees-sensibilite-presentation",
+   "depot": "20261106_typed_decision_presentation_sensitivity_camembert",
+   "titre": "Un décideur typé (choix parmi options, probabilité lue) est-il aussi précis et aussi stable qu'un CamemBERT fine-tuné quand on change l'ordre, les étiquettes ou le texte annexe ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "complete",
+   "materiel": "GPU T4 (Google Colab)",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné)",
+    "raison": ""
+   },
+   "iterations": 2,
+   "metrique_principale": "permutation_flip_rate",
+   "sens": "min",
+   "approches": [
+    {
+     "nom": "CamemBERT-base fine-tuné",
+     "role": "reference",
+     "valeur": 0.0,
+     "ic95": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "nom": "Décideur typé (Qwen/Qwen3-1.7B)",
+     "role": "nouvelle",
+     "valeur": 0.534,
+     "ic95": [
+      0.488,
+      0.576
+     ]
+    }
+   ],
+   "n_exemples": 500,
+   "jeu": "DeepPavlov/banking77_fr",
+   "synthese": "permutation_flip_rate : Décideur typé (Qwen/Qwen3-1.7B) 0,534 contre 0 pour CamemBERT-base fine-tuné (500 exemples, GPU T4 (Google Colab)).",
+   "conclusion": "À l'échelle complète (500 exemples de test, GPU), le décideur typé change de choix sur 53,4 % des exemples [48,8 ; 57,6] quand l'ordre des options varie, contre 0 % pour CamemBERT. Ce résultat est net et bien au-dessus du seuil de 5 %. Il ne vient pas du bruit, puisque les appels répétés à l'identique donnent 0 %. En accuracy, le décideur atteint 0,49 en ordre du rang contre 0,676 pour CamemBERT, mais 0,652 en ordre inversé : l'écart dépend fortement de l'ordre. CamemBERT, probablement sous-entraîné (ECE de 0,60), perd lui aussi plus de dix points avec la note neutre. À l'échelle réduite, la référence était presque non entraînée et le décideur la dépassait, ce qui confirme que l'écart dépend de son niveau d'entraînement. Le protocole diffère de la source (77 classes, proxy ouvert) : on retrouve la sensibilité à la présentation, sans chiffres comparables.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Le décideur typé ouvert est très sensible à l'ordre des options, alors que CamemBERT reste stable sous permutation. L'écart de précision dépend de l'ordre et d'une référence probablement sous-entraînée, donc il est à relativiser.",
+   "libelle_metrique": "taux de changement sous permutation",
+   "reserves": [
+    "CamemBERT est probablement sous-ajusté. L'écart de précision réel avec un classifieur correctement entraîné est sans doute plus grand que celui mesuré, et le rappel du top-10 est probablement sous-estimé.",
+    "L'écart de précision n'a pas de valeur unique. Il va d'environ 19 points (ordre du rang) à environ 2 points (ordre inversé), ce qui est en soi un signe de sensibilité à la présentation. Le chiffre d'accuracy affiché est le pire cas d'ordre.",
+    "CamemBERT n'est stable que sous permutation des options. Un texte annexe sans rapport lui coûte plus de dix points d'accuracy, donc la stabilité de la référence est moins nette que le 0 % affiché.",
+    "Ne pas conclure que le décideur est mieux calibré que CamemBERT. Les deux ECE ne mesurent pas la même chose, et le décideur est en réalité très sur-confiant.",
+    "Le taux de changement mesuré vaut pour ce petit modèle ouvert et ce prompt. Il confirme la sensibilité à l'ordre dans ce cas, mais ne dit rien de précis sur les services propriétaires audités dans la source."
+   ],
+   "duree_minutes": 56.3,
+   "consommation": {
+    "claude:poc_code:modeles-decision-typees-sensibilite-presentation": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 614.3,
+     "cout_equivalent_usd": 1.6581,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:modeles-decision-typees-sensibilite-presentation": {
+     "appels": 3,
+     "echecs": 0,
+     "secondes": 737.1,
+     "cout_equivalent_usd": 3.3162,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:modeles-decision-typees-sensibilite-presentation": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 106.6,
+     "cout_equivalent_usd": 0.5398,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261106_typed_decision_presentation_sensitivity_camembert",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-05",
    "sujet_id": "liquidai-d1-2b-decision-model",
    "depot": "20261105_d1_decision_model_camembert_banking77",
