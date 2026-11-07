@@ -80,6 +80,93 @@
    "tentatives": 1
   },
   {
+   "jour": "2026-11-07",
+   "sujet_id": "nace-drex-decision-models",
+   "depot": "20261107_typed_decision_encoder_label_wording_french",
+   "titre": "Un décideur typé entraîné (encodeur de paires texte/option) égale-t-il un CamemBERT à classes fixes en français, et reste-t-il stable quand on change l'ordre, la formulation des libellés et les classes proposées ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné)",
+    "raison": "exception (cellule 59, section new_approach)"
+   },
+   "iterations": 2,
+   "metrique_principale": "permutation_flip_rate",
+   "sens": "min",
+   "approches": [
+    {
+     "nom": "CamemBERT-base (classes fixes)",
+     "role": "reference",
+     "valeur": 0.0,
+     "ic95": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "nom": "Décideur typé (augmentation de libellés)",
+     "role": "nouvelle",
+     "valeur": 0.0,
+     "ic95": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "nom": "Décideur typé (libellés fixes)",
+     "role": "nouvelle",
+     "valeur": 0.0,
+     "ic95": [
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "n_exemples": 120,
+   "jeu": "mteb/amazon_massive_intent",
+   "synthese": "permutation_flip_rate : Décideur typé (libellés fixes) 0 contre 0 pour CamemBERT-base (classes fixes) (120 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (substitut de 140 M de paramètres, 120 questions de test, 1 époque sur 320 textes, 8 options), les chiffres ne permettent pas de trancher. CamemBERT est au niveau du hasard (accuracy 0,156 sur les intentions vues) et son intervalle de confiance ne dépasse pas le niveau trivial. Le décideur à libellés fixes atteint 0,67 et la variante augmentée 0,31, ce qui reflète des budgets d'entraînement très différents, pas un résultat. Le taux de bascule nul est garanti par construction pour les deux approches. Les codes opaques tombent près du hasard (0,16), cohérent avec l'hypothèse mais sur un petit échantillon. Il faut l'échelle complète pour juger l'écart de précision, les intentions jamais vues et l'effet de l'augmentation. Aucune conclusion n'est transposable aux modèles Drex.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Verdict impossible à cette échelle : la référence est à peine entraînée et reste au hasard. La stabilité à l'ordre est acquise par construction, donc peu informative sur les modèles de décision de la source.",
+   "libelle_metrique": "taux de bascule (permutation)",
+   "reserves": [
+    "Un taux de bascule nul ne prouve pas que l'approche soit robuste à l'ordre. Il est nul pour toute architecture qui note les options séparément. Il ne dit rien sur les modèles de décision de la source.",
+    "L'avantage apparent du décideur sur CamemBERT à cette échelle vient surtout d'une référence à peine entraînée. Il ne permet pas de conclure sur l'écart réel.",
+    "Un bon score sur les libellés reformulés ou tronqués est un score sur des formes vues à l'entraînement. Il ne garantit pas la tenue face à des libellés réécrits autrement."
+   ],
+   "duree_minutes": 60.2,
+   "consommation": {
+    "claude:poc_code:nace-drex-decision-models": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1775.2,
+     "cout_equivalent_usd": 4.7694,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:nace-drex-decision-models": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 514.9,
+     "cout_equivalent_usd": 2.3897,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:nace-drex-decision-models": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 125.2,
+     "cout_equivalent_usd": 0.6132,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261107_typed_decision_encoder_label_wording_french",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-06",
    "sujet_id": "modeles-decision-typees-sensibilite-presentation",
    "depot": "20261106_typed_decision_presentation_sensitivity_camembert",
