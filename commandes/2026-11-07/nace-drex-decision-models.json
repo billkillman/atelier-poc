@@ -1,0 +1,409 @@
+{
+ "version": 1,
+ "jour": "2026-11-07",
+ "sujet_id": "nace-drex-decision-models",
+ "depot": "20261107_typed_decision_encoder_label_wording_french",
+ "fiche": {
+  "sujet_id": "nace-drex-decision-models",
+  "titre": "Drex (Nace AI) : quatre modèles de décision à poids ouverts, rapides et calibrés, mais licence à négocier pour un acteur des services financiers et rien en français",
+  "en_une_phrase": "Les quatre modèles Drex renvoient une probabilité par option fournie, sans générer de texte ; le plus gros approche les LLM frontière sur des décisions métier. Mais licence à négocier pour un acteur des services financiers, aucun test en français.",
+  "probleme": "Pour classer un texte, il y a deux voies classiques.\n\n- **L'encodeur fine-tuné** (CamemBERT) : rapide, mais ses classes sont figées à l'entraînement.\n- **Le LLM génératif** : on lui pose la question, puis on analyse le texte qu'il rédige. Ses réponses sont instables, l'extraction est fragile, et il coûte cher en temps et en argent.\n\nOn peut forcer un LLM à ne produire qu'un des libellés autorisés (« génération contrainte »). Le libellé est alors toujours valide, mais la probabilité obtenue n'est pas une vraie distribution sur les options. Les « modèles de décision » visent l'entre-deux : options fournies à chaque requête, une probabilité par option, aucune génération.",
+  "comment_ca_marche": "1. **La requête.** Elle contient un *état* : un document, un dossier JSON ou le contexte d'un agent, éventuellement avec des images. S'y ajoutent une ou plusieurs questions, de trois types possibles :\n   - un choix entre options nommées (255 au plus) ;\n   - un oui/non ;\n   - une note sur une échelle.\n2. **Les trois modèles « pointeur ».** Ce sont DLM (8 Md de paramètres), v1.5 (9 Md) et v2.0 (35 Md, dont 3 Md actifs par mot).\n   - Leurs bases diffèrent. DLM part d'un modèle de diffusion, qui lit le texte dans les deux sens. v1.5 utilise un hybride à couches *Gated DeltaNet*, une attention récurrente peu coûteuse sur les longs textes. v2.0 est un *mixture of experts* : seule une partie du réseau travaille pour chaque mot.\n   - L'état est encodé une seule fois, puis mis en cache. Chaque question passe ensuite seule, en une passe courte.\n   - Une petite « tête pointeur » (1 à 2 M de paramètres) compare la représentation de la question à celle de chaque option. Un softmax en tire une probabilité par option. Une option jamais vue à l'entraînement est notée par le même mécanisme qu'une option connue.\n3. **Drex Max.** C'est un modèle dense de 27 Md de paramètres, entraîné à partir de Qwen3.8-27B, qui lit aussi les images.\n   - Il réencode tout l'état pour chaque question : plus précis, mais plus cher par question.\n   - Une couche sur quatre lit la séquence dans les deux sens, ce qui permet de comparer les options entre elles.\n   - Les options sont codées A, B, C… Une couche linéaire produit 255 scores, dont on ne garde que ceux des options fournies.\n4. **L'entraînement.**\n   - D'abord un fine-tuning supervisé sur 1,15 M d'exemples vérifiés, distillés pour la plupart de modèles plus forts. Deux pénalités apprennent au modèle à ne pas changer d'avis si l'on permute les options ou si l'on mélange les phrases du document.\n   - Ensuite le *RLAF*, une forme d'apprentissage par renforcement. La cible combine la réponse vérifiée et la distribution proposée par un modèle juge qui raisonne. La récompense est une règle de score « propre » : elle est maximale quand la probabilité prédite égale la vraie probabilité. Elle pousse donc à la fois la précision et la calibration.\n5. **La sortie.** Une distribution de probabilités, lisible directement, que l'on peut comparer à un seuil de confiance.\n\n**Ce qui est nouveau :** une famille à poids ouverts qui reproduit l'interface de Jev (TypeSafe AI) sur quatre architectures, avec des mesures publiées de calibration et de sensibilité à l'ordre des options.",
+  "demarche_experimentale": "**Benchmarks**\n- *Decision Index 0.4.1* : 37 benchmarks publics (140 620 requêtes) et un sous-ensemble privé, noté par ses mainteneurs. Le score « skill » est corrigé du hasard : 0 = tirage aléatoire, 100 = parfait.\n- *Decision Bench v4* : 1 071 décisions tirées de 36 jeux de données réels, dont 122 avec image.\n- *Artificial Analysis Decision Index* : exécuté par un tiers.\n\n**Comparaisons**\n- Modèles de décision : Jev 1.13 et 1.14, GPT-6 Luna Decisions, d3-turbo.\n- LLM frontière : GPT-6 Sol et Claude Opus 5.5, à qui l'on demande des probabilités au format JSON.\n\n**Protocole**\n- Calibration mesurée sur environ 230 000 décisions.\n- Ordre des options testé sur 1 591 décisions, chacune présentée dans 3 ordres.\n- Tests appariés (bootstrap, McNemar), sans correction pour comparaisons multiples.\n- Ablation contrôlée sur Max : versions sans RL, sans pénalités de cohérence, sans étape vision.",
+  "resultats": [
+   {
+    "metrique": "Decision Index 0.4.1, skill public (plus haut = mieux)",
+    "valeur": "67,52 (score complet : 66,60)",
+    "comparaison": "Jev 1.14.0 : 60,70 (complet : 60,24)",
+    "conditions": "37 benchmarks publics ; score complet calculé par les mainteneurs avec tests privés",
+    "citation": "On Decision Index 0.4.1, Max sets a new state-of-the-art among the decision models we compare (67.52 on the public suite vs 60.70 for Jev 1.14.0)."
+   },
+   {
+    "metrique": "Précision sur Decision Bench v4",
+    "valeur": "94,0 %",
+    "comparaison": "Claude Opus 5.5 : 95,6 % ; GPT-6 Sol : 94,7 % ; Jev 1.14 : 92,3 %",
+    "conditions": "1 071 décisions réelles, Drex Max avec images ; écart avec GPT-6 Sol non significatif",
+    "citation": "On Decision Bench v4, with images provided to the model via its image encoder, its accuracy is 94.0%, which is not significantly different from that of GPT-6 Sol and d3-turbo, and 1.6 percentage points below that of Claude Opus 5.5 (Section 8.2)."
+   },
+   {
+    "metrique": "Latence médiane et coût pour 1 000 décisions",
+    "valeur": "183 ms ; 0,06 $",
+    "comparaison": "Claude Opus 5.5 : environ 3,5 s ; 10,17 $",
+    "conditions": "API hébergée, mesurée depuis l'Oregon, réseau compris (70 à 215 ms)",
+    "citation": "Max answers a typical request in 183 ms, against about 2.0 s for GPT-6 Sol and 3.5 s for Claude Opus 5.5"
+   },
+   {
+    "metrique": "Taux de bascule : part des décisions qui changent quand on permute les options (plus bas = mieux)",
+    "valeur": "4,3 % au total ; 13,3 % avec 6 options ou plus",
+    "comparaison": "Jev 1.14 : 4,3 % ; v2.0 : 5,9 %",
+    "conditions": "1 591 décisions, dont 173 seulement à 6 options ou plus",
+    "citation": "Binary decisions almost never flip (1.0% for Max, 2.0% for the others), but with six or more options, 13–16% of decisions change under a permutation for every model, including Jev."
+   },
+   {
+    "metrique": "Précision sur les décisions les plus sûres",
+    "valeur": "96,1 % (80 % les plus sûres) ; 99,3 % (50 %)",
+    "comparaison": "87,9 % sur toutes les décisions",
+    "conditions": "Drex Max, Decision Index, environ 115 000 décisions tenues à l'écart",
+    "citation": "Keeping only the 80% of decisions on which Drex Max is most confident raises its precision from 87.9% (precision@top-100%, i.e., accuracy on all decisions) to 96.1% (precision@top-80%), and keeping the most confident 50% raises it further to 99.3%"
+   },
+   {
+    "metrique": "Apport du RLAF (ablation)",
+    "valeur": "+2,0 points de score ; +1,5 point de précision ; ECE −0,9 point",
+    "comparaison": "Fine-tuning supervisé seul",
+    "conditions": "Drex Max, mêmes base, données et calendrier d'entraînement",
+    "citation": "Relative to SFT alone, it adds 2.0 points to the Decision Index score and 1.5 percentage points of accuracy and lowers ECE by 0.9 percentage points."
+   }
+  ],
+  "limites": [
+   "**Licence trompeuse.** Malgré l'étiquette « open », une entité de plus de 1 M$ de chiffre d'affaires doit signer une licence commerciale séparée. Les modèles fine-tunés ou distillés à partir de Drex restent soumis à cette licence. DLM est non commercial.",
+   "**Aucune évaluation en français ni sur données internes.** Le rapport vient de l'éditeur. Les auteurs reconnaissent des contaminations non filtrées : questions de test reformulées, ou benchmarks déjà mémorisés par les modèles professeurs.",
+   "**Surconfiance de Max, reconnue par les auteurs.** L'ECE (écart entre confiance affichée et précision réelle) atteint 7,2 à 9,2 % hors domaine Language, et 8,4 % entre 6 et 20 options. La température est à recaler sur chaque cas d'usage.",
+   "**Sensibilité à l'ordre au-delà de 6 options** : 13 à 16 % de bascules, sur 173 décisions seulement. C'est cohérent avec l'audit publié hier sur Jev et ses concurrents. Selon les auteurs, les gains de Max ne sont pas attribuables à une cause unique."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "94,0 %",
+    "libelle": "précision de Drex Max sur Decision Bench v4, contre 95,6 % pour Claude Opus 5.5"
+   },
+   {
+    "valeur": "0,06 $",
+    "libelle": "pour 1 000 décisions avec Drex Max, contre 10,17 $ avec Claude Opus 5.5"
+   },
+   {
+    "valeur": "13 à 16 %",
+    "libelle": "décisions qui changent quand on permute 6 options ou plus (tous modèles)"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "La famille Drex compte quatre modèles de 8 Md, 9 Md, 35 Md (dont 3 Md actifs) et 27 Md de paramètres.",
+    "citation": "The four models have 8B (DLM), 9B (v1.5), 35B with 3B active (v2.0), and 27B (Max) parameters."
+   },
+   {
+    "affirmation": "Une entité de plus de 1 M$ de chiffre d'affaires doit obtenir une licence commerciale séparée pour utiliser les modèles, sauf usage personnel ou de recherche.",
+    "citation": "for any purpose if You (your employer, or the entity you are affiliated with) generated more than one million US dollars ($1,000,000) in gross revenue in the prior twelve (12) months, except where Your Use is limited to personal use or research purposes;"
+   },
+   {
+    "affirmation": "Les modèles fine-tunés ou distillés à partir de Drex, et ceux entraînés sur ses sorties, sont des dérivés soumis à la licence.",
+    "citation": "including but not limited to fine-tuned, quantized, merged, pruned or distilled models, and models trained on synthetic data generated by the Model."
+   },
+   {
+    "affirmation": "Une question de type choix accepte au plus 255 options.",
+    "citation": "A choice question lists named options, with K≤255, and the model returns a probability for each option together with the most probable option."
+   },
+   {
+    "affirmation": "Drex Max atteint 94,0 % sur Decision Bench v4, 1,6 point sous Claude Opus 5.5.",
+    "citation": "On Decision Bench v4, with images provided to the model via its image encoder, its accuracy is 94.0%, which is not significantly different from that of GPT-6 Sol and d3-turbo, and 1.6 percentage points below that of Claude Opus 5.5 (Section 8.2)."
+   },
+   {
+    "affirmation": "Avec 6 options ou plus, 13 à 16 % des décisions changent quand on permute les options, pour tous les modèles testés, Jev compris.",
+    "citation": "Binary decisions almost never flip (1.0% for Max, 2.0% for the others), but with six or more options, 13–16% of decisions change under a permutation for every model, including Jev."
+   },
+   {
+    "affirmation": "Drex Max est surconfiant sur les questions de 6 à 20 options.",
+    "citation": "We find that Max is over-confident on questions with 6–20 options (ECE 8.4% at 71.7% accuracy), where v2.0 is well-calibrated (ECE 2.0%)."
+   },
+   {
+    "affirmation": "Les auteurs reconnaissent que leurs filtres anti-contamination laissent passer deux types de contamination.",
+    "citation": "These filters miss two kinds of contamination: paraphrased benchmark items, and knowledge of benchmarks that may be distilled from teacher models that were themselves trained on benchmark data."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision",
+    "definition": "Modèle qui reçoit un contexte, une question et une liste d'options, et renvoie directement une probabilité par option, sans rédiger de texte."
+   },
+   {
+    "terme": "Tête pointeur",
+    "definition": "Petite couche qui compare la représentation de la question à celle de chaque option et en tire un score. Elle fonctionne quel que soit le nombre d'options."
+   },
+   {
+    "terme": "Tête de lecture (readout head)",
+    "definition": "Couche linéaire de Drex Max qui produit un score par code d'option (A, B, C…), jusqu'à 255 codes."
+   },
+   {
+    "terme": "ECE",
+    "definition": "Expected calibration error : écart moyen entre la confiance affichée par le modèle et sa précision réelle. Plus bas = mieux calibré."
+   },
+   {
+    "terme": "Taux de bascule (flip rate)",
+    "definition": "Part des décisions dont l'option préférée change quand on modifie seulement l'ordre de présentation des options. Plus bas = plus stable."
+   },
+   {
+    "terme": "RLAF",
+    "definition": "Reinforcement learning from adjusted feedback : apprentissage par renforcement dont la récompense combine la réponse vérifiée et l'avis d'un modèle juge."
+   },
+   {
+    "terme": "Règle de score propre",
+    "definition": "Fonction de récompense maximale seulement quand la probabilité prédite égale la vraie probabilité. Elle pousse à être à la fois juste et bien calibré."
+   },
+   {
+    "terme": "Mixture of experts (MoE)",
+    "definition": "Architecture où seule une partie du réseau s'active pour chaque mot : ici 3 Md de paramètres sur 35 Md, ce qui réduit le coût de calcul."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Towards Foundation Decision Models: Drex (rapport technique, arXiv 2611.07854)",
+    "url": "https://arxiv.org/abs/2611.07854",
+    "type": "primaire",
+    "date": "2026-11-05"
+   },
+   {
+    "titre": "Dépôt officiel nace-ai/drex-decision-models",
+    "url": "https://github.com/nace-ai/drex-decision-models",
+    "type": "primaire",
+    "date": "2026-11"
+   },
+   {
+    "titre": "Fiche Hugging Face de Drex v2.0",
+    "url": "https://huggingface.co/nace-ai/drex-v2.0",
+    "type": "primaire",
+    "date": "2026-10"
+   },
+   {
+    "titre": "Nace AI Open RAIL-M License (Modified), version 1.0",
+    "url": "https://huggingface.co/nace-ai/drex-v2.0/blob/main/LICENSE",
+    "type": "primaire",
+    "date": "2026-10"
+   },
+   {
+    "titre": "AMA Nace AI sur r/LocalLLaMA",
+    "url": "https://www.reddit.com/r/LocalLLaMA/comments/1xphq4u/ama_how_we_trained_a_sota_decision_model_got_top/",
+    "type": "secondaire",
+    "date": "2026-11-06"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-05",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un décideur typé entraîné (encodeur de paires texte/option) égale-t-il un CamemBERT à classes fixes en français, et reste-t-il stable quand on change l'ordre, la formulation des libellés et les classes proposées ?",
+  "hypothese": "Un décideur typé encodeur (mmBERT-base, paires texte/option, 60 options) entraîné avec augmentation de libellés atteint une accuracy à au plus 3 points de CamemBERT-base sur les intentions vues, avec un taux de bascule sous permutation inférieur à 5 %, une accuracy supérieure à 50 % sur 10 intentions jamais vues à l'entraînement (impossible pour CamemBERT), mais s'effondre (accuracy proche du hasard, 1/60) sur libellés opaques.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné",
+   "description": "Classifieur à classes fixes : encodeur CamemBERT-base avec tête linéaire sur les 50 intentions d'entraînement, entraîné jusqu'à convergence avec sélection sur la validation.",
+   "implementation": "transformers AutoModelForSequenceClassification (almanach/camembert-base), 6 époques à l'échelle complète (1 en réduit), lr 3e-5, batch 32, longueur max 64, meilleur point sur validation. Ordre des options sans effet. Probabilités par softmax, puis mise à l'échelle par température ajustée sur la validation.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Décideur typé encodeur (paires texte/option) avec augmentation de libellés",
+   "description": "Un encodeur lit chaque paire (texte, libellé de l'option) et produit un score ; un softmax avec température sur les options fournies donne une probabilité par option, sans tête de classes fixes. À l'entraînement, chaque libellé est tiré parmi plusieurs formulations.",
+   "implementation": "mmBERT-base en cross-encoder (transformers AutoModel + tête linéaire sur [CLS]), entraîné en perte softmax sur K=16 options tirées (la bonne + négatifs dont des frères du même scénario), 3 époques à l'échelle complète. Deux variantes : libellés fixes (clé anglaise lisible) et augmentation (clé, mots français séparés, forme tronquée, scénario+intention). Évaluation à 60 options sur plusieurs présentations : 3 ordres (aléatoire, rang, inverse), 4 vocabulaires (clé, mots français, sigle tronqué à 3 lettres, code opaque), et décision en deux temps (scénario puis intention). Température ajustée sur validation.",
+   "modeles_hf": [
+    "jhu-clsp/mmBERT-base"
+   ],
+   "modeles_hf_sandbox": [
+    "jhu-clsp/mmBERT-small"
+   ],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "text, label, label_text (scenario_intent : le préfixe donne le scénario parent)",
+   "representativite": "Seul jeu français chargeable à traduction humaine avec arbre à deux niveaux (18 scénarios, 60 intentions) et libellés textuels, licence apache-2.0 : permet de mesurer cohérence parent/enfant, changement de libellés et classes ajoutées sans réentraînement.",
+   "ecarts_donnees_reelles": "Requêtes courtes d'assistant vocal, hors services financiers ; 60 classes au lieu de ~300 ; classes équilibrées ; pas d'e-mails ni de jargon réel ; vocabulaires de libellés construits par règle (français, tronqué, codes) plutôt que par des experts.",
+   "jeux_explores": [
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "60 intentions en arbre à 2 niveaux, traduction humaine, libellés lisibles, apache-2.0.",
+     "decision": "retenu",
+     "raison": "Seul jeu avec hiérarchie explicite, libellés textuels et licence commerciale claire."
+    },
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "77 intentions financières proches, mais étiquettes entières, plat.",
+     "decision": "ecarte",
+     "raison": "Pas de libellés ni d'arbre dans le jeu ; licence non précisée ; déjà utilisé à 500 exemples, extension possible."
+    },
+    {
+     "nom": "DeepPavlov/clinc150_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/clinc150_fr",
+     "acces": "hub_libre",
+     "adequation": "150 classes, 15 200 textes d'entraînement, bon pour le nombre de classes.",
+     "decision": "ecarte",
+     "raison": "Étiquettes entières sans noms ni domaines dans ce jeu : impossible de varier les libellés."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "~113 intentions déséquilibrées.",
+     "decision": "ecarte",
+     "raison": "Pas de noms de classes, licence inconnue."
+    },
+    {
+     "nom": "Mouwiya/cfpb-consumer-complaints",
+     "url": "https://huggingface.co/datasets/Mouwiya/cfpb-consumer-complaints",
+     "acces": "hub_libre",
+     "adequation": "Vraie hiérarchie de réclamations financières, centaines de feuilles.",
+     "decision": "ecarte",
+     "raison": "Anglais : la comparaison avec un encodeur français serait faussée."
+    },
+    {
+     "nom": "coastalcph/multi_eurlex",
+     "url": "https://huggingface.co/datasets/coastalcph/multi_eurlex",
+     "acces": "hub_libre",
+     "adequation": "Taxonomie profonde en français.",
+     "decision": "ecarte",
+     "raison": "Multi-label, documents longs, chargement par script non chargeable."
+    }
+   ]
+  },
+  "metriques": [
+   "permutation_flip_rate",
+   "accuracy_seen_classes",
+   "accuracy_unseen_classes",
+   "macro_f1",
+   "expected_calibration_error",
+   "scenario_consistency_rate",
+   "accuracy_by_label_vocabulary"
+  ],
+  "metrique_principale": "permutation_flip_rate",
+  "sens": "min",
+  "protocole": "Split train (11 514) : 50 intentions d'entraînement, 10 intentions réservées jamais vues ; split validation pour la température et le choix du point d'arrêt ; split test : 1 500 questions tirées à l'échelle complète, 200 en réduit. Test apparié : mêmes questions pour toutes les approches. Trois ordres d'options et quatre vocabulaires ; bascule = part des questions dont le choix change entre ordres ; intervalles de confiance par bootstrap et test de McNemar apparié contre CamemBERT. Calibration (ECE, 15 intervalles) avant et après température. Cohérence : part des erreurs d'intention restant dans le bon scénario. Appels répétés pour vérifier le déterminisme. Sensibilité à la taille de l'ensemble d'options (5, 18, 60). Deux variantes du décideur (avec et sans augmentation) pour isoler l'effet des libellés.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Substitut mmBERT-small (140M) pour mmBERT-base, 200 questions de test, 1 époque, sous-ensemble d'entraînement de ~1 500 textes, K=8 options. Coût GPU à l'échelle complète : entraînement ≈ 11,5k textes×16 paires×3 époques×2 variantes ≈ 1,1M paires de ~30 tokens ≈ 33M tokens, ≈ 12 min ; évaluation 1 500 questions×60 options×(3 ordres + 3 vocabulaires)×2 variantes ≈ 1,6M paires ≈ 15 min ; CamemBERT ≈ 4 min ; total ≈ 35 min (limite 45) : si dépassé (limites), ramener le test à 1 000 questions.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Message ou e-mail client anonymisé"
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif (niveau 1), libellé"
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif (niveau 2), libellé exact"
+    },
+    {
+     "colonne": "reason_description",
+     "type": "string",
+     "description": "Description courte du sous-motif, avec le jargon interne"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception, pour le découpage temporel"
+    }
+   ],
+   "volume_conseille": "Au moins 50 textes par sous-motif pour les classes courantes (≥ 15 000 textes), un test d'au moins 2 000 textes d'une période postérieure à l'entraînement, et 10 sous-motifs réservés non vus.",
+   "metriques_metier": "Taux de routage correct, part des cas envoyés en revue humaine à seuil de confiance fixé, taux de bascule sous permutation, cohérence motif/sous-motif.",
+   "garde_fous": "Résultat indicatif, aucun usage en décision automatisée ; recalage de la température sur les libellés internes ; vérification de la licence des poids avant tout usage.",
+   "prescriptions": [
+    "≥ 50 textes par sous-motif sur au moins 150 sous-motifs, et au moins 10 sous-motifs avec moins de 20 textes pour tester les classes rares",
+    "Étiquettes par annotateurs formés avec double annotation sur 10 % et accord (kappa) rapporté",
+    "Découpage temporel : test sur les mois postérieurs à l'entraînement",
+    "Libellés fournis dans deux formulations (officielle et jargon interne) plus un code opaque",
+    "Réserver ~10 sous-motifs non vus à l'entraînement pour mesurer l'évolution de la taxonomie",
+    "Anonymisation des noms, IBAN et numéros avant extraction ; exclure les e-mails contenant des données de santé",
+    "Textes en UTF-8, longueur tronquée à 256 tokens"
+   ],
+   "preparation": "Extraire les demandes qualifiées d'un système de gestion des demandes, joindre le motif et le sous-motif validés par un conseiller, filtrer les étiquettes douteuses (reclassées, abandonnées), échantillonner par sous-motif et réserver une période postérieure pour le test."
+  },
+  "duree_estimee_minutes": 90,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "jhu-clsp/mmBERT-base": {
+    "id": "jhu-clsp/mmBERT-base",
+    "sha": "c5955035435e2bf121cde7f3c8863ef52ff35d82",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": null,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": []
+   },
+   "jhu-clsp/mmBERT-small": {
+    "id": "jhu-clsp/mmBERT-small",
+    "sha": "abc32620dd4f6ab06f5fbe905dc25f310618e09f",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": null,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "splits": [
+    "train",
+    "test",
+    "validation"
+   ],
+   "licence": "apache-2.0",
+   "colonnes": {
+    "id": "Value",
+    "label": "Value",
+    "label_text": "Value",
+    "text": "Value",
+    "lang": "Value"
+   },
+   "exemple": {
+    "id": "1",
+    "label": "alarm_set",
+    "label_text": "alarm_set",
+    "text": "réveille-moi à neuf heures du matin le vendredi",
+    "lang": "fr"
+   },
+   "lignes": {
+    "train": 11514,
+    "test": 2974,
+    "validation": 2033
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

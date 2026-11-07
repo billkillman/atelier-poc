@@ -1,0 +1,302 @@
+{
+ "version": 1,
+ "jour": "2026-11-07",
+ "sujet_id": "pii-caviardage-regex-presidio-hybride",
+ "depot": "20261107_pii_redaction_regex_ner_french",
+ "fiche": {
+  "sujet_id": "pii-caviardage-regex-presidio-hybride",
+  "titre": "Caviardage PII avant LLM : spaCy NER + regex atteint 100 % sur un test synthétique anglais, à 13 ms",
+  "en_une_phrase": "Sur 100 CV synthétiques américains, un caviardeur « spaCy NER + regex » attrape tout, en 13 ms, contre 89 % pour le regex seul. Rien n'est prouvé sur le français ni sur des textes réels.",
+  "probleme": "Les textes envoyés à un LLM contiennent des données personnelles, copiées chez le fournisseur, dans les logs et dans les traces. Le caviardage préalable est évident, mais on manque de chiffres sur son coût en latence et sur ce qu'il laisse passer.",
+  "comment_ca_marche": "Le caviardeur s'insère entre la construction du prompt et le client LLM. Quatre variantes partagent le même cœur :\n\n1. **Règle de l'entité connue** : le système connaît la personne traitée (ex. le client du ticket) et remplace son nom complet et ses parties, partout dans le texte.\n2. **Regex** (expressions régulières, motifs de texte) : emails, téléphones, adresses, codes postaux, dates de naissance.\n3. **NER** (reconnaissance d'entités nommées, un modèle qui repère les noms de personnes) : trouve les noms inconnus à l'avance. Variante rapide : seul le composant NER de spaCy (bibliothèque NLP) est chargé, sans Presidio.\n4. **Fusion** : les zones détectées sont fusionnées, puis remplacées par des jetons numérotés (`[PERSON_1]`, `[PERSON_2]`), pour que le LLM distingue les personnes.",
+  "demarche_experimentale": "100 CV synthétiques américains (523 caractères en moyenne, 900 PII, 600 termes métier à conserver), CPU seul, un poste, un processus. 300 appels chronométrés par variante. Fuite : valeur retrouvée en mot entier après caviardage.",
+  "resultats": [
+   {
+    "metrique": "PII détectées (plus haut = mieux)",
+    "valeur": "Regex 88,9 % ; Presidio, hybride, hybride rapide 100 %",
+    "comparaison": "Le regex manque les 100 noms de références",
+    "conditions": "100 CV synthétiques anglais, 900 PII, termes métier conservés à 100 % partout",
+    "citation": "Regex ran at a 0.20 ms median but caught only 88.9% of PII, because it cannot find names that are not known in advance, such as the references listed in a resume."
+   },
+   {
+    "metrique": "Latence médiane par document (plus bas = mieux)",
+    "valeur": "Regex 0,20 ms ; hybride rapide 13,48 ms ; hybride 30,23 ms ; Presidio 37,59 ms",
+    "comparaison": "Hybride rapide 2,8 fois plus rapide que Presidio",
+    "conditions": "300 appels, CPU, un poste ; chargement du modèle : 1,7 s (hybride rapide), 5,0 s (Presidio)",
+    "citation": "Presidio, hybrid and fast hybrid each caught 100% of PII and kept 100% of business terms, at median latencies of 37.59 ms, 30.23 ms and 13.48 ms."
+   },
+   {
+    "metrique": "Part du temps d'un appel LLM",
+    "valeur": "0,15 % (hybride rapide) à 0,41 % (Presidio)",
+    "comparaison": "Médiane LLM de 9 120 ms",
+    "conditions": "Médiane issue de traces d'une charge LLM représentative, hors benchmark",
+    "citation": "Measured against a 9,120 ms median LLM call, even the slowest option adds only 0.41% to the request."
+   }
+  ],
+  "limites": [
+   "Corpus synthétique, court, uniforme, en anglais, avec formats américains : les auteurs préviennent que le 100 % ne se généralise pas et attendent des oublis sur du texte réel.",
+   "Réserve d'analyse : 10 prénoms et 10 noms seulement ; noms rares, initiales ou formats français (IBAN, numéro de sécurité sociale) non testés. Étude d'une équipe de ManpowerGroup, sans relecture par les pairs.",
+   "Chronométrage sur un seul poste, ordre fixe : les temps de chargement des variantes tardives sont probablement flattés (auteurs). Listes d'exclusion à régler à la main pour éviter le sur-caviardage."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "88,9 %",
+    "libelle": "PII détectées par le regex seul (les noms de références échappent), contre 100 % avec NER"
+   },
+   {
+    "valeur": "13,48 ms",
+    "libelle": "Latence médiane du caviardeur hybride rapide, par document de 523 caractères"
+   },
+   {
+    "valeur": "0,15 %",
+    "libelle": "Part ajoutée à un appel LLM médian de 9 120 ms"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Le regex seul détecte 88,9 % des PII, car il rate les noms inconnus à l'avance comme les références.",
+    "citation": "Regex ran at a 0.20 ms median but caught only 88.9% of PII, because it cannot find names that are not known in advance, such as the references listed in a resume."
+   },
+   {
+    "affirmation": "Presidio, l'hybride et l'hybride rapide détectent 100 % des PII et conservent 100 % des termes métier, avec des médianes de 37,59, 30,23 et 13,48 ms.",
+    "citation": "Presidio, hybrid and fast hybrid each caught 100% of PII and kept 100% of business terms, at median latencies of 37.59 ms, 30.23 ms and 13.48 ms."
+   },
+   {
+    "affirmation": "Même Presidio n'ajoute que 0,41 % à un appel LLM de 9 120 ms médians.",
+    "citation": "Measured against a 9,120 ms median LLM call, even the slowest option adds only 0.41% to the request."
+   },
+   {
+    "affirmation": "Les auteurs préviennent que le 100 % vaut pour ce corpus synthétique et non en général.",
+    "citation": "the 100% recall of the model-based designs should be read as a result on this corpus and not as a general claim"
+   },
+   {
+    "affirmation": "Le test porte sur 100 CV synthétiques américains, avec des motifs regex au format US.",
+    "citation": "Because our example data is US-based, the patterns target US formats"
+   },
+   {
+    "affirmation": "Les temps de chargement sont probablement flattés pour les variantes testées après Presidio.",
+    "citation": "Presidio was loaded first, so the later designs benefited from modules already imported and model files already cached, which probably flatters their load times."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "PII",
+    "definition": "Personally identifiable information : donnée personnelle permettant d'identifier quelqu'un (nom, email, téléphone, adresse, date de naissance)."
+   },
+   {
+    "terme": "Regex",
+    "definition": "Expression régulière : motif de texte décrivant un format (ex. un email). Rapide et exact sur les formats fixes, aveugle aux noms."
+   },
+   {
+    "terme": "NER",
+    "definition": "Reconnaissance d'entités nommées : modèle qui repère dans un texte les noms de personnes, lieux ou organisations."
+   },
+   {
+    "terme": "Presidio",
+    "definition": "Bibliothèque open source de Microsoft qui détecte et anonymise les données personnelles, avec reconnaisseurs à motifs et modèles NER."
+   },
+   {
+    "terme": "spaCy",
+    "definition": "Bibliothèque Python de traitement du langage qui fournit des modèles de NER prêts à l'emploi."
+   },
+   {
+    "terme": "P50 / P95",
+    "definition": "Latence médiane, et latence sous laquelle tombent 95 % des appels. Plus bas = mieux."
+   },
+   {
+    "terme": "Entité connue",
+    "definition": "Personne que le système sait déjà traiter (ex. client du ticket) : son nom est retiré par recherche directe."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Redacting Personal Data: A Speed and Accuracy Comparison of Regex, Presidio and Hybrid Designs",
+    "url": "https://arxiv.org/abs/2611.07633",
+    "type": "primaire",
+    "date": "2026-11-05"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-05",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un caviardage hybride regex + NER français détecte-t-il nettement plus de données personnelles que le regex seul sur du texte français, et à quelle latence ?",
+  "hypothese": "Sur du texte français annoté, le regex seul a un rappel de spans inférieur à 60 % (noms et adresses non détectés) alors que regex + NER CamemBERT dépasse 80 % de rappel, avec une latence médiane inférieure à 150 ms par document sur 2 cœurs CPU, et une précision supérieure à 70 %.",
+  "reference": {
+   "nom": "Regex seul",
+   "description": "Expressions régulières pour e-mails, téléphones français, IBAN, URL, dates jj/mm/aaaa, sans modèle.",
+   "implementation": "Module re de Python, motifs adaptés au français (IBAN FR, +33/0X XX XX XX XX), fusion des spans, remplacement par jetons typés.",
+   "modeles_hf": [],
+   "modeles_hf_sandbox": [],
+   "entrainement": "aucun",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Hybride regex + NER CamemBERT",
+   "description": "Les regex captent les formats rigides ; un modèle de reconnaissance d'entités nommées français trouve personnes et lieux ; fusion des spans.",
+   "implementation": "Pipeline transformers token-classification (Jean-Baptiste/camembert-ner, agrégation simple) pour PER et LOC, combiné aux mêmes regex ; correspondance des types vers private_person, private_address, etc. ; mesure de la latence par document (médiane, p95) sur 2 cœurs.",
+   "modeles_hf": [
+    "Jean-Baptiste/camembert-ner"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "aucun",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "TheoDB/french-pii-eval",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "",
+   "colonnes_utiles": "text, spans (début, fin, type), info",
+   "representativite": "Seul jeu français chargeable avec spans typés (8 classes dont IBAN) et split de test séparé ; permet rappel, précision et latence par type.",
+   "ecarts_donnees_reelles": "Textes synthétiques dérivés d'ai4privacy, noms et IBAN souvent étrangers, pas de conversations réelles, pas de termes métier à préserver, licence à valider ; le format exact des spans est contrôlé au chargement.",
+   "jeux_explores": [
+    {
+     "nom": "TheoDB/french-pii-eval",
+     "url": "https://huggingface.co/datasets/TheoDB/french-pii-eval",
+     "acces": "hub_libre",
+     "adequation": "Français, 8 classes avec IBAN, test séparé.",
+     "decision": "retenu",
+     "raison": "Meilleur compromis français/spans/split ; licence à valider."
+    },
+    {
+     "nom": "gretelai/synthetic_pii_finance_multilingual",
+     "url": "https://huggingface.co/datasets/gretelai/synthetic_pii_finance_multilingual",
+     "acces": "hub_libre",
+     "adequation": "Documents financiers longs, apache-2.0.",
+     "decision": "ecarte",
+     "raison": "Français non vu sur les premières lignes, taxonomie très large demandant un mapping."
+    },
+    {
+     "nom": "TypicaAI/pii-masking-60k_fr",
+     "url": "https://huggingface.co/datasets/TypicaAI/pii-masking-60k_fr",
+     "acces": "hub_libre",
+     "adequation": "62k textes français avec spans.",
+     "decision": "ecarte",
+     "raison": "Un seul split, usage éducatif, recoupe TheoDB."
+    },
+    {
+     "nom": "ai4privacy/pii-masking-300k",
+     "url": "https://huggingface.co/datasets/ai4privacy/pii-masking-300k",
+     "acces": "hub_libre",
+     "adequation": "Multilingue avec colonne language.",
+     "decision": "ecarte",
+     "raison": "Licence « other » et source déjà reprise par TheoDB."
+    },
+    {
+     "nom": "nvidia/Nemotron-PII",
+     "url": "https://huggingface.co/datasets/nvidia/Nemotron-PII",
+     "acces": "hub_libre",
+     "adequation": "Anglais, cc-by-4.0.",
+     "decision": "ecarte",
+     "raison": "Pas de français."
+    }
+   ]
+  },
+  "metriques": [
+   "span_recall",
+   "span_precision",
+   "span_f1",
+   "value_leak_rate",
+   "median_latency_ms",
+   "p95_latency_ms",
+   "recall_by_type"
+  ],
+  "metrique_principale": "span_recall",
+  "sens": "max",
+  "protocole": "Test complet (2 926 textes à l'échelle complète ; 150 en réduit). Un span est détecté si l'intervalle prédit recouvre le span annoté d'au moins 50 % ; fuite par valeur : la valeur annotée reste présente après caviardage. Rappel, précision, F1 par type avec intervalles de confiance par bootstrap. Latence : un document à la fois, après échauffement, sur 2 cœurs. Les deux approches sont évaluées sur les mêmes textes.",
+  "niveau_sandbox": "complet",
+  "adaptation_sandbox": "",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte brut (e-mail, ticket, transcription) avant caviardage"
+    },
+    {
+     "colonne": "spans",
+     "type": "json",
+     "description": "Liste de spans annotés (start, end, type)"
+    },
+    {
+     "colonne": "source",
+     "type": "string",
+     "description": "Canal : e-mail, chat, transcription"
+    }
+   ],
+   "volume_conseille": "Au moins 500 documents par canal, avec au moins 50 occurrences de chaque type (IBAN, nom, adresse, téléphone).",
+   "metriques_metier": "Rappel par type sensible, taux de fuite par valeur, latence ajoutée par appel, taux de sur-caviardage de termes métier.",
+   "garde_fous": "Les données sont annotées et traitées uniquement dans l'environnement cible ; le rappel doit être validé par type avant tout usage ; aucune conclusion de conformité.",
+   "prescriptions": [
+    "≥ 500 documents par canal, représentatifs des longueurs réelles",
+    "Annotation des spans par deux relecteurs sur 20 % des documents",
+    "Inclure des cas sans donnée personnelle et une liste de termes métier à préserver",
+    "Couvrir noms rares, noms composés et initiales",
+    "Découpage par client pour éviter la fuite entre échantillons",
+    "Pas de données de santé ni de mineurs"
+   ],
+   "preparation": "Tirer un échantillon stratifié par canal de textes déjà utilisés dans les traitements, faire annoter les spans par des relecteurs habilités dans l'environnement cible, puis ajouter une liste de termes métier."
+  },
+  "duree_estimee_minutes": 15,
+  "analyse_materiel": "Camembert-ner (110M) en inférence sur ~3 000 textes courts : ~100 ms par texte sur 2 cœurs, soit environ 5 min, donc le CPU suffit.",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "Jean-Baptiste/camembert-ner": {
+    "id": "Jean-Baptiste/camembert-ner",
+    "sha": "ef35fe7767c1dad71f5c853838cdd80d0b3441ed",
+    "tache": "token-classification",
+    "bibliotheque": "transformers",
+    "parametres": 110035719,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "TheoDB/french-pii-eval",
+   "config": "default",
+   "splits": [
+    "train",
+    "validation",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "text": "Value",
+    "spans": "Json",
+    "info": null
+   },
+   "exemple": {
+    "text": "Votre session avec nous depuis l'adresse IP bbd8:b6a8:7ea5:45ea:7fc9:4eb8:28e5:6be5 a été interrompue, souhaitez-vous continuer votre consultation en temps réel"
+   },
+   "lignes": {
+    "train": 57248,
+    "validation": 500,
+    "test": 2926
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
