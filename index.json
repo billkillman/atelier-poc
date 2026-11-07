@@ -2,6 +2,84 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-07",
+   "sujet_id": "pii-caviardage-regex-presidio-hybride",
+   "depot": "20261107_pii_redaction_regex_ner_french",
+   "titre": "Un caviardage hybride regex + NER français détecte-t-il nettement plus de données personnelles que le regex seul sur du texte français, et à quelle latence ?",
+   "statut": "valide",
+   "niveau_sandbox": "complet",
+   "echelle": "complete",
+   "materiel": "CPU, 4 cœurs",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "cpu",
+    "raison_materiel": "Camembert-ner (110M) en inférence sur ~3 000 textes courts : ~100 ms par texte sur 2 cœurs, soit environ 5 min, donc le CPU suffit.",
+    "raison": ""
+   },
+   "iterations": 3,
+   "metrique_principale": "span_recall",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "Regex seul",
+     "role": "reference",
+     "valeur": 0.23778882714243932,
+     "ic95": [
+      0.22805712585540017,
+      0.24812140857521733
+     ]
+    },
+    {
+     "nom": "Hybride regex + NER CamemBERT",
+     "role": "nouvelle",
+     "valeur": 0.6572097104416496,
+     "ic95": [
+      0.6455807158509861,
+      0.6690462592804112
+     ]
+    }
+   ],
+   "n_exemples": 2926,
+   "jeu": "TheoDB/french-pii-eval",
+   "synthese": "span_recall : Hybride regex + NER CamemBERT 0,657 contre 0,238 pour Regex seul (2926 exemples, CPU, 4 cœurs).",
+   "conclusion": "À l'échelle complète (2 926 textes français annotés, CPU), l'hybride regex + NER CamemBERT atteint un rappel de 0,657 (IC 95 % 0,646–0,669) contre 0,238 (0,228–0,248) pour les regex seules : l'écart est net, les intervalles sont disjoints, et les deux approches sont évaluées sur les mêmes textes. La précision est comparable (0,738 contre 0,758), la latence médiane de 78 ms (p95 137 ms) reste sous 150 ms pour des textes courts. L'hypothèse n'est toutefois qu'en partie confirmée : le rappel de 80 % n'est pas atteint, 34 % des valeurs fuitent encore, et le pire rappel par type est de 0,18 (secrets). Le gain vient presque entièrement des noms et adresses ; comptes, dates et téléphones ne progressent pas. Les chiffres absolus sont à lire avec prudence, car les annotations du jeu synthétique sont bruitées. Ils ne sont pas comparables à ceux de la source (100 % contre 88,9 % sur des CV anglais), seule la direction de l'effet est la même.",
+   "confiance": "elevee",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Le NER français améliore nettement le caviardage par rapport aux regex seules, surtout pour les noms et adresses. Mais il laisse encore fuir une part importante de données, notamment des secrets, comptes et dates : il ne suffit pas seul.",
+   "libelle_metrique": "Rappel des spans",
+   "reserves": [
+    "L'hybride fait bien mieux que les regex seules, mais il n'atteint pas 80 % de rappel : environ un tiers des valeurs personnelles restent lisibles après caviardage. Il ne suffit pas tel quel pour protéger des données.",
+    "Le rappel global dépend de la proportion de noms et d'adresses dans le jeu. Avec peu de noms, l'avantage du NER serait bien plus faible. Les mots de passe, numéros de compte et dates restent largement non caviardés par les deux approches.",
+    "La précision de 0,74 est probablement sous-estimée, car des noms réels non annotés sont comptés comme erreurs. Le rappel absolu l'est aussi pour les types dont l'annotation est douteuse. Seul l'écart entre approches est fiable."
+   ],
+   "duree_minutes": 26.3,
+   "consommation": {
+    "claude:poc_code:pii-caviardage-regex-presidio-hybride": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 454.6,
+     "cout_equivalent_usd": 1.2369,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:pii-caviardage-regex-presidio-hybride": {
+     "appels": 3,
+     "echecs": 0,
+     "secondes": 686.7,
+     "cout_equivalent_usd": 3.0971,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:pii-caviardage-regex-presidio-hybride": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 85.8,
+     "cout_equivalent_usd": 0.4786,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261107_pii_redaction_regex_ner_french",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-06",
    "sujet_id": "modeles-decision-typees-sensibilite-presentation",
    "depot": "20261106_typed_decision_presentation_sensitivity_camembert",
