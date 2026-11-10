@@ -1,0 +1,421 @@
+{
+ "version": 1,
+ "jour": "2026-11-10",
+ "sujet_id": "fraude-surcouche-regles-llm-modele-gele",
+ "depot": "20261110_llm_rule_overlay_frozen_fraud_detector",
+ "fiche": {
+  "sujet_id": "fraude-surcouche-regles-llm-modele-gele",
+  "titre": "Fraude : des règles écrites par LLM corrigent un modèle gelé, gain modeste (+2,3 points de rappel), hors ligne",
+  "en_une_phrase": "Des règles proposées par trois LLM, ajoutées au score d'un détecteur de fraude gelé, gagnent +2,26 points de rappel sur données eBay. Résultats hors ligne, sans test réel, sans code annoncé.",
+  "probleme": "Un détecteur de fraude à arbres boostés a des angles morts : des fraudes qu'il note trop bas. Le réentraîner impose un redéploiement, et ses données d'entraînement sont biaisées, car des filtres en amont n'y laissent que le trafic déjà approuvé.",
+  "comment_ca_marche": "1. On calcule les valeurs **SHAP** (influence de chaque variable sur le score) du modèle gelé, et on repère les variables qu'il sous-pondère.\n2. Trois LLM à poids ouverts, 10 tirages chacun, reçoivent un résumé des arbres et de ces écarts. Ils proposent des règles : conjonctions de seuils dont la première condition porte sur une variable sous-pondérée.\n3. Un filtre garde les règles dont le taux de fraude dépasse la moyenne (lift > 1) et qui se déclenchent au moins 3 fois.\n4. Chaque règle ajoute le logarithme de son lift au score, en échelle logit (log-cotes), par tranche de seuil d'alerte.\n5. On moyenne les tirages, puis on remappe le score sur l'échelle de production : le seuil d'alerte ne change pas. Règles coupées, on retrouve le score d'origine.",
+  "demarche_experimentale": "Deux jeux : fraude e-commerce eBay non publique (500 variables, évaluation sur cohorte non biaisée, janvier-mars 2026) et BAF, jeu public d'ouverture de comptes, avec 7 variantes de décalage. Mesure : rappel à précision égale (ΔR@P) et précision à rappel égal (ΔP@R), contre le modèle gelé.",
+  "resultats": [
+   {
+    "metrique": "ΔR@P / ΔP@R moyens, ensemble des 3 LLM",
+    "valeur": "+2,26 % / +1,60 %",
+    "comparaison": "contre le modèle gelé ; IC 95 % [+1,84 ; +2,90] sur ΔR@P",
+    "conditions": "D-Industrial (eBay), hors ligne, coupures à 30-57 % de précision",
+    "citation": "The overlay instead gains avgΔR@P +2.26% (95% CI [+1.84%,+2.90%], paired block bootstrap over 66 calendar-day blocks, 1000 replicates) and avgΔP@R +1.60%"
+   },
+   {
+    "metrique": "ΔR@P du réentraînement le mieux réglé (CT-Tuned)",
+    "valeur": "−7,69 %",
+    "comparaison": "contre le modèle gelé ; CT-100 et réentraînement complet n'atteignent jamais la précision de production",
+    "conditions": "D-Industrial, données d'entraînement biaisées par sélection",
+    "citation": "Even CT-Tuned (one boosting round, lr=0.03) regresses, at avgΔR@P −7.69% and avgΔP@R −2.85%"
+   },
+   {
+    "metrique": "ΔP@R sur BAF, ensemble",
+    "valeur": "+0,02 à +0,30 %",
+    "comparaison": "ΔR@P entre −0,13 % et +0,27 % ; les auteurs revendiquent seulement l'absence de dégradation",
+    "conditions": "BAF, 7 découpages, gains minimes",
+    "citation": "avgΔP@R is positive on all seven splits ([+0.02%,+0.30%]) and avgΔR@P stays near neutral ([−0.13%,+0.27%]"
+   }
+  ],
+  "limites": [
+   "Aucun test réel (A/B) : tout est évalué hors ligne sur étiquettes historiques (les auteurs).",
+   "Pas de comparaison à un extracteur de règles classique ni à un réentraînement pondéré contre le biais ; seulement 2 réglages de réentraînement (les auteurs).",
+   "Un seul LLM est instable : le meilleur sur eBay est négatif sur BAF. L'ensemble coûte ~3× plus d'inférence. Étude d'eBay, jeu principal non public."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "+2,26 %",
+    "libelle": "rappel gagné à précision égale (points absolus), fraude e-commerce eBay, hors ligne"
+   },
+   {
+    "valeur": "−7,69 %",
+    "libelle": "rappel à précision égale du meilleur réentraînement testé, contre le modèle gelé"
+   },
+   {
+    "valeur": "≈3×",
+    "libelle": "inférence LLM de l'ensemble de trois modèles, contre un seul"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Le modèle de base n'est jamais modifié et la surcouche tourne au seuil d'alerte de production ; règles coupées, on retrouve le score d'origine.",
+    "citation": "Serving needs only FA, the rules with their lifts, and τb; nothing is refitted on new traffic, and with the rules switched off s̃b=s."
+   },
+   {
+    "affirmation": "Les LLM sont trois modèles à poids ouverts exécutés en local ; aucune API hébergée.",
+    "citation": "Generation ran locally on one Apple M4 Max workstation (128 GB unified memory); no hosted API was used, so transaction data never leaves the environment."
+   },
+   {
+    "affirmation": "Le bénéfice d'un seul LLM est très variable et s'inverse d'un jeu à l'autre.",
+    "citation": "LLM-MoE is best industrially (+3.88% avgΔR@P) yet negative on six of seven BAF splits, while LLM-CoT is slightly negative on D-Industrial (−0.28%) yet the best single source on all seven."
+   },
+   {
+    "affirmation": "Sur BAF, les auteurs ne revendiquent qu'un plancher de robustesse, pas une amélioration.",
+    "citation": "The claim is a robustness floor, not an improvement."
+   },
+   {
+    "affirmation": "Aucun test en conditions réelles ; l'ensemble coûte environ 3 fois plus d'inférence LLM.",
+    "citation": "All results are offline evaluations against historical labels, with every parameter fixed on the adaptation window; no live A/B test has been conducted."
+   },
+   {
+    "affirmation": "Les auteurs ne comparent pas à un extracteur de règles classique.",
+    "citation": "We do not compare empirically against rule-mining baselines and flag this as the primary gap."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "SHAP",
+    "definition": "Méthode d'explicabilité qui attribue à chaque variable sa contribution au score d'une prédiction ; ici moyennée sur les fraudes pour repérer les variables sous-utilisées."
+   },
+   {
+    "terme": "Lift",
+    "definition": "Rapport entre le taux de fraude quand une règle se déclenche et le taux de fraude moyen ; 1 = aucun signal, supérieur à 1 = signal de fraude."
+   },
+   {
+    "terme": "Logit",
+    "definition": "Transformation d'une probabilité en log-cotes. Y ajouter des termes revient à multiplier les cotes ; c'est ce qui rend la surcouche additive et réversible."
+   },
+   {
+    "terme": "Biais de sélection",
+    "definition": "Les données d'entraînement ne contiennent que des transactions déjà approuvées par des filtres, donc peu des fraudes que ces filtres bloquent d'habitude."
+   },
+   {
+    "terme": "ΔR@P",
+    "definition": "Rappel gagné à précision égale par rapport au modèle de production ; plus haut = mieux. ΔP@R est la version symétrique."
+   },
+   {
+    "terme": "Rappel / précision",
+    "definition": "Rappel : fraudes détectées sur fraudes totales. Précision : vraies fraudes parmi les alertes. Plus haut = mieux."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Patching the Blind Spots: Reversible LLM Rule Overlay for Frozen Fraud Detectors",
+    "url": "https://arxiv.org/abs/2611.08714",
+    "type": "primaire",
+    "date": "2026-11-05"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-05",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Une surcouche de règles écrites par LLM améliore-t-elle un détecteur de fraude gelé mieux qu'une extraction de règles classique ou un réentraînement pondéré ?",
+  "hypothese": "Sur les mois ultérieurs à l'entraînement d'un XGBoost gelé, la surcouche de règles LLM filtrées par lift ne dégrade pas le rappel à précision égale (ΔR@P ≥ 0, IC95 % excluant −0,5 point) et ne bat pas de plus de 0,3 point une extraction de règles par arbre de décision sur la même fenêtre d'adaptation.",
+  "reference": {
+   "nom": "XGBoost gelé, règles par arbre et réentraînement pondéré",
+   "description": "Détecteur XGBoost entraîné sur les premiers mois puis gelé ; correctifs de référence : règles extraites par arbre peu profond sur la fenêtre d'adaptation, et poursuite d'entraînement pondérée.",
+   "implementation": "xgboost XGBClassifier (scale_pos_weight, 300 arbres, profondeur 6) entraîné sur les mois 0-2 ; baseline règles : DecisionTreeClassifier de profondeur 3 sur le mois 3, mêmes filtres (lift > 1, ≥ 3 déclenchements) et même ajout de log-lift au logit ; baseline réentraînement : 50 arbres supplémentaires pondérés sur les fraudes manquées (xgb_model=) ; mêmes seuils d'alerte pour toutes les méthodes.",
+   "modeles_hf": [],
+   "modeles_hf_sandbox": [],
+   "entrainement": "autre",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Surcouche de règles écrites par LLM ouverts",
+   "description": "Les valeurs SHAP du modèle gelé repèrent les variables sous-pondérées ; plusieurs LLM proposent chacun 10 jeux de règles (conjonctions de seuils) ; un filtre par lift garde les règles utiles ; chaque règle ajoute log(lift) au logit ; le score est remappé sur l'échelle d'origine.",
+   "implementation": "SHAP via xgboost pred_contribs=True ; prompt avec noms de variables, quantiles et écarts SHAP ; génération par transformers (température 0,7, 10 tirages par modèle, JSON strict, validation par parse et noms de colonnes valides) ; règle retenue si lift > 1 et ≥ 3 déclenchements sur la fenêtre d'adaptation ; log-lift ajouté par tranche de seuil ; moyenne des tirages ; modèle de base inchangé. En phase privée, génération via le LLMaaS.",
+   "modeles_hf": [
+    "Qwen/Qwen2.5-3B-Instruct",
+    "HuggingFaceTB/SmolLM3-3B",
+    "Qwen/Qwen3-1.7B"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen3-0.6B"
+   ],
+   "entrainement": "autre",
+   "service_phase2": "llmaas"
+  },
+  "jeu_public": {
+   "hub_id": "jAEhEEkIM/operationbench-baf-raw",
+   "config": "default",
+   "split_evaluation": "train",
+   "split_entrainement": "train",
+   "colonnes_utiles": "fraud_bool, month, et 30 variables nommées (income, velocity_6h, credit_risk_score, customer_age, device_distinct_emails_8w, etc.). Le découpage est fait dans le notebook sur la colonne month du split unique train : mois 0-2 pour le modèle gelé, mois 3 pour l'adaptation et le choix des règles, mois 4-7 pour l'évaluation.",
+   "representativite": "Jeu public d'ouverture de comptes très déséquilibré (~1 % de fraude), avec axe temporel et variables nommées : permet un test de non-dégradation et la comparaison aux références.",
+   "ecarts_donnees_reelles": "Synthétique et anonymisé, sans biais de sélection ni cohorte non biaisée ; gains attendus minimes ; licence cc-by-nc-sa-4.0 (évaluation seulement) ; le split unique peut concaténer Base et variantes (à contrôler au chargement, lecture en streaming des premières lignes) ; pas de données françaises.",
+   "jeux_explores": [
+    {
+     "nom": "jAEhEEkIM/operationbench-baf-raw",
+     "url": "https://huggingface.co/datasets/jAEhEEkIM/operationbench-baf-raw",
+     "acces": "hub_libre",
+     "adequation": "Copie de Bank Account Fraud : 31 variables, month, fraude ~1 %.",
+     "decision": "retenu",
+     "raison": "Seul jeu chargeable avec variables nommées et axe temporel."
+    },
+    {
+     "nom": "flwrlabs/fed-fraud-paysim-banks",
+     "url": "https://huggingface.co/datasets/flwrlabs/fed-fraud-paysim-banks",
+     "acces": "hub_libre",
+     "adequation": "6,4 M transactions synthétiques, cc-by-4.0.",
+     "decision": "ecarte",
+     "raison": "12 colonnes, fuites de soldes, fraude générée par règles simples."
+    },
+    {
+     "nom": "AMLGentex/sweden_100K_easy",
+     "url": "https://huggingface.co/datasets/AMLGentex/sweden_100K_easy",
+     "acces": "hub_libre",
+     "adequation": "Journal AML synthétique avec variantes de décalage.",
+     "decision": "ecarte",
+     "raison": "Signal dans le graphe, agrégations par compte nécessaires, hors cadre de la méthode."
+    },
+    {
+     "nom": "Kshitijbhatt1998/ieee-fraud-detection-pipeline-features",
+     "url": "https://huggingface.co/datasets/Kshitijbhatt1998/ieee-fraud-detection-pipeline-features",
+     "acces": "hub_libre",
+     "adequation": "590 540 transactions réelles, 16 variables construites.",
+     "decision": "ecarte",
+     "raison": "Schéma et colonne temporelle non vérifiés, dérivé tiers, usage commercial douteux."
+    },
+    {
+     "nom": "IEEE-CIS Fraud Detection / Amazon Fraud Dataset Benchmark",
+     "url": "https://github.com/amazon-science/fraud-dataset-benchmark",
+     "acces": "compte_requis",
+     "adequation": "Fraude e-commerce réelle, ~430 variables opaques.",
+     "decision": "ecarte",
+     "raison": "Compte Kaggle et règles de compétition requis."
+    },
+    {
+     "nom": "David-Egea/Creditcard-fraud-detection",
+     "url": "https://huggingface.co/datasets/David-Egea/Creditcard-fraud-detection",
+     "acces": "hub_libre",
+     "adequation": "284 807 transactions, variables ACP anonymes.",
+     "decision": "ecarte",
+     "raison": "Variables sans sens, règles illisibles, 2 jours seulement."
+    },
+    {
+     "nom": "FiFAR (Feedzai)",
+     "url": "https://github.com/feedzai/fifar-dataset",
+     "acces": "telechargement_libre",
+     "adequation": "Alertes revues par analystes synthétiques, basé sur BAF.",
+     "decision": "ecarte",
+     "raison": "Ne répond pas à la question centrale, dépend de BAF."
+    }
+   ]
+  },
+  "metriques": [
+   "delta_recall_at_precision",
+   "delta_precision_at_recall",
+   "average_precision",
+   "rules_kept_rate",
+   "invalid_rule_rate",
+   "score_rank_correlation_with_frozen"
+  ],
+  "metrique_principale": "delta_recall_at_precision",
+  "sens": "max",
+  "protocole": "Lecture du split train en streaming (premier million de lignes), contrôle du taux de fraude (~1 %) et des mois 0-7. XGBoost entraîné sur les mois 0-2 puis gelé ; mois 3 = fenêtre d'adaptation (SHAP, règles, baselines) ; mois 4-7 = évaluation. ΔR@P à trois précisions cibles (celles du modèle gelé à trois niveaux d'alerte), ΔP@R aux rappels correspondants ; IC95 % par bootstrap par blocs de lignes contigus (blocs de 5 000) ; comparaison appariée entre modèle gelé, règles par arbre, réentraînement pondéré, surcouche par LLM individuel et ensemble moyen. Contrôle de non-dégradation : règles coupées = score d'origine.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Échelle réduite : 80 000 lignes (mois 0-2 / 3 / 4-7), XGBoost 50 arbres, Qwen/Qwen3-0.6B pour tous les tirages (les modèles de 1,7 à 3 Md dépassent le budget CPU), 3 tirages. Calcul GPU complet : 3 modèles × 10 tirages × ~700 tokens de sortie = 21 k tokens, ≈ 1 min à 700 tok/s en lots remplis, plus prompts ≈ 30 k tokens et chargements ≈ 6 min ; XGBoost et évaluation sur 1 M lignes ≈ 8 min ; total ≈ 20 min, sous le budget de 45 min.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "is_fraud",
+     "type": "int",
+     "description": "Étiquette de fraude confirmée (0/1)"
+    },
+    {
+     "colonne": "event_time",
+     "type": "datetime",
+     "description": "Date de l'événement pour le découpage temporel"
+    },
+    {
+     "colonne": "features",
+     "type": "colonnes numériques et catégorielles nommées",
+     "description": "Variables du détecteur en production, avec noms explicites"
+    },
+    {
+     "colonne": "frozen_score",
+     "type": "float",
+     "description": "Score du détecteur en production au moment de la décision"
+    },
+    {
+     "colonne": "was_filtered_upstream",
+     "type": "bool",
+     "description": "Événement bloqué par un filtre amont (mesure du biais de sélection)"
+    }
+   ],
+   "volume_conseille": "≥ 1 M d'événements sur ≥ 6 mois, ≥ 2 000 fraudes confirmées sur la fenêtre d'évaluation.",
+   "metriques_metier": "Rappel à précision de production, précision à rappel donné, volume d'alertes supplémentaires, montant fraudé évité, nombre de règles et lisibilité.",
+   "garde_fous": "Le LLM ne décide rien en ligne ; règles revues par un expert métier avant usage ; coupure instantanée de la surcouche ; suivi de l'équité sur les groupes protégés ; données traitées uniquement par un service LLM interne.",
+   "prescriptions": [
+    "Fenêtres séparées chronologiquement (modèle gelé, adaptation, évaluation), jamais mélangées",
+    "Étiquettes de fraude matures (délai de confirmation écoulé) sur toutes les fenêtres",
+    "Au moins 2 000 fraudes sur la fenêtre d'évaluation et 500 sur celle d'adaptation",
+    "Variables nommées explicitement et décrites ; exclure celles postérieures à la décision",
+    "Conserver ou construire une cohorte non filtrée en amont pour évaluer le biais de sélection",
+    "Même seuil d'alerte de production pour toutes les méthodes",
+    "Anonymisation, exclusion des données personnelles directes ; contrôle d'équité sur les variables sensibles"
+   ],
+   "preparation": "Extraire les événements (transactions ou ouvertures de compte) avec les variables du détecteur, le score de production et la décision, joindre les étiquettes de fraude confirmées, filtrer doublons et événements de test, découper par fenêtres temporelles, échantillonner si besoin les non-fraudes en conservant leur poids."
+  },
+  "duree_estimee_minutes": 100,
+  "analyse_materiel": "Les LLM de 1,7 à 3 Md de paramètres génèrent par échantillonnage (10 tirages chacun) : impraticable sur 2 cœurs en moins de 20 minutes, alors que XGBoost seul y tiendrait ; le GPU sert à la seule génération.",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "Qwen/Qwen2.5-3B-Instruct": {
+    "id": "Qwen/Qwen2.5-3B-Instruct",
+    "sha": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 3085938688,
+    "licence": "other",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   },
+   "HuggingFaceTB/SmolLM3-3B": {
+    "id": "HuggingFaceTB/SmolLM3-3B",
+    "sha": "a07cc9a04f16550a088caea529712d1d335b0ac1",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 3075098624,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": [
+     "en",
+     "fr",
+     "es",
+     "it",
+     "pt",
+     "zh",
+     "ar",
+     "ru"
+    ]
+   },
+   "Qwen/Qwen3-1.7B": {
+    "id": "Qwen/Qwen3-1.7B",
+    "sha": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 2031739904,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "Qwen/Qwen3-0.6B": {
+    "id": "Qwen/Qwen3-0.6B",
+    "sha": "c1899de289a04d12100db370d81485cdf75e47ca",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 751632384,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "jAEhEEkIM/operationbench-baf-raw",
+   "config": "default",
+   "splits": [
+    "train"
+   ],
+   "licence": "cc-by-nc-sa-4.0",
+   "colonnes": {
+    "fraud_bool": "Value",
+    "income": "Value",
+    "name_email_similarity": "Value",
+    "prev_address_months_count": "Value",
+    "current_address_months_count": "Value",
+    "customer_age": "Value",
+    "days_since_request": "Value",
+    "intended_balcon_amount": "Value",
+    "payment_type": "Value",
+    "zip_count_4w": "Value",
+    "velocity_6h": "Value",
+    "velocity_24h": "Value",
+    "velocity_4w": "Value",
+    "bank_branch_count_8w": "Value",
+    "date_of_birth_distinct_emails_4w": "Value",
+    "employment_status": "Value",
+    "credit_risk_score": "Value",
+    "email_is_free": "Value",
+    "housing_status": "Value",
+    "phone_home_valid": "Value",
+    "phone_mobile_valid": "Value",
+    "bank_months_count": "Value",
+    "has_other_cards": "Value",
+    "proposed_credit_limit": "Value",
+    "foreign_request": "Value",
+    "source": "Value",
+    "session_length_in_minutes": "Value",
+    "device_os": "Value",
+    "keep_alive_session": "Value",
+    "device_distinct_emails_8w": "Value",
+    "device_fraud_count": "Value",
+    "month": "Value"
+   },
+   "exemple": {
+    "fraud_bool": 0,
+    "income": 0.3,
+    "name_email_similarity": 0.986506310633034,
+    "prev_address_months_count": -1,
+    "current_address_months_count": 25,
+    "customer_age": 40,
+    "days_since_request": 0.0067353870811739,
+    "intended_balcon_amount": 102.45371092469456,
+    "payment_type": "AA",
+    "zip_count_4w": 1059,
+    "velocity_6h": 13096.035018400871,
+    "velocity_24h": 7850.955007125409,
+    "velocity_4w": 6742.080561007602,
+    "bank_branch_count_8w": 5,
+    "date_of_birth_distinct_emails_4w": 5,
+    "employment_status": "CB",
+    "credit_risk_score": 163,
+    "email_is_free": 1,
+    "housing_status": "BC",
+    "phone_home_valid": 0,
+    "phone_mobile_valid": 1,
+    "bank_months_count": 9,
+    "has_other_cards": 0,
+    "proposed_credit_limit": 1500.0,
+    "foreign_request": 0,
+    "source": "INTERNET",
+    "session_length_in_minutes": 16.224843433978073,
+    "device_os": "linux",
+    "keep_alive_session": 1,
+    "device_distinct_emails_8w": 1,
+    "device_fraud_count": 0,
+    "month": 0
+   },
+   "lignes": {}
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

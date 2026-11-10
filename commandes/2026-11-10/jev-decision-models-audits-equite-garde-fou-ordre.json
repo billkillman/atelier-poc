@@ -1,0 +1,385 @@
+{
+ "version": 1,
+ "jour": "2026-11-10",
+ "sujet_id": "jev-decision-models-audits-equite-garde-fou-ordre",
+ "depot": "20261110_typed_decision_option_shuffle_camembert",
+ "fiche": {
+  "sujet_id": "jev-decision-models-audits-equite-garde-fou-ordre",
+  "titre": "Modèles de décision typés : biais de style faibles en moyenne, mais choix instables selon l'ordre et les nudges",
+  "en_une_phrase": "Quatre préprints sur Jev et ses pairs : écarts d'équité moyens minimes, mais décisions individuelles instables, sensibles à l'ordre des options et aux nudges. Anglais seulement, rien sur le français.",
+  "probleme": "Les modèles de décision typés (« System One ») choisissent parmi des options sans générer de texte, plus vite et moins cher qu'un LLM. Leur robustesse est peu documentée : style d'écriture, ordre des options, incitations de présentation, usage en filtre de sécurité.",
+  "comment_ca_marche": "Un modèle de décision typé reçoit une question et une liste d'options, puis renvoie une distribution de probabilités sur ces options, sans rédiger de réponse. Jev (éditeur TypeSafe) en est l'exemple central.\n\nL'audit principal se déroule ainsi :\n1. Chaque réclamation interne américaine (base publique du régulateur CFPB) est réécrite en 36 styles (âge, géographie, éducation, niveau socio-économique), avec consigne de conserver tous les faits.\n2. Trois systèmes choisissent une réparation : aucune, non monétaire, monétaire. Ce sont deux LLM génératifs (GPT-4o-mini, GPT-5-mini) et Jev.\n3. Les auteurs comparent les écarts moyens entre groupes, puis la fréquence à laquelle deux versions d'une même réclamation reçoivent des décisions différentes.\n4. Des modifications de faits servent de contrôle positif.\n\nLes autres papiers testent Jev comme filtre d'entrée, et trois modèles de décision face aux nudges.",
+  "demarche_experimentale": "Audit préenregistré sur 1 000 réclamations CFPB en anglais, chacune en 36 styles, avec deux modèles de réécriture. Contrôles : re-notation, six ordres d'options, faits modifiés, audit externe de fidélité. Trois autres études isolées : filtre, ordre, nudges.",
+  "resultats": [
+   {
+    "metrique": "Écart de taux monétaire entre styles (plus bas = plus équitable)",
+    "valeur": "≤ 0,5 point pour les 3 systèmes",
+    "comparaison": "Écart max : GPT-4o-mini, niveau d'éducation, +0,47 point",
+    "conditions": "1 000 réclamations de test, anglais ; cadre préenregistré",
+    "citation": "on held-out complaints every monetary-remedy gap is within 0.5 percentage points. At the individual scale, two style versions of the same complaint receive different monetary decisions 2.6–6.3% of the time."
+   },
+   {
+    "metrique": "Réponses données à des prompts nuisibles / refus de prompts sains (plus bas = mieux)",
+    "valeur": "73,2 % → 2,4 % ; refus sains 1,2 % → 10,8 %",
+    "comparaison": "Sans filtre vs filtre d'entrée Jev (seuil 0,5), pipeline Qwen2.5-1.5B",
+    "conditions": "970 prompts (AdvBench, XSTest) ; seuils réglés sur les données d'évaluation",
+    "citation": "the fraction recorded as answered decreases from 527/720 (73.2%) without filtering to 17/720 (2.4%) with input filtering. On 250 XSTest-safe prompts, however, non-answer/refusal increases from 3/250 (1.2%) to 27/250 (10.8%)."
+   },
+   {
+    "metrique": "Questions dont la réponse change selon l'ordre des options (plus bas = mieux)",
+    "valeur": "25,8 % → 7,2 %",
+    "comparaison": "Checkpoint publié vs après fine-tuning avec mélange des options",
+    "conditions": "951 questions vérifiées par Qwen, étiquettes générées par LLM ; fine-tuning sur 2 818 lignes",
+    "citation": "the released checkpoint changes its answer for 25.8% [22.9–28.7] of questions (19.7% on the 605 English-language items alone)"
+   }
+  ],
+  "limites": [
+   "Aucune vérité terrain : l'audit mesure sensibilité et écarts, pas la justesse. Styles synthétiques générés par LLM, réclamations en anglais, 3 niveaux de remède (auteurs).",
+   "Un seul modèle de décision, Jev 1.13.0, non déterministe. Les autres études sont des préprints, avec étiquettes ou jeux de test produits par LLM (auteurs de Laya).",
+   "Les nudges ne sont connus que par le résumé : seul l'achat en ligne est testé, et les chiffres des conditions réflexives ne sont pas donnés. Tâches éloignées d'une classification de motifs."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "2,6–6,3 %",
+    "libelle": "des réclamations reformulées reçoivent une décision monétaire différente (Jev et GPT, anglais, CFPB)"
+   },
+   {
+    "valeur": "25,8 %",
+    "libelle": "des questions changent de réponse quand on permute les options (Laya, 421 M de paramètres)"
+   },
+   {
+    "valeur": "97,5–99,9 %",
+    "libelle": "de choix de l'option présélectionnée par les trois modèles de décision testés"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Sur le panel de test, tous les écarts de taux de remède monétaire entre styles restent sous 0,5 point.",
+    "citation": "on held-out complaints every monetary-remedy gap is within 0.5 percentage points."
+   },
+   {
+    "affirmation": "Deux versions stylistiques d'une même réclamation reçoivent des décisions monétaires différentes dans 2,6 à 6,3 % des cas.",
+    "citation": "two style versions of the same complaint receive different monetary decisions 2.6–6.3% of the time."
+   },
+   {
+    "affirmation": "Réécrire toutes les réclamations dans un style standard réduit les écarts de GPT-4o-mini mais n'a pas stabilisé les décisions individuelles.",
+    "citation": "rewriting every complaint into one standard style reduced GPT-4o-mini’s education and SES gaps by 94% and 87% in point estimates while retaining 96–102% of fact sensitivity; it reversed two of the probabilistic model’s gaps and did not make individual decisions more stable."
+   },
+   {
+    "affirmation": "Le filtre d'entrée Jev fait chuter les réponses aux prompts nuisibles mais multiplie par neuf les refus de prompts sains.",
+    "citation": "the fraction recorded as answered decreases from 527/720 (73.2%) without filtering to 17/720 (2.4%) with input filtering. On 250 XSTest-safe prompts, however, non-answer/refusal increases from 3/250 (1.2%) to 27/250 (10.8%)."
+   },
+   {
+    "affirmation": "Le modèle Laya change de réponse pour un quart des questions quand on permute les options.",
+    "citation": "the released checkpoint changes its answer for 25.8% [22.9–28.7] of questions (19.7% on the 605 English-language items alone)"
+   },
+   {
+    "affirmation": "Le fine-tuning avec mélange des options ramène le taux de bascule de Laya à 7,2 %, contre 11,4 % sans mélange.",
+    "citation": "Fine-tuning with Laya’s trainer on 2,818 teacher-verified rows with option shuffling cuts the flip rate to 7.2%; the identical rows without shuffling give 11.4%"
+   },
+   {
+    "affirmation": "Les trois modèles de décision choisissent presque toujours l'option présélectionnée.",
+    "citation": "they chose a preselected default in 97.5-99.9%"
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision typé (System One)",
+    "definition": "Modèle qui répond à une question à options en renvoyant des probabilités par option, sans générer de texte. Référence à la pensée rapide et automatique de la théorie du double processus."
+   },
+   {
+    "terme": "Matched guise",
+    "definition": "Méthode qui garde le contenu identique et ne fait varier que la manière de l'exprimer, pour mesurer si le style seul influence le jugement."
+   },
+   {
+    "terme": "Nudge",
+    "definition": "Incitation de présentation, comme une option présélectionnée ou un avis d'autres clients, qui oriente un choix sans changer les options."
+   },
+   {
+    "terme": "Garde-fou (guardrail)",
+    "definition": "Filtre externe qui inspecte les requêtes ou les réponses d'un LLM et les bloque si elles sont jugées dangereuses."
+   },
+   {
+    "terme": "Taux de bascule (flip rate)",
+    "definition": "Part des questions dont la réponse change quand on modifie un détail sans importance, ici l'ordre des options. Plus bas = plus stable."
+   },
+   {
+    "terme": "Ratio d'impact défavorable (AIR)",
+    "definition": "Taux de résultat favorable d'un groupe divisé par celui d'un autre. La règle des quatre cinquièmes, issue de l'emploi aux États-Unis, y voit un signal sous 0,80."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Same Facts, Different Remedy: Linguistic Profiling and Arbitrariness in LLM and System One Decisions",
+    "url": "https://arxiv.org/abs/2611.08995",
+    "type": "primaire",
+    "date": "2026-11-06"
+   },
+   {
+    "titre": "Jev as an LLM Safety Guardrail: An Empirical Study of Input Filtering, Selective Output Review, and Over-Refusal",
+    "url": "https://arxiv.org/abs/2611.08845",
+    "type": "primaire",
+    "date": "2026-11-06"
+   },
+   {
+    "titre": "Maya a1: Do the Options Read the Model, or Does Their Position? Order Sensitivity in a Non-Autoregressive Decision Model",
+    "url": "https://arxiv.org/abs/2611.09803",
+    "type": "primaire",
+    "date": "2026-11-06"
+   },
+   {
+    "titre": "Nudging Decision Models: Do Digital Nudges Steer Fast, Generation-Free AI Agents?",
+    "url": "https://arxiv.org/abs/2611.09264",
+    "type": "primaire",
+    "date": "2026-11-06"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-06",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un décideur typé fine-tuné avec mélange des options devient-il aussi stable et précis qu'un CamemBERT correctement entraîné quand l'ordre des options change ?",
+  "hypothese": "Un décideur typé Qwen3-1.7B fine-tuné (LoRA) avec mélange aléatoire des options ramène le taux de changement de choix sous permutation (permutation_flip_rate) de ~53 % (version non adaptée) à moins de 10 %, et reste à moins de 5 points d'accuracy d'un CamemBERT-base entraîné jusqu'à convergence sur 77 intentions ; le même fine-tuning sans mélange reste au-dessus de 15 % de flip.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné (entraîné à convergence)",
+   "description": "Classifieur CamemBERT-base à 77 sorties fine-tuné sur tout le train, sans options ni ordre.",
+   "implementation": "AutoModelForSequenceClassification, 4 époques, lr 3e-5, batch 32, warmup 10 %, fp16, sélection du meilleur point sur 10 % du train ; probabilités par softmax, ECE sur 15 intervalles ; test avec note annexe neutre ajoutée au texte.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Décideur typé Qwen3-1.7B fine-tuné avec mélange des options",
+   "description": "Le modèle reçoit le message et 10 options numérotées, et choisit sans générer : probabilités lues sur les logits des 10 indices ; fine-tuné par LoRA avec ordre des options tiré au hasard à chaque exemple, comparé à la version sans mélange et à la version non adaptée.",
+   "implementation": "transformers + peft (LoRA r=16, cibles q,k,v,o), perte d'entropie croisée sur le logit de l'indice correct (1 passe), fp16 ; options = 10 intentions les plus proches du message par similarité d'embedding avec les libellés (le bon libellé est ajouté à l'entraînement s'il manque, rappel@10 déclaré au test) ; trois variantes : base, LoRA ordre fixe (rang), LoRA ordre mélangé.",
+   "modeles_hf": [
+    "Qwen/Qwen3-1.7B",
+    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen3-0.6B"
+   ],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "utterance, label ; libellés : mteb/banking77 (noms des 77 intentions)",
+   "representativite": "77 intentions de services financiers proches, en français, comme dans l'expérience antérieure (même jeu, même métrique principale), ce qui rend les deux résultats comparables.",
+   "ecarts_donnees_reelles": "Traduction automatique, textes courts de type chat, pas d'e-mails ni de pièces jointes, 77 classes sans hiérarchie, libellés anglais, licence du jeu non précisée (original CC BY 4.0).",
+   "jeux_explores": [
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "10 003 + 3 080 requêtes françaises, 77 intentions fines et proches.",
+     "decision": "retenu",
+     "raison": "Même jeu que l'expérience antérieure, effectifs suffisants pour entraîner correctement la référence."
+    },
+    {
+     "nom": "mteb/banking77",
+     "url": "https://huggingface.co/datasets/mteb/banking77",
+     "acces": "hub_libre",
+     "adequation": "Noms des 77 intentions (anglais), mit.",
+     "decision": "retenu",
+     "raison": "Fournit les libellés servant d'options du décideur."
+    },
+    {
+     "nom": "BEE-spoke-data/consumer-finance-complaints",
+     "url": "https://huggingface.co/datasets/BEE-spoke-data/consumer-finance-complaints",
+     "acces": "hub_libre",
+     "adequation": "1,69 M réclamations réelles en anglais, arbre produit → sous-problème, CC0.",
+     "decision": "ecarte",
+     "raison": "Anglais ; casserait la comparabilité avec l'expérience antérieure, piste hiérarchique pour la suite."
+    },
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "60 intentions françaises à deux niveaux, hors domaine financier.",
+     "decision": "ecarte",
+     "raison": "Domaine éloigné ; utile plus tard pour tester la cohérence hiérarchique."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "~113 intentions françaises déséquilibrées.",
+     "decision": "ecarte",
+     "raison": "Licence inconnue, étiquettes sans noms, hors domaine."
+    },
+    {
+     "nom": "kgptalkie/cfpb-complaint-routing",
+     "url": "https://huggingface.co/datasets/kgptalkie/cfpb-complaint-routing",
+     "acces": "hub_libre",
+     "adequation": "9 classes de réclamations anglaises, équilibrées.",
+     "decision": "ecarte",
+     "raison": "Trop simple et en anglais."
+    }
+   ]
+  },
+  "metriques": [
+   "permutation_flip_rate",
+   "accuracy_top1_worst_order",
+   "accuracy_top1_rank_order",
+   "expected_calibration_error",
+   "neutral_note_accuracy_drop",
+   "recall_at_10_candidates"
+  ],
+  "metrique_principale": "permutation_flip_rate",
+  "sens": "min",
+  "protocole": "Évaluation : 200 exemples du split test, échantillonnés de façon stratifiée par classe. Entraînement : split train complet (10 003 exemples) pour CamemBERT ; sous-échantillon de 1 000 exemples du split train pour chaque variante LoRA, mêmes exemples pour les deux variantes. Trois ordres des options : rang d'embedding, inverse, aléatoire fixe. permutation_flip_rate = part des exemples dont l'option choisie change selon l'ordre (IC bootstrap) ; appels répétés identiques en contrôle de déterminisme. Comparaison appariée des variantes décideur (base, LoRA fixe, LoRA mélangé) et CamemBERT sur les mêmes exemples (McNemar sur l'exactitude). Note annexe neutre (phrase sans rapport) pour mesurer la perte d'accuracy. CamemBERT entraîné 4 époques ; LoRA 1 époque. ECE calculée sur les probabilités de chaque système, avec l'avertissement que les deux ne sont pas strictement comparables.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Échelle réduite : Qwen/Qwen3-0.6B, 100 exemples de test, 150 exemples d'entraînement LoRA (une époque, quelques pas), CamemBERT sur 800 exemples 1 époque. Calcul GPU complet : test 200 × (3 ordres + 1 note) = 800 passes × ~250 tokens = 200 k tokens par variante, 3 variantes ≈ 600 k tokens à 700 tok/s ≈ 14 min ; LoRA 2 × 1 000 ex × 250 tokens × 3 (aller-retour) ≈ 1,5 M tokens-équivalents ≈ 12 min ; CamemBERT ≈ 4 min ; chargements ≈ 4 min : ≈ 34 min sous 45 min ; test limité à 200 exemples pour tenir le budget.",
+  "dependances": [
+   "peft"
+  ],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte du message ou de l'e-mail du client, anonymisé"
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif de niveau 1 (étiquette)"
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif de niveau 2 (étiquette)"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception pour le découpage temporel"
+    }
+   ],
+   "volume_conseille": "≥ 20 000 messages étiquetés, ≥ 30 par classe sur les classes évaluées, 300 à 1 000 exemples de test.",
+   "metriques_metier": "Exactitude de routage par sous-motif, taux de bascule sous permutation et reformulation, ECE, coût et latence par message.",
+   "garde_fous": "Aucune décision automatique sur la base du seul décideur ; seuil de confiance et repli humain ; mesures de stabilité obligatoires avant toute adoption ; pas de données internes vers un service externe.",
+   "prescriptions": [
+    "≥ 30 exemples d'entraînement par classe, classes rares signalées séparément",
+    "Étiquettes validées par deux annotateurs sur un échantillon, accord inter-annotateurs (kappa) reporté",
+    "Découpage temporel train/test pour éviter les fuites, doublons exacts supprimés",
+    "Libellés des classes décrits en une phrase, identiques pour toutes les variantes",
+    "Options candidates générées par la même procédure en test et en production",
+    "Anonymisation des noms, IBAN, numéros de carte avant tout traitement",
+    "Exclure les messages vides ou à pièce jointe seule"
+   ],
+   "preparation": "Extraire d'un journal de messages entrants les textes avec leur motif et sous-motif finaux validés, filtrer les doublons et les messages automatiques, anonymiser, échantillonner par classe en conservant la distribution naturelle pour le test, découper par date."
+  },
+  "duree_estimee_minutes": 90,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "Qwen/Qwen3-1.7B": {
+    "id": "Qwen/Qwen3-1.7B",
+    "sha": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 2031739904,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": {
+    "id": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "sha": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42",
+    "tache": "sentence-similarity",
+    "bibliotheque": "sentence-transformers",
+    "parametres": 117654272,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": [
+     "ar",
+     "bg",
+     "ca",
+     "cs",
+     "da",
+     "de",
+     "el",
+     "en"
+    ]
+   },
+   "Qwen/Qwen3-0.6B": {
+    "id": "Qwen/Qwen3-0.6B",
+    "sha": "c1899de289a04d12100db370d81485cdf75e47ca",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 751632384,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "label": "Value",
+    "utterance": "Value"
+   },
+   "exemple": {
+    "label": 0,
+    "utterance": "S'il vous plaît, aidez-moi avec ma carte.  Il ne s'activera pas."
+   },
+   "lignes": {
+    "train": 10003,
+    "test": 3080
+   }
+  },
+  "paquets": {
+   "peft": {
+    "paquet": "peft",
+    "derniere_version": "0.21.2",
+    "licence": "Apache",
+    "auteur": "The HuggingFace team",
+    "source": "https://github.com/huggingface/peft"
+   }
+  }
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

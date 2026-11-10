@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import calendar
 import json
 import logging
 import os
@@ -577,6 +578,7 @@ class Atelier:
         self.colab = colab
         self.t0 = time.time()
         self.duree_complete: float | None = None   # durée mesurée d'une échelle complète réussie de ce POC
+        self.suivi: Suivi | None = None             # avancement pour l'application (executer)
         self.regles = _prompt("poc_regles", api_aide=api_aide(), preinstalles=", ".join(preinstalles()))
         # Termes interdits dans le dépôt publié : empreintes reçues de config/atelier.yaml (ou calculées dans le dépôt privé).
         livrable.configurer_empreintes(self.conf.get("empreintes_interdites")
@@ -584,6 +586,8 @@ class Atelier:
 
     def note(self, msg: str):
         self.r.note(msg)
+        if self.suivi:
+            self.suivi.observer(msg)
 
     def min_exemples(self) -> int:
         """Taille minimale de l'évaluation : en exemples courts, ou en enregistrements longs (appels, réunions, documents)."""
@@ -669,6 +673,8 @@ class Atelier:
         # Délai réel : tout le temps restant du job (moins la marge de publication), jamais au-delà du réglage.
         delai = int(self.temps_restant() - 600)
         self.note(f"[poc] {self.sid} : échelle complète sur {'GPU' if materiel == 'gpu' else 'CPU du sandbox'} ({raison})")
+        if self.suivi:
+            self.suivi.etape("complete", f"sur {'GPU ' + self.colab.materiel if materiel == 'gpu' else 'CPU du sandbox'}")
         if materiel == "gpu":
             rapport = self.colab.executer(self.dir, OUTILS, delai=delai, suivi=self.note)
             notebook = self.dir / "complete" / "execute_complete.ipynb"
@@ -723,11 +729,16 @@ class Atelier:
                 "faits": faits}
         depart = self.reprise_complete() or {}
         etat["iterations"] = depart.get("iterations", [])
+        if self.suivi:
+            self.suivi.etape("ecriture", "le modèle écrit le notebook : protocole, deux approches, évaluation")
         code = depart.get("code") or self.r.etape("code_1", self.ecrire)
         reprise, dernier = depart.get("sandbox"), len(etat["iterations"]) + self.conf["iterations_max"]
         for k in range(len(etat["iterations"]) + 1, dernier + 1):
             it = {"numero": k, "diagnostic": code.get("diagnostic", "")}
             etat["iterations"].append(it)
+            if self.suivi:
+                self.suivi.etape("essai", f"itération {k} sur {dernier}" + (" : correction du notebook faite" if k > 1 else ""),
+                                 iteration=k - len(depart.get("iterations", [])))
             motif, compte, pub, ban = None, "", {}, None
             # Lisibilité d'abord (deux passes au plus, sans exécution) : le notebook publié doit se lire comme un tutoriel.
             for j in range(1, MISES_EN_FORME + 1):
@@ -753,11 +764,15 @@ class Atelier:
                 break
             else:
                 t = self.conf["timeouts"]
+                if self.suivi:
+                    self.suivi.detail(f"itération {k} : phase publique sur le jeu public (échelle réduite, CPU)")
                 pub = reprise["publique"] if reprise else self.sandbox.executer(travail, "publique", t["publique"], t["cellule"])
                 it["publique"] = {"ok": pub.get("ok"), "secondes": pub.get("secondes"), "erreur": (pub.get("erreur") or {}).get("nature")}
                 self.note(f"[poc] {sid} itération {k} : phase publique {'réussie' if pub.get('ok') else 'en échec'} ({pub.get('secondes')} s)")
                 erreurs = valider_execution(pub, None, plan, self.min_exemples())
                 if not erreurs:
+                    if self.suivi:
+                        self.suivi.detail(f"itération {k} : phase privée sur données factices, contre le faux service")
                     ban = reprise["privee"] if reprise else self.sandbox.executer(travail, "privee", t["privee"], t["cellule"],
                                                                                   modeles=modeles_par_taille(plan)["reduced"])
                     it["privee"] = {"ok": ban.get("ok"), "secondes": ban.get("secondes"), "erreur": (ban.get("erreur") or {}).get("nature"),
@@ -779,6 +794,8 @@ class Atelier:
                     # protocole se corrige sans brûler l'échelle complète (le 2026-10-28, un Brier de 672 découvert après 25 min de GPU).
                     prealables = []
                     if self.empechement_complete()[1] is None:
+                        if self.suivi:
+                            self.suivi.etape("revue_prealable", "relecture de la méthode sur l'échelle réduite")
                         pre = self.r.etape(f"revue_prealable_{k}", lambda: self.revoir(code, pub, ban, echelle="prealable"))
                         prealables = [x for x in pre["problemes"] if x["gravite"] == "bloquant"]
                         it["revue_prealable"] = {"bloquants": len(prealables), "confiance": pre["confiance"]}
@@ -788,6 +805,8 @@ class Atelier:
                     if complet:
                         it["complete"] = {c: complet.get(c) for c in ("statut", "materiel_requis", "materiel", "secondes", "raison")}
                         revue_sur = complet["rapport"] if complet["statut"] == "valide" else pub
+                        if self.suivi:
+                            self.suivi.etape("revue", "revue de méthode : fuites, équité, validité statistique, fidélité")
                         revue = self.r.etape(f"revue_{k}", lambda: self.revoir(
                             code, revue_sur, ban, reduit=pub if revue_sur is not pub else None,
                             echelle="complete" if revue_sur is not pub else "reduite", raison=complet.get("raison") or ""))
@@ -813,6 +832,8 @@ class Atelier:
             if self.temps_restant() < self.conf["timeouts"]["publique"] + self.conf["timeouts"]["privee"] + 600:
                 etat["dernier_compte_rendu"] = "budget de temps épuisé. " + etat["dernier_compte_rendu"]
                 break
+            if self.suivi:
+                self.suivi.detail(f"itération {k} : correction du notebook ({motif.rstrip('.')})"[:200] if motif else "")
             if it["lisibilite"]:  # la correction traite aussi ce que la mise en forme n'a pas réglé
                 compte += ("\n\nRègles de lisibilité encore non respectées (à corriger aussi) :\n"
                            + "\n".join(f"- {d}" for d in it["lisibilite"]))
@@ -890,6 +911,12 @@ class Atelier:
                       else f"[poc] GPU indisponible : {self.colab.raison}")
         base = {"jour": self.jour, "sujet_id": self.sid, "depot": self.c["depot"], "titre": self.plan["titre"]}
         try:
+            self.suivi = Suivi(self.dir, self.c, self.conf)
+            self.suivi.ecrire()
+        except Exception as e:  # noqa: BLE001 : sans suivi, l'expérience se déroule quand même
+            self.note(f"[poc] suivi en direct indisponible : {e}")
+            self.suivi = None
+        try:
             etat = self.un_poc(sans_execution)
             if etat["statut"] == "valide":
                 resultat = {**base, **self.livrer(etat)}
@@ -906,6 +933,8 @@ class Atelier:
             self.note(f"[poc] modèle en échec : {e}")
             resultat = {**base, "statut": "echec", "cause": "technique", "raison": f"modèle en échec : {str(e)[:200]}"}
         resultat.update(duree_minutes=round((time.time() - self.t0) / 60, 1), consommation=llm.COMPTA.resume())
+        if self.suivi:
+            self.suivi.etape("publication", "dépôt public créé seulement si l'expérience est validée")
         write_json(self.dir / "resultat.json", resultat)
         (self.dir / "journal.log").write_text("\n".join(self.r.journal) + "\n", encoding="utf-8")
         return resultat
@@ -995,6 +1024,182 @@ def _materiel_commande(commande: dict, conf: dict) -> str:
         return "gpu"
 
 
+# --------------------------------------------------------------------------- suivi en direct (application)
+
+# Étapes montrées à l'application, avec leur durée typique en minutes (mesurée du 28/10 au 08/11 : écriture 25 min,
+# itération à l'échelle réduite 26 min, échelle complète selon le plan, revues 1 min, publication 2 min).
+ETAPES_SUIVI = (("ecriture", "Écriture du notebook", 25), ("essai", "Exécution à échelle réduite", 26),
+                ("revue_prealable", "Relecture avant l'échelle complète", 1), ("complete", "Échelle complète", 35),
+                ("revue", "Revue de méthode", 1), ("publication", "Publication", 2))
+FINS = ("valide", "echec", "non_traite")
+BRANCHE_SUIVI = "suivi"
+_EXEMPLES = re.compile(r"(\d+)\s*/\s*(\d+)\s+(?:exemples|enregistrements|examples|lots|steps|pas)\b")
+
+
+def _iso(t: float | None = None) -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t or time.time()))
+
+
+class Suivi:
+    """Avancement d'une commande pour l'application : travail/<jour>/<sujet>/suivi.json, réécrit à chaque étape.
+    Une tâche de fond du job, qui ne voit que ce fichier (jamais le notebook), le recopie dans la branche `suivi` de
+    l'atelier (`suivre`) : le jeton d'écriture n'est jamais dans l'étape qui exécute le code des modèles."""
+
+    def __init__(self, dossier: Path, commande: dict, conf: dict):
+        self.chemin = dossier / "suivi.json"
+        plan = commande.get("plan") or {}
+        complete = plan.get("duree_estimee_minutes")
+        self.durees = {c: (int(complete) if c == "complete" and isinstance(complete, (int, float)) and complete > 0 else m)
+                       for c, _, m in ETAPES_SUIVI}
+        ancien = read_json(self.chemin, None)
+        self.d = ancien if ancien and ancien.get("statut") not in FINS else {
+            "version": 1, "jour": commande["jour"], "sujet_id": commande["sujet_id"], "depot": commande.get("depot"),
+            "titre": plan.get("titre", ""), "debut": _iso(), "maj": _iso(), "statut": "en_cours", "etape": "ecriture",
+            "detail": "", "iteration": 0, "iterations_max": conf.get("iterations_max", 3), "sous_progression": None,
+            "etapes": [{"code": c, "libelle": l, "statut": "a_venir", "debut": None, "fin": None} for c, l, _ in ETAPES_SUIVI],
+            "progression": 0.0, "estimation_fin": None, "resultat": None}
+
+    def _e(self, code: str) -> dict:
+        return next(e for e in self.d["etapes"] if e["code"] == code)
+
+    def etape(self, code: str, detail: str = "", **kw) -> None:
+        """Passe à l'étape `code` : celles d'avant qui n'ont pas eu lieu sont « sautées », celle en cours « faite »."""
+        if code not in {c for c, _, _ in ETAPES_SUIVI}:
+            return
+        codes = [c for c, _, _ in ETAPES_SUIVI]
+        for e in self.d["etapes"]:
+            if codes.index(e["code"]) < codes.index(code):
+                if e["statut"] == "en_cours":
+                    e.update(statut="fait", fin=_iso())
+                elif e["statut"] == "a_venir":
+                    e["statut"] = "saute"
+        e = self._e(code)
+        if e["statut"] != "en_cours":
+            e.update(statut="en_cours", debut=e["debut"] or _iso(), fin=None)
+        self.d.update(etape=code, detail=detail, sous_progression=None, **kw)
+        self.ecrire()
+
+    def observer(self, message: str) -> None:
+        """Lignes du journal qui disent où en est l'étape (phases du sandbox, progression de l'échelle complète)."""
+        m = _EXEMPLES.search(message)
+        if m and self.d["etape"] == "complete" and int(m.group(2)):
+            self.d["sous_progression"] = min(1.0, int(m.group(1)) / int(m.group(2)))
+            self.d["detail"] = re.sub(r"^\[poc\]\s*", "", message)[-160:]
+            self.ecrire()
+
+    def detail(self, texte: str) -> None:
+        self.d["detail"] = texte[:200]
+        self.ecrire()
+
+    def _calculer(self) -> None:
+        """Progression (0 à 1) et heure de fin estimée, à partir des durées typiques : une itération de plus allonge
+        l'exécution réduite d'autant ; l'étape en cours compte pour la part écoulée de sa durée (95 % au plus)."""
+        maintenant = time.time()
+        it = max(1, int(self.d.get("iteration") or 1))
+        poids = {c: self.durees[c] * (it if c == "essai" else 1) for c, _, _ in ETAPES_SUIVI}
+        fait, reste = 0.0, 0.0
+        for e in self.d["etapes"]:
+            w = poids[e["code"]]
+            if e["statut"] == "fait":
+                fait += w
+            elif e["statut"] == "en_cours":
+                part = self.d.get("sous_progression")
+                if part is None:
+                    debut = calendar.timegm(time.strptime(e["debut"], "%Y-%m-%dT%H:%M:%SZ")) if e["debut"] else maintenant
+                    part = min(0.95, (maintenant - debut) / 60 / w) if w else 0.0
+                fait += w * part
+                reste += w * (1 - part)
+            elif e["statut"] == "a_venir":
+                reste += w
+        total = sum(poids[e["code"]] for e in self.d["etapes"] if e["statut"] != "saute") or 1
+        self.d["progression"] = round(min(0.99, fait / total), 3) if self.d["statut"] == "en_cours" else 1.0
+        self.d["estimation_fin"] = _iso(maintenant + reste * 60) if self.d["statut"] == "en_cours" else None
+
+    def fin(self, resultat: dict) -> None:
+        """Fin de la commande (après la publication) : statut, lien du dépôt et verdict, tels que dans l'index."""
+        for e in self.d["etapes"]:
+            if e["statut"] == "en_cours":
+                e.update(statut="fait" if resultat.get("statut") == "valide" else "echec", fin=_iso())
+            elif e["statut"] == "a_venir":
+                e["statut"] = "saute"
+        garde = ("statut", "url", "depot", "en_bref", "synthese", "metrique_principale", "libelle_metrique", "sens", "approches",
+                 "n_exemples", "jeu", "materiel", "echelle", "confiance", "raison", "cause", "tentatives")
+        self.d.update(statut=resultat.get("statut", "echec"), resultat={k: resultat.get(k) for k in garde if k in resultat},
+                      etape="publication", detail="")
+        self.ecrire()
+
+    def ecrire(self) -> None:
+        """Écrit le suivi ; une erreur ici ne coûte que l'affichage, jamais l'expérience."""
+        try:
+            self.d["maj"] = _iso()
+            self._calculer()
+            write_json(self.chemin, self.d)
+        except Exception as e:  # noqa: BLE001
+            log.info("suivi non écrit : %s: %s", type(e).__name__, e)
+
+
+def _api_suivi(methode: str, chemin: str, jeton: str, **kw) -> requests.Response:
+    return requests.request(methode, f"{API}/repos/{os.environ.get('GITHUB_REPOSITORY', '')}/{chemin}", timeout=30,
+                            headers={"Authorization": f"Bearer {jeton}", "Accept": "application/vnd.github+json",
+                                     "User-Agent": "atelier-poc"}, **kw)
+
+
+def _branche_suivi(jeton: str) -> None:
+    """Branche `suivi` créée depuis main si elle n'existe pas (422 : créée entre-temps par un autre job)."""
+    if _api_suivi("GET", f"git/ref/heads/{BRANCHE_SUIVI}", jeton).status_code == 404:
+        tete = _api_suivi("GET", "git/ref/heads/main", jeton)
+        tete.raise_for_status()
+        _api_suivi("POST", "git/refs", jeton, json={"ref": f"refs/heads/{BRANCHE_SUIVI}", "sha": tete.json()["object"]["sha"]})
+
+
+def pousser_suivi(fichier: Path, cible: str, jeton: str) -> bool:
+    """Écrit `fichier` dans la branche `suivi`, par l'API des contenus : un commit par mise à jour, sans clone, sans
+    toucher à main (aucun run déclenché)."""
+    import base64
+    contenu = base64.b64encode(fichier.read_bytes()).decode()
+    for essai in range(4):
+        r = _api_suivi("GET", f"contents/{cible}", jeton, params={"ref": BRANCHE_SUIVI})
+        sha = r.json().get("sha") if r.status_code == 200 and isinstance(r.json(), dict) else None
+        p = _api_suivi("PUT", f"contents/{cible}", jeton, json={"message": f"Suivi : {cible}", "content": contenu,
+                                                               "branch": BRANCHE_SUIVI, **({"sha": sha} if sha else {})})
+        if p.ok:
+            return True
+        time.sleep(3 * (essai + 1))   # 409 : écriture concurrente d'un autre job ; on relit le sha
+    return False
+
+
+def suivre(commande_chemin: str, une_fois: bool = False, intervalle: int = 45) -> None:
+    """Tâche de fond du job : recopie suivi.json dans la branche `suivi` à chaque changement, jusqu'à la fin de la
+    commande. `une_fois` : une seule recopie (étape de publication)."""
+    jeton = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    commande = read_json(ROOT / commande_chemin, None)
+    if not (jeton and commande):
+        log.info("suivi : jeton ou commande absents, rien à recopier")
+        return
+    fichier = _travail(commande) / "suivi.json"
+    cible = f"suivi/{commande['jour']}/{commande['sujet_id']}.json"
+    try:
+        _branche_suivi(jeton)
+    except requests.RequestException as e:
+        log.info("suivi : branche %s indisponible (%s)", BRANCHE_SUIVI, e)
+        return
+    dernier = None
+    while True:
+        if fichier.exists():
+            octets = fichier.read_bytes()
+            if octets != dernier:
+                try:
+                    if pousser_suivi(fichier, cible, jeton):
+                        dernier = octets
+                except requests.RequestException as e:
+                    log.info("suivi non recopié : %s", e)
+            if une_fois or (dernier is not None and (read_json(fichier, {}) or {}).get("statut") in FINS):
+                return
+        elif une_fois:
+            return
+        time.sleep(intervalle)
+
+
 def _travail(commande: dict) -> Path:
     return ROOT / "travail" / commande["jour"] / commande["sujet_id"]
 
@@ -1004,12 +1209,18 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog=f"python -m {__package__}.atelier")
     sous = ap.add_subparsers(dest="action", required=True)
     sous.add_parser("lister", help="commandes en attente (JSON)").add_argument("--materiel", choices=("gpu", "cpu"))
+    s = sous.add_parser("suivre", help="recopier l'avancement d'une commande dans la branche suivi (tâche de fond)")
+    s.add_argument("commande")
+    s.add_argument("--une-fois", action="store_true")
     for nom in ("executer", "publier", "indexer"):
         p = sous.add_parser(nom)
         p.add_argument("commande", help="chemin de la commande (commandes/<jour>/<sujet>.json)")
     a = ap.parse_args(argv)
     if a.action == "lister":
         print(json.dumps(lister(ROOT, a.materiel)))
+        return 0
+    if a.action == "suivre":
+        suivre(a.commande, une_fois=a.une_fois)
         return 0
     commande = read_json(ROOT / a.commande, None)
     if not commande:
@@ -1043,6 +1254,10 @@ def main(argv: list[str] | None = None) -> int:
         res.update(statut="echec", raison=f"{res.get('raison', '')} (abandon après {res['tentatives']} tentatives)"[:300])
     travail.mkdir(parents=True, exist_ok=True)
     write_json(travail / "resultat.json", res)  # relu par « indexer » après la remise à niveau de l'index
+    try:
+        Suivi(travail, commande, charger_reglages()["poc"]).fin(res)
+    except Exception as e:  # noqa: BLE001 : la publication et l'index passent avant l'affichage
+        log.info("suivi final non écrit : %s", e)
     maj_index(ROOT, res)
     log.info("POC %s : %s%s", commande["sujet_id"], res["statut"], f" → {res['url']}" if res.get("url") else "")
     return 0
