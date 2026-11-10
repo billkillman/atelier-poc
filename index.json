@@ -3,6 +3,102 @@
  "pocs": [
   {
    "jour": "2026-11-10",
+   "sujet_id": "jev-decision-models-audits-equite-garde-fou-ordre",
+   "depot": "20261110_typed_decision_option_shuffle_camembert",
+   "titre": "Un décideur typé fine-tuné avec mélange des options devient-il aussi stable et précis qu'un CamemBERT correctement entraîné quand l'ordre des options change ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné (entraîné à convergence))",
+    "raison": "exception (cellule 43, section new_approach)"
+   },
+   "iterations": 3,
+   "metrique_principale": "permutation_flip_rate",
+   "sens": "min",
+   "approches": [
+    {
+     "nom": "CamemBERT-base fine-tuné",
+     "role": "reference",
+     "valeur": 0.1,
+     "ic95": [
+      0.05,
+      0.17
+     ]
+    },
+    {
+     "nom": "Décideur Qwen3 non adapté",
+     "role": "nouvelle",
+     "valeur": 0.82,
+     "ic95": [
+      0.74,
+      0.89
+     ]
+    },
+    {
+     "nom": "Décideur Qwen3 + LoRA, ordre fixe",
+     "role": "nouvelle",
+     "valeur": 0.44,
+     "ic95": [
+      0.34,
+      0.54
+     ]
+    },
+    {
+     "nom": "Décideur Qwen3 + LoRA, ordre mélangé",
+     "role": "nouvelle",
+     "valeur": 0.47,
+     "ic95": [
+      0.37,
+      0.57
+     ]
+    }
+   ],
+   "n_exemples": 100,
+   "jeu": "DeepPavlov/banking77_fr",
+   "synthese": "permutation_flip_rate : Décideur Qwen3 + LoRA, ordre mélangé 0,47 contre 0,1 pour CamemBERT-base fine-tuné (100 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (Qwen3-0.6B, 5 options, 48 exemples LoRA, 100 messages de test, CamemBERT sur 540 exemples), le mélange des options ne stabilise pas le décideur : bascule de 47 % contre 44 % à ordre fixe, loin du seuil de 10 %. Ces chiffres ne permettent pas de trancher. Le décideur est indiscernable de sa variante sans mélange. La référence est sous-entraînée (25 % d'exactitude) et le baseline pertinent, le premier candidat par similarité, n'est pas mesuré. Le protocole est trop différent de la source (25,8 % → 7,2 %) pour être comparé. Le code est cohérent et la comparaison est équitable par construction, mais seule l'échelle complète pourrait répondre à l'hypothèse.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Le mélange des options n'a pas montré d'effet mesurable sur la stabilité à cette échelle. La référence sous-entraînée et l'absence de baseline par similarité empêchent de conclure sur la comparaison avec le classifieur.",
+   "libelle_metrique": "Taux de bascule sous permutation",
+   "reserves": [
+    "Le décideur n'est comparé qu'au hasard. On ne sait pas s'il apporte quoi que ce soit par rapport à la simple recherche par similarité qui choisit ses options.",
+    "Ici la référence est très loin de son niveau d'entraînement normal. L'avantage apparent du décideur sur elle ne dit rien de ce que donnerait une référence entraînée sur tout le jeu.",
+    "Le taux de bascule de la référence et celui du décideur ne mesurent pas la même chose. Ils ne se comparent pas directement."
+   ],
+   "duree_minutes": 99.2,
+   "consommation": {
+    "claude:poc_code:jev-decision-models-audits-equite-garde-fou-ordre": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1675.4,
+     "cout_equivalent_usd": 4.4336,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:jev-decision-models-audits-equite-garde-fou-ordre": {
+     "appels": 4,
+     "echecs": 0,
+     "secondes": 996.3,
+     "cout_equivalent_usd": 4.3979,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:jev-decision-models-audits-equite-garde-fou-ordre": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 89.0,
+     "cout_equivalent_usd": 0.5234,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261110_typed_decision_option_shuffle_camembert",
+   "tentatives": 1
+  },
+  {
+   "jour": "2026-11-10",
    "sujet_id": "fraude-surcouche-regles-llm-modele-gele",
    "depot": "20261110_llm_rule_overlay_frozen_fraud_detector",
    "titre": "Une surcouche de règles écrites par LLM améliore-t-elle un détecteur de fraude gelé mieux qu'une extraction de règles classique ou un réentraînement pondéré ?",
