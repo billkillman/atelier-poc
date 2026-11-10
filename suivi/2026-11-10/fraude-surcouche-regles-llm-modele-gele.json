@@ -5,10 +5,10 @@
  "depot": "20261110_llm_rule_overlay_frozen_fraud_detector",
  "titre": "Une surcouche de règles écrites par LLM améliore-t-elle un détecteur de fraude gelé mieux qu'une extraction de règles classique ou un réentraînement pondéré ?",
  "debut": "2026-11-10T02:10:28Z",
- "maj": "2026-11-10T02:58:25Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-10T02:59:18Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,72 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-10T02:58:25Z",
-   "fin": null
+   "fin": "2026-11-10T02:59:10Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-10T02:59:10Z",
+   "fin": "2026-11-10T02:59:18Z"
   }
  ],
- "progression": 0.986,
- "estimation_fin": "2026-11-10T03:01:25Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261110_llm_rule_overlay_frozen_fraud_detector",
+  "depot": "20261110_llm_rule_overlay_frozen_fraud_detector",
+  "en_bref": "Aucune conclusion possible : la surcouche n'a quasiment pas agi avec un petit LLM, et tous les écarts sont dans le bruit. Le dispositif de comparaison est correct, mais seul le passage à l'échelle complète pourrait trancher.",
+  "synthese": "delta_recall_at_precision : Surcouche LLM (Qwen/Qwen3-0.6B) 0,224 contre -0,673 pour Réentraînement pondéré (36037 exemples, échelle réduite, CPU du sandbox).",
+  "metrique_principale": "delta_recall_at_precision",
+  "libelle_metrique": "ΔR@P (points, vs cibles de production)",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "XGBoost gelé",
+    "role": "reference",
+    "valeur": 1.0463378176382663,
+    "ic95": [
+     0.0,
+     4.763993316624898
+    ]
+   },
+   {
+    "nom": "Règles par arbre",
+    "role": "reference",
+    "valeur": -0.5231689088191323,
+    "ic95": [
+     -4.085318001910743,
+     3.7957256130063963
+    ]
+   },
+   {
+    "nom": "Réentraînement pondéré",
+    "role": "reference",
+    "valeur": -0.6726457399103135,
+    "ic95": [
+     -4.519704433497536,
+     2.9317943941387163
+    ]
+   },
+   {
+    "nom": "Surcouche LLM (Qwen/Qwen3-0.6B)",
+    "role": "nouvelle",
+    "valeur": 0.22421524663677103,
+    "ic95": [
+     -1.4857357357357357,
+     4.981596866209219
+    ]
+   }
+  ],
+  "n_exemples": 36037,
+  "jeu": "jAEhEEkIM/operationbench-baf-raw",
+  "materiel": "CPU du sandbox",
+  "echelle": "reduite",
+  "confiance": "faible",
+  "tentatives": 1
+ }
 }
