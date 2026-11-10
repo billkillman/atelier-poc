@@ -5,11 +5,11 @@
  "depot": "20261110_llm_rule_overlay_frozen_fraud_detector",
  "titre": "Une surcouche de règles écrites par LLM améliore-t-elle un détecteur de fraude gelé mieux qu'une extraction de règles classique ou un réentraînement pondéré ?",
  "debut": "2026-11-10T02:10:28Z",
- "maj": "2026-11-10T02:47:36Z",
+ "maj": "2026-11-10T02:52:38Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 2 : correction du notebook (son exécution dans le sandbox a échoué ou ne remplit pas les conditions de validation)",
- "iteration": 2,
+ "detail": "itération 3 : phase publique sur le jeu public (échelle réduite, CPU)",
+ "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
  "etapes": [
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.183,
- "estimation_fin": "2026-11-10T05:15:31Z",
+ "progression": 0.184,
+ "estimation_fin": "2026-11-10T05:41:31Z",
  "resultat": null
 }
