@@ -5,10 +5,10 @@
  "depot": "20261110_typed_decision_option_shuffle_camembert",
  "titre": "Un décideur typé fine-tuné avec mélange des options devient-il aussi stable et précis qu'un CamemBERT correctement entraîné quand l'ordre des options change ?",
  "debut": "2026-11-10T03:03:08Z",
- "maj": "2026-11-10T04:42:13Z",
- "statut": "en_cours",
+ "maj": "2026-11-10T04:42:21Z",
+ "statut": "valide",
  "etape": "publication",
- "detail": "dépôt public créé seulement si l'expérience est validée",
+ "detail": "",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -51,12 +51,65 @@
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-10T04:42:13Z",
-   "fin": null
+   "fin": "2026-11-10T04:42:21Z"
   }
  ],
- "progression": 0.99,
- "estimation_fin": "2026-11-10T04:44:13Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261110_typed_decision_option_shuffle_camembert",
+  "depot": "20261110_typed_decision_option_shuffle_camembert",
+  "en_bref": "Le mélange des options n'a pas montré d'effet mesurable sur la stabilité à cette échelle. La référence sous-entraînée et l'absence de baseline par similarité empêchent de conclure sur la comparaison avec le classifieur.",
+  "synthese": "permutation_flip_rate : Décideur Qwen3 + LoRA, ordre mélangé 0,47 contre 0,1 pour CamemBERT-base fine-tuné (100 exemples, échelle réduite, CPU du sandbox).",
+  "metrique_principale": "permutation_flip_rate",
+  "libelle_metrique": "Taux de bascule sous permutation",
+  "sens": "min",
+  "approches": [
+   {
+    "nom": "CamemBERT-base fine-tuné",
+    "role": "reference",
+    "valeur": 0.1,
+    "ic95": [
+     0.05,
+     0.17
+    ]
+   },
+   {
+    "nom": "Décideur Qwen3 non adapté",
+    "role": "nouvelle",
+    "valeur": 0.82,
+    "ic95": [
+     0.74,
+     0.89
+    ]
+   },
+   {
+    "nom": "Décideur Qwen3 + LoRA, ordre fixe",
+    "role": "nouvelle",
+    "valeur": 0.44,
+    "ic95": [
+     0.34,
+     0.54
+    ]
+   },
+   {
+    "nom": "Décideur Qwen3 + LoRA, ordre mélangé",
+    "role": "nouvelle",
+    "valeur": 0.47,
+    "ic95": [
+     0.37,
+     0.57
+    ]
+   }
+  ],
+  "n_exemples": 100,
+  "jeu": "DeepPavlov/banking77_fr",
+  "materiel": "CPU du sandbox",
+  "echelle": "reduite",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
