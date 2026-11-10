@@ -5,10 +5,10 @@
  "depot": "20261110_typed_decision_option_shuffle_camembert",
  "titre": "Un décideur typé fine-tuné avec mélange des options devient-il aussi stable et précis qu'un CamemBERT correctement entraîné quand l'ordre des options change ?",
  "debut": "2026-11-10T03:03:08Z",
- "maj": "2026-11-10T04:05:40Z",
+ "maj": "2026-11-10T04:09:33Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 3 sur 3 : correction du notebook faite",
+ "detail": "itération 3 : phase publique sur le jeu public (échelle réduite, CPU)",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.303,
+ "progression": 0.322,
  "estimation_fin": "2026-11-10T06:23:03Z",
  "resultat": null
 }
