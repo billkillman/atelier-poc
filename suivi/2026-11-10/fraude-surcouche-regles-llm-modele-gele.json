@@ -5,10 +5,10 @@
  "depot": "20261110_llm_rule_overlay_frozen_fraud_detector",
  "titre": "Une surcouche de règles écrites par LLM améliore-t-elle un détecteur de fraude gelé mieux qu'une extraction de règles classique ou un réentraînement pondéré ?",
  "debut": "2026-11-10T02:10:28Z",
- "maj": "2026-11-10T02:55:31Z",
+ "maj": "2026-11-10T02:58:25Z",
  "statut": "en_cours",
- "etape": "complete",
- "detail": "sur GPU GPU T4 (Google Colab)",
+ "etape": "revue",
+ "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -37,15 +37,15 @@
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-10T02:55:31Z",
-   "fin": null
+   "fin": "2026-11-10T02:58:25Z"
   },
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-10T02:58:25Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.502,
- "estimation_fin": "2026-11-10T04:38:31Z",
+ "progression": 0.986,
+ "estimation_fin": "2026-11-10T03:01:25Z",
  "resultat": null
 }
