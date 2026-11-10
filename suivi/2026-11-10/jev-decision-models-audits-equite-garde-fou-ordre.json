@@ -5,10 +5,10 @@
  "depot": "20261110_typed_decision_option_shuffle_camembert",
  "titre": "Un décideur typé fine-tuné avec mélange des options devient-il aussi stable et précis qu'un CamemBERT correctement entraîné quand l'ordre des options change ?",
  "debut": "2026-11-10T03:03:08Z",
- "maj": "2026-11-10T04:21:28Z",
+ "maj": "2026-11-10T04:33:54Z",
  "statut": "en_cours",
- "etape": "essai",
- "detail": "itération 3 : phase privée sur données factices, contre le faux service",
+ "etape": "complete",
+ "detail": "sur GPU GPU T4 (Google Colab)",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -23,22 +23,22 @@
   {
    "code": "essai",
    "libelle": "Exécution à échelle réduite",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-10T03:31:03Z",
-   "fin": null
+   "fin": "2026-11-10T04:33:18Z"
   },
   {
    "code": "revue_prealable",
    "libelle": "Relecture avant l'échelle complète",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-10T04:33:18Z",
+   "fin": "2026-11-10T04:33:54Z"
   },
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-10T04:33:54Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.383,
- "estimation_fin": "2026-11-10T06:23:03Z",
+ "progression": 0.528,
+ "estimation_fin": "2026-11-10T06:06:54Z",
  "resultat": null
 }
