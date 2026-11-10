@@ -2,6 +2,101 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-10",
+   "sujet_id": "fraude-surcouche-regles-llm-modele-gele",
+   "depot": "20261110_llm_rule_overlay_frozen_fraud_detector",
+   "titre": "Une surcouche de règles écrites par LLM améliore-t-elle un détecteur de fraude gelé mieux qu'une extraction de règles classique ou un réentraînement pondéré ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "Qwen/Qwen2.5-3B-Instruct (3.1 Md de paramètres) trop gros pour le CPU du sandbox",
+    "raison": "lancement sur Colab impossible"
+   },
+   "iterations": 3,
+   "metrique_principale": "delta_recall_at_precision",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "XGBoost gelé",
+     "role": "reference",
+     "valeur": 1.0463378176382663,
+     "ic95": [
+      0.0,
+      4.763993316624898
+     ]
+    },
+    {
+     "nom": "Règles par arbre",
+     "role": "reference",
+     "valeur": -0.5231689088191323,
+     "ic95": [
+      -4.085318001910743,
+      3.7957256130063963
+     ]
+    },
+    {
+     "nom": "Réentraînement pondéré",
+     "role": "reference",
+     "valeur": -0.6726457399103135,
+     "ic95": [
+      -4.519704433497536,
+      2.9317943941387163
+     ]
+    },
+    {
+     "nom": "Surcouche LLM (Qwen/Qwen3-0.6B)",
+     "role": "nouvelle",
+     "valeur": 0.22421524663677103,
+     "ic95": [
+      -1.4857357357357357,
+      4.981596866209219
+     ]
+    }
+   ],
+   "n_exemples": 36037,
+   "jeu": "jAEhEEkIM/operationbench-baf-raw",
+   "synthese": "delta_recall_at_precision : Surcouche LLM (Qwen/Qwen3-0.6B) 0,224 contre -0,673 pour Réentraînement pondéré (36037 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (80 000 lignes, XGBoost à 50 arbres, un seul LLM de 0,6 Md avec 3 tirages), la surcouche LLM change à peine le score : une seule règle est gardée sur quatre valides. Son ΔR@P apparié au gelé est de −0,82 point, IC 95 % [−2,09 ; +1,80]. La non-dégradation n'est donc pas établie et aucun gain n'est démontré. L'écart avec l'arbre (+0,75 point, IC [−0,92 ; +5,23]) est non concluant, et l'arbre et le réentraînement sont eux aussi non distinguables du gelé. Le code de calcul, la réversibilité et la comparaison appariée semblent corrects, mais les chiffres ne permettent pas de trancher. Ils ne peuvent pas non plus être comparés au +2,26 de la source, obtenue sur un autre jeu et avec trois LLM.",
+   "confiance": "faible",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Aucune conclusion possible : la surcouche n'a quasiment pas agi avec un petit LLM, et tous les écarts sont dans le bruit. Le dispositif de comparaison est correct, mais seul le passage à l'échelle complète pourrait trancher.",
+   "libelle_metrique": "ΔR@P (points, vs cibles de production)",
+   "reserves": [
+    "Le petit LLM n'a fourni qu'une règle exploitable. L'écart avec le modèle gelé reflète donc cette règle et le bruit, pas la méthode décrite dans la source.",
+    "Les gains sont mesurés avec un seuil réajusté après coup sur les données d'évaluation. Ils sont donc un peu plus favorables que ce qu'on obtiendrait en production avec le seuil fixé d'avance."
+   ],
+   "duree_minutes": 48.8,
+   "consommation": {
+    "claude:poc_code:fraude-surcouche-regles-llm-modele-gele": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1742.8,
+     "cout_equivalent_usd": 4.6204,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:fraude-surcouche-regles-llm-modele-gele": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 601.0,
+     "cout_equivalent_usd": 2.5422,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:fraude-surcouche-regles-llm-modele-gele": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 104.6,
+     "cout_equivalent_usd": 0.5637,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261110_llm_rule_overlay_frozen_fraud_detector",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-07",
    "sujet_id": "pii-caviardage-regex-presidio-hybride",
    "depot": "20261107_pii_redaction_regex_ner_french",
