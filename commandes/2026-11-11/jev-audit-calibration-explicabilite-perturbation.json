@@ -1,0 +1,402 @@
+{
+ "version": 1,
+ "jour": "2026-11-11",
+ "sujet_id": "jev-audit-calibration-explicabilite-perturbation",
+ "depot": "20261111_typed_decider_calibration_noise_camembert",
+ "fiche": {
+  "sujet_id": "jev-audit-calibration-explicabilite-perturbation",
+  "titre": "Modèles de décision type Jev : calibrés dès 4 Md en anglais, mais leur « confiance » n'est pas une probabilité",
+  "en_une_phrase": "Les modèles de décision type Jev de 4 Md+ sont mieux calibrés qu'un LLM 8 Md génératif, mais leur « confiance » n'est pas une probabilité et grouper les questions peut fausser les réponses. Anglais seulement.",
+  "probleme": "Les modèles de décision typés rendent une probabilité par option, et l'éditeur de Jev promet qu'elles sont calibrées. C'est ce qui les rend attractifs pour le routage ou les garde-fous : fixer un seuil, expliquer une décision. Mais une probabilité nue, sans justification écrite, invite à la sur-confiance, surtout si le modèle s'appuie sur des raccourcis lexicaux. Trois points n'avaient jamais été mesurés systématiquement :\n- leur calibration face à des pièges ;\n- leur stabilité sur du texte bruité ;\n- la fiabilité des méthodes d'explication sur des sorties aussi tranchées.",
+  "comment_ca_marche": "Un *modèle de décision* ne génère pas de texte. Cette famille a été ouverte par Jev, de TypeSafe AI. On lui envoie un *état* (le texte à juger) et des questions typées. En une seule passe, il rend une probabilité pour chaque option déclarée. Il existe trois types de questions :\n- **Choice** : une option parmi K ;\n- **Score** : un niveau sur une échelle ordonnée ;\n- **Noul** : la probabilité qu'une affirmation soit vraie.\n\nLes modèles audités sont des Qwen3.5 réentraînés, de 0,8 à 27 Md de paramètres. L'audit est automatisé et déterministe :\n1. Chaque exemple est mis sous la forme état + questions.\n2. On en fabrique des variantes qui gardent la même bonne réponse : 5 à 20 % de fautes de frappe, une phrase hors sujet ajoutée, ou tout en minuscules sans ponctuation, comme une transcription automatique.\n3. Chaque question est envoyée seule, ou groupée avec une autre, pour voir si les réponses s'influencent.\n4. La réponse est validée : options attendues, probabilités dont la somme fait 1.\n5. **Calibration** : on vérifie que « 90 % » correspond bien à 90 % de bonnes réponses.\n6. **Explications** : on retire des sous-ensembles de mots et on mesure l'effet sur la probabilité. On compare trois méthodes d'attribution :\n   - LOO : on retire un mot à la fois ;\n   - LIME : un modèle linéaire local approxime le modèle ;\n   - KernelSHAP : estime les *valeurs de Shapley*, la part équitable de chaque mot dans la décision.\n\n**La nouveauté, S1-SHAP**, applique KernelSHAP aux *log-odds*, c'est-à-dire ln(p/(1−p)), au lieu de la probabilité. Prenons deux indices qui suffisent chacun à décider. Retirer l'un fait à peine bouger la probabilité (0,989 → 0,943), alors que la baisse est nette en log-odds (+4,5 → +2,8). Ce calcul ne demande aucun appel supplémentaire au modèle. Grâce à la passe unique (24 à 64 ms jusqu'à 9 Md), une explication sur 512 combinaisons de mots prend 1,3 à 3,2 s.",
+  "demarche_experimentale": "**Modèles.** Cinq modèles de décision à poids ouverts : Tev1-0.8B et Tev1-4B (Together AI), Nimble-9B (Bespoke Labs), Clef-Flash-9B et Clef-27B (Cloudflare). Ils sont servis en local via Ollama, quantifiés, sur un GPU grand public de 16 Go.\n\n**Référence générative.** Gemma4-8B, interrogé de trois façons : probabilité du premier token, JSON avec probabilités énoncées par le modèle, et raisonnement pas à pas.\n\n**Données.** Toutes en anglais, avec des classes équilibrées :\n- e-SNLI (inférence entre deux phrases) : 300 exemples ;\n- HANS (pièges syntaxiques) : 300 exemples ;\n- triage médical synthétique avec phrases émotionnelles parasites : 300 exemples ;\n- Tensor Trust (injections de prompt et requêtes bénignes piégeuses) : 250 requêtes ;\n- règles cachées à mots-codes : 86 cas.\n\n**Métriques.** ECE et Brier avec intervalles de confiance par bootstrap. Fidélité des explications par suppression et insertion des mots les mieux classés. Tests statistiques corrigés pour comparaisons multiples (Holm-Bonferroni).",
+  "resultats": [
+   {
+    "metrique": "ECE sur HANS (plus bas = mieux)",
+    "valeur": "0,030 à 0,087",
+    "comparaison": "Gemma4-8B : 0,144 (premier token), 0,378 (JSON)",
+    "conditions": "Modèles de décision ≥ 4 Md, question Choice, 300 paires anglaises",
+    "citation": "System 1 models with ≥4B parameters are substantially faster and better calibrated under adversarial syntactic shifts (ECEw=0.030–0.087) than both single-token logprob (ECEw=0.144) and structured JSON (ECEw=0.378) System 2 baselines"
+   },
+   {
+    "metrique": "ECE sur HANS de Tev1-0.8B",
+    "valeur": "0,213 → 0,042",
+    "comparaison": "Brut contre recalibré par température",
+    "conditions": "Exactitude 0,663, confiance moyenne 0,876",
+    "citation": "on HANS, ECEw drops from 0.213→0.042 (Temp.) / 0.039 (Platt) on Tev1-0.8B"
+   },
+   {
+    "metrique": "Réponses oui/non qui basculent si on groupe deux questions",
+    "valeur": "22,4 %",
+    "comparaison": "Tev1-4B : 0,2 % ; modèles 9 à 27 Md : jusqu'à 13–17 %",
+    "conditions": "Tev1-0.8B, 450 entrées propres",
+    "citation": "caused the binary Noul decision to flip on 22.4% of inputs on Tev1-0.8B (N=450 ...) and up to 13–17% on 9B–27B models (Clef-Flash-9B, Nimble-9B, and Clef-27B), whereas Tev1-4B achieved near-zero interference (0.2%)."
+   },
+   {
+    "metrique": "Détection d'injection de prompt : rappel au seuil 0,5 / fausses alertes",
+    "valeur": "70,4–80 % / 0 % (48–60 ms) ; 95,2 % / 0 % (828 ms)",
+    "comparaison": "Gemma4-8B premier token : 63,2 % / 0 % (74 ms)",
+    "conditions": "Tev1-4B, Clef-Flash-9B ; Clef-27B ; 250 requêtes Tensor Trust",
+    "citation": "attack recall rises from 70.4% on Tev1-4B (ECEw=0.045) and 69.6% on Nimble-9B (ECEw=0.065) to 80.0% on Clef-Flash-9B (ECEw=0.035, Brier 0.139) and 95.2% on Clef-27B"
+   },
+   {
+    "metrique": "Logique OU entre 3 mots-déclencheurs retrouvée par l'explication",
+    "valeur": "89,3 %",
+    "comparaison": "57,1 % en espace probabilité",
+    "conditions": "Interactions de Shapley en log-odds, 28 cas",
+    "citation": "boosting SII and ArchDetect to 0.964 pair precision, 1.000 sign accuracy, and 0.893 (89.3%) full gate recovery (+32.2 percentage points over probability space)."
+   },
+   {
+    "metrique": "Passages jugés pertinents à plus de 0,9 par Jev, réellement pertinents",
+    "valeur": "66 %",
+    "comparaison": "Après recalibration, Brier DL21 : 0,147 (Jev), 0,144 (pplx-decider)",
+    "conditions": "Seconde étude, TREC DL21, jugements humains",
+    "citation": "of the DL21 pairs it scores above 0.9, only 66% are relevant."
+   }
+  ],
+  "limites": [
+   "Tout est en anglais, sur 300 exemples par jeu, dont un triage médical synthétique. Les auteurs reconnaissent l'absence de textes réels et de proportions de classes réalistes. Rien sur le français ni sur ~300 classes.",
+   "Comparaison limitée : un seul LLM génératif (Gemma4-8B quantifié, sans fine-tuning) et aucun encodeur fine-tuné de type BERT. Le gain face à un CamemBERT entraîné reste entièrement à mesurer.",
+   "Le résumé gonfle le garde-fou : les 95,2 % de rappel viennent de Clef-27B à 828 ms, pas des modèles à 48–60 ms (70 à 80 %). Petites incohérences d'effectifs entre le corps et l'annexe.",
+   "Préprint non relu d'un chercheur indépendant. Together AI écrivait déjà que le champ « confidence » n'est pas une chance d'avoir raison. Licence des poids non précisée."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "0,030",
+    "libelle": "Erreur de calibration de Tev1-4B sur les pièges HANS, contre 0,378 pour Gemma4-8B en JSON"
+   },
+   {
+    "valeur": "22,4 %",
+    "libelle": "Réponses oui/non de Tev1-0.8B qui basculent quand on groupe deux questions"
+   },
+   {
+    "valeur": "66 %",
+    "libelle": "Part réellement pertinente des passages que Jev juge pertinents à plus de 0,9"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Sur les quatre modèles de moins de 10 Md, le champ « confidence » renvoyé est exactement 1 moins l'entropie normalisée, et non une probabilité d'avoir raison.",
+    "citation": "across the four sub-10B decision models (Tev1-0.8B, Tev1-4B, Nimble-9B, and Clef-Flash-9B), for any K-way Choice distribution p=(p1,…,pK), the returned confidence equals one minus the normalized Shannon entropy"
+   },
+   {
+    "affirmation": "La page Ollama de Together AI indiquait déjà que le champ « confidence » n'est pas la probabilité que la réponse soit juste.",
+    "citation": "confidence runs from 0 to 1 and shows how concentrated the probabilities are. It isn't the chance that the answer is right."
+   },
+   {
+    "affirmation": "Grouper deux questions dans une même requête fait basculer 22,4 % des réponses oui/non de Tev1-0.8B, contre 0,2 % pour Tev1-4B.",
+    "citation": "caused the binary Noul decision to flip on 22.4% of inputs on Tev1-0.8B (N=450 ...) whereas Tev1-4B achieved near-zero interference (0.2%)."
+   },
+   {
+    "affirmation": "Les modèles de décision d'au moins 4 Md sont mieux calibrés sur HANS que Gemma4-8B, que ce soit en score du premier token ou en JSON.",
+    "citation": "System 1 models with ≥4B parameters are substantially faster and better calibrated under adversarial syntactic shifts (ECEw=0.030–0.087) than both single-token logprob (ECEw=0.144) and structured JSON (ECEw=0.378) System 2 baselines"
+   },
+   {
+    "affirmation": "Le rappel de 95,2 % sur les injections de prompt est celui de Clef-27B, dont la latence est de 828 ms ; Tev1-4B et Clef-Flash-9B atteignent 70,4 % et 80 %.",
+    "citation": "attack recall rises from 70.4% on Tev1-4B (ECEw=0.045) and 69.6% on Nimble-9B (ECEw=0.065) to 80.0% on Clef-Flash-9B (ECEw=0.035, Brier 0.139) and 95.2% on Clef-27B"
+   },
+   {
+    "affirmation": "Calculer les interactions de Shapley en log-odds retrouve 89,3 % des règles OU à trois déclencheurs, soit +32,2 points par rapport à l'espace probabilité.",
+    "citation": "boosting SII and ArchDetect to 0.964 pair precision, 1.000 sign accuracy, and 0.893 (89.3%) full gate recovery (+32.2 percentage points over probability space)."
+   },
+   {
+    "affirmation": "En reranking, les probabilités natives de Jev sont surconfiantes : seuls 66 % des passages notés au-dessus de 0,9 sont pertinents.",
+    "citation": "We then compare Jev's native probabilities with the human assessors' labels and find them overconfident: of the DL21 pairs it scores above 0.9, only 66% are relevant."
+   },
+   {
+    "affirmation": "Les auteurs reconnaissent que le triage clinique est synthétique et que les classes sont équilibrées, contrairement aux proportions réelles.",
+    "citation": "our Clinical Triage cohort (n=300) is constructed from controlled multi-slot clinical templates rather than de-identified hospital EHR notes."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision (System 1)",
+    "definition": "Modèle qui ne génère pas de texte : il renvoie en une seule passe une probabilité pour chaque option déclarée d'une question typée."
+   },
+   {
+    "terme": "Calibration",
+    "definition": "Accord entre la probabilité annoncée et la fréquence réelle de bonnes réponses : sur 100 décisions annoncées à 90 %, environ 90 doivent être justes."
+   },
+   {
+    "terme": "ECE",
+    "definition": "Expected Calibration Error : écart moyen entre confiance annoncée et taux réel de bonnes réponses, calculé par tranches de confiance. Plus bas = mieux."
+   },
+   {
+    "terme": "Score de Brier",
+    "definition": "Écart quadratique moyen entre les probabilités prédites et la réalité (0 ou 1). Mesure à la fois justesse et calibration. Plus bas = mieux."
+   },
+   {
+    "terme": "HANS",
+    "definition": "Jeu de test anglais piégé : les deux phrases partagent beaucoup de mots sans que l'une implique l'autre. Il démasque les modèles qui raisonnent par simple recouvrement lexical."
+   },
+   {
+    "terme": "KernelSHAP",
+    "definition": "Méthode d'explication en boîte noire : elle masque des combinaisons de mots et estime la contribution équitable de chacun à la décision (valeur de Shapley)."
+   },
+   {
+    "terme": "Log-odds",
+    "definition": "ln(p/(1−p)) : transforme une probabilité entre 0 et 1 en échelle non bornée, où les variations près de 0 ou 1 restent visibles."
+   },
+   {
+    "terme": "Recalibration (Platt, température)",
+    "definition": "Correction après coup des probabilités par une fonction à 1 ou 2 paramètres, ajustée sur des exemples étiquetés. Elle ne change pas le classement des réponses."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Can the Confidence and Decisions of System 1 Models Be Trusted? An Explainability and Perturbation Audit of Jev-Style Decision Models",
+    "url": "https://arxiv.org/abs/2611.12521",
+    "type": "primaire",
+    "date": "2026-11-09"
+   },
+   {
+    "titre": "Beyond Ranking: Are Decision Models Calibrated Relevance Scorers?",
+    "url": "https://arxiv.org/abs/2611.11480",
+    "type": "primaire",
+    "date": "2026-11-08"
+   },
+   {
+    "titre": "Dépôt GitHub j2launay/jev-decision-models-xai (code d'audit, licence MIT)",
+    "url": "https://github.com/j2launay/jev-decision-models-xai",
+    "type": "primaire",
+    "date": "2026-11-08"
+   },
+   {
+    "titre": "Fiche Ollama du modèle Tev1 (Together AI)",
+    "url": "https://ollama.com/library/tev1",
+    "type": "primaire",
+    "date": ""
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-09",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un décideur typé à probabilités par option est-il mieux calibré et plus robuste au bruit qu'un CamemBERT entièrement entraîné, avant et après recalibrage ?",
+  "hypothese": "Après recalibrage par température sur 500 exemples, le décideur Qwen3-0.6B adapté par LoRA atteint une ECE sur texte bruité inférieure d'au moins 30 % relatif à celle d'un CamemBERT-base entraîné sur tout le jeu, sans perdre plus de 3 points d'exactitude sur texte propre.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné",
+   "description": "Classifieur CamemBERT-base fine-tuné sur tout le train (hors lot de calibration), logits restreints aux mêmes candidats que le décideur pour une comparaison à périmètre égal.",
+   "implementation": "transformers AutoModelForSequenceClassification (77 classes), 3 époques, lr 3e-5, batch 32, fp16 ; softmax restreint aux K=8 candidats ; recalibrage par température ajustée sur le lot de calibration.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Décideur typé Qwen3 + LoRA (probabilité par option)",
+   "description": "Un petit LLM reçoit le texte et 8 options candidates lettrées et rend, en une passe, une distribution sur les lettres lue dans les logits du premier token, sans génération. Adapté par LoRA sur un sous-ensemble du train, puis recalibré.",
+   "implementation": "Candidats K=8 par similarité d'embeddings aux centroïdes de classes (rappel@8 rapporté) ; prompt à options lettrées, ordre mélangé à l'entraînement ; peft LoRA r=16 sur projections d'attention, 1 époque ; probabilité = softmax des logits des lettres A–H ; recalibrage par température ; perturbations : 10 % de fautes de frappe et minuscules sans ponctuation.",
+   "modeles_hf": [
+    "Qwen/Qwen3-0.6B",
+    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "utterance, label (noms de classes via mteb/banking77 label_text)",
+   "representativite": "Requêtes clients de services financiers en français, 77 intentions proches, assez de données pour entraîner correctement l'encodeur ; permet ECE, Brier, recalibrage et bruit contrôlé.",
+   "ecarts_donnees_reelles": "Traduction automatique, messages courts et propres, 77 classes plates et équilibrées, pas de hiérarchie, licence de la traduction non précisée ; bruit simulé et non réel.",
+   "jeux_explores": [
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "77 intentions proches en français, 10 003 + 3 080 exemples.",
+     "decision": "retenu",
+     "raison": "Seul jeu français de services financiers avec assez de données pour une référence honnête."
+    },
+    {
+     "nom": "mteb/banking77",
+     "url": "https://huggingface.co/datasets/mteb/banking77",
+     "acces": "hub_libre",
+     "adequation": "Version anglaise avec noms de classes.",
+     "decision": "ecarte",
+     "raison": "Anglais ; utilisé seulement pour les libellés de classes."
+    },
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "60 intentions en français, hiérarchie à 2 niveaux.",
+     "decision": "ecarte",
+     "raison": "Hors domaine ; couvert par une autre expérience hiérarchique."
+    },
+    {
+     "nom": "facebook/xnli",
+     "url": "https://huggingface.co/datasets/facebook/xnli",
+     "acces": "hub_libre",
+     "adequation": "Paires NLI françaises, 3 classes.",
+     "decision": "ecarte",
+     "raison": "3 classes seulement, licence mixte, éloigné du routage."
+    },
+    {
+     "nom": "deepset/prompt-injections",
+     "url": "https://huggingface.co/datasets/deepset/prompt-injections",
+     "acces": "hub_libre",
+     "adequation": "Injections vs requêtes bénignes, 662 lignes.",
+     "decision": "ecarte",
+     "raison": "Pas de français constaté, très petit."
+    },
+    {
+     "nom": "jhu-cogsci/hans",
+     "url": "https://huggingface.co/datasets/jhu-cogsci/hans",
+     "acces": "hub_libre",
+     "adequation": "Jeu de calibration de l'article source.",
+     "decision": "ecarte",
+     "raison": "Anglais et script de chargement, non lisible en parquet."
+    }
+   ]
+  },
+  "metriques": [
+   "expected_calibration_error",
+   "expected_calibration_error_recalibrated",
+   "brier_score",
+   "accuracy",
+   "macro_f1",
+   "accuracy_drop_under_noise",
+   "candidate_recall_at_8"
+  ],
+  "metrique_principale": "expected_calibration_error_recalibrated",
+  "sens": "min",
+  "protocole": "Découpage à partir des deux seuls splits du jeu. Split train : 500 exemples tirés au hasard forment le lot de calibration (exclus de tout entraînement) ; le reste entraîne CamemBERT (tout en full, 500 exemples en reduced) et un sous-échantillon de 2000 exemples (150 en reduced) entraîne le décideur LoRA, 1 époque. Split test : échantillon de 800 exemples en full, 100 en reduced, identique pour les deux approches. Trois conditions de test : propre, 10 % de fautes de frappe, minuscules sans ponctuation. Température ajustée sur la calibration propre uniquement puis appliquée aux conditions bruitées. ECE à 15 intervalles, bootstrap 1000 rééchantillons pour les intervalles de confiance, test apparié sur les erreurs. Baseline de similarité (premier candidat) rapportée. Évaluation sur les mêmes candidats pour les deux approches.",
+  "niveau_sandbox": "complet",
+  "adaptation_sandbox": "Mêmes modèles ; échelle réduite : 150 exemples LoRA, 500 pour CamemBERT, 100 en test, 1 époque. Coût GPU full : entraînement LoRA 2000 ex × 250 tokens × 1 époque ≈ 0,5 M tokens, évaluation (800 test × 3 conditions + 500 calibration) ≈ 2900 prompts × 250 = 0,7 M tokens, à ~2500 tok/s pour 0,6 Md ≈ 8 min avec l'entraînement (rétropropagation comprise) ; CamemBERT 3 époques sur ~9 500 exemples ≈ 5 min : sous 45 min.",
+  "dependances": [
+   "peft"
+  ],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte du message client, anonymisé"
+    },
+    {
+     "colonne": "label",
+     "type": "string",
+     "description": "Classe de routage annotée (motif ou sous-motif)"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception pour le découpage temporel"
+    }
+   ],
+   "volume_conseille": "≥ 20 000 messages, ≥ 30 par classe pour les classes évaluées, 1 000 messages de calibration distincts",
+   "metriques_metier": "Taux de routage automatique à seuil de confiance fixé pour 95 % de précision ; taux d'erreurs à forte confiance.",
+   "garde_fous": "Pas de décision automatique sans seuil recalibré ; surveiller la dérive de calibration ; tous les modèles tournent en local, sans envoi de données hors de l'environnement cible.",
+   "prescriptions": [
+    "Découpage temporel : calibration et test postérieurs à l'entraînement",
+    "Au moins 30 exemples par classe dans le test pour les classes rapportées",
+    "Étiquettes validées par double annotation sur un échantillon, accord inter-annotateurs rapporté",
+    "Inclure des messages réellement bruités (transcriptions, fautes) pour tester la robustesse",
+    "Anonymiser noms, IBAN et numéros avant extraction",
+    "Exclure les doublons exacts entre train et test"
+   ],
+   "preparation": "Extraire les messages routés par des opérateurs sur une période récente, joindre la classe finale validée, dédoublonner, anonymiser, découper par date, échantillonner en conservant la distribution des classes."
+  },
+  "duree_estimee_minutes": 90,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "Qwen/Qwen3-0.6B": {
+    "id": "Qwen/Qwen3-0.6B",
+    "sha": "c1899de289a04d12100db370d81485cdf75e47ca",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 751632384,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2": {
+    "id": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "sha": "e8f8c211226b894fcb81acc59f3b34ba3efd5f42",
+    "tache": "sentence-similarity",
+    "bibliotheque": "sentence-transformers",
+    "parametres": 117654272,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": [
+     "ar",
+     "bg",
+     "ca",
+     "cs",
+     "da",
+     "de",
+     "el",
+     "en"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "label": "Value",
+    "utterance": "Value"
+   },
+   "exemple": {
+    "label": 0,
+    "utterance": "S'il vous plaît, aidez-moi avec ma carte.  Il ne s'activera pas."
+   },
+   "lignes": {
+    "train": 10003,
+    "test": 3080
+   }
+  },
+  "paquets": {
+   "peft": {
+    "paquet": "peft",
+    "derniere_version": "0.21.2",
+    "licence": "Apache",
+    "auteur": "The HuggingFace team",
+    "source": "https://github.com/huggingface/peft"
+   }
+  }
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

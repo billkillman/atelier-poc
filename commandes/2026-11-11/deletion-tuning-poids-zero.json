@@ -1,0 +1,339 @@
+{
+ "version": 1,
+ "jour": "2026-11-11",
+ "sujet_id": "deletion-tuning-poids-zero",
+ "depot": "20261111_deletion_tuning_vs_lora_french_classification",
+ "fiche": {
+  "sujet_id": "deletion-tuning-poids-zero",
+  "titre": "Fine-tuning par suppression de poids : un masque de quelques Mo égale le fine-tuning complet, sur des benchmarks académiques",
+  "en_une_phrase": "Les auteurs rapportent que mettre à zéro moins de 0,05 % des poids d'un LLM égale le fine-tuning complet, avec un adaptateur de quelques Mo. Preprint, modèles ≤ 30B, aucun test en français.",
+  "probleme": "Adapter un LLM à une nouvelle tâche coûte cher en stockage (un checkpoint complet par tâche) et fait souvent oublier des capacités antérieures. Les auteurs testent le minimum de changement : ne modifier aucune valeur, seulement choisir quels poids préentraînés supprimer.",
+  "comment_ca_marche": "1. Le modèle préentraîné reste gelé. À chaque poids de la couche « gate » (une des matrices du bloc MLP de chaque couche du transformer) est associé un score appris, appelé logit.\n2. Pendant l'entraînement, chaque poids est multiplié par un masque doux entre 0 et 1 (sigmoïde du logit). Ce masque est progressivement durci jusqu'à un seuil net.\n3. Les logits sont initialisés avec Wanda, un score d'importance des poids (magnitude × activation d'entrée), qui place environ 0,18 % des poids en suppression au départ.\n4. L'entraînement utilise la perte habituelle : GRPO (RL à récompense vérifiable), SFT (imitation de réponses cibles) ou distillation.\n5. Au déploiement, logit positif = poids conservé, négatif = poids mis à zéro. L'adaptateur est un bit par poids, compressé.",
+  "demarche_experimentale": "Comparaison au fine-tuning complet (FFT), LoRA rang 1 et 4, et MTH (mise à jour de 1 % ou 0,05 % de poids tirés au hasard), à données et pas égaux. Familles Llama et Qwen, 0,5B à 30B ; GRPO, SFT, SDFT.",
+  "resultats": [
+   {
+    "metrique": "Précision GRPO Llama 8B sur GSM8K (maths scolaires, plus haut = mieux)",
+    "valeur": "83,55 % (masque 8,4 Mo)",
+    "comparaison": "FFT : 83,24 % (30 633 Mo) ; base : 60,27 %",
+    "conditions": "Meilleur checkpoint, un seul run rapporté. À 1B : 54,44 % contre 60,50 % pour FFT.",
+    "citation": "Deletion Tuning scores 83.55% against FFT’s 83.24% on Llama8B GSM8K and 52.32% against 51.89% on Qwen7B SimpleRL-Zoo."
+   },
+   {
+    "metrique": "Précision sur 6 tâches antérieures après GRPO, variation vs base (plus proche de 0 = mieux)",
+    "valeur": "à moins d'1 point de la base",
+    "comparaison": "FFT : −1,3 à −3,1 pts ; LoRA et MTH : jusqu'à −5,4 pts",
+    "conditions": "Llama 1B, 3B, 8B ; HellaSwag, MMLU, TruthfulQA, WinoGrande, IFEval, HumanEval",
+    "citation": "Deletion Tuning’s forward KL stays at or below 0.05 at all three scales, and its prior-task accuracy stays within one point of base throughout training."
+   },
+   {
+    "metrique": "Précision sur outils (ToolAlpaca) et sciences, SDFT, Qwen 7B",
+    "valeur": "69,07 % et 70,61 %",
+    "comparaison": "FFT : 68,04 % et 71,20 %",
+    "conditions": "Masque de 27,1 et 47,1 Mo contre 29 051 Mo",
+    "citation": "| Deletion Tuning | 69.07 | 27.1 | 70.61 | 47.1 |"
+   }
+  ],
+  "limites": [
+   "Aux petites tailles, l'égalité n'est pas atteinte : 54,44 % contre 60,50 % pour FFT sur Llama 1B ; en SFT, BBEH 1B est à 5,65 % contre 8,35 %. Les auteurs parlent d'un écart qui se referme avec l'échelle.",
+   "Évaluation limitée à maths, QCM, outils et sciences, en anglais, sur des modèles ≤ 30B. Aucune tâche interne ni en français ; un seul run par configuration rapporté, sans barre d'erreur dans les tableaux lus.",
+   "Entraînement plus gourmand en mémoire que LoRA (un logit par poids), de l'aveu des auteurs. Preprint non relu ; code annoncé sur Reddit, non vérifié par la source lue."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "< 0,05 %",
+    "libelle": "des poids mis à zéro par Deletion Tuning, selon les auteurs, en RL"
+   },
+   {
+    "valeur": "8,4 Mo",
+    "libelle": "taille du masque sur Llama 8B, contre 30 633 Mo pour le fine-tuning complet"
+   },
+   {
+    "valeur": "−5,4 pts",
+    "libelle": "perte maximale de précision sur tâches antérieures pour FFT, LoRA et MTH ; Deletion Tuning reste proche de la base"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Les auteurs rapportent qu'en mettant à zéro moins de 0,05 % des poids, la méthode égale le fine-tuning complet sur trois régimes de post-entraînement.",
+    "citation": "zeroing fewer than 0.05% of its weights, with no other modification, matches full fine-tuning (FFT) at scale across three LLM post-training regimes"
+   },
+   {
+    "affirmation": "Le masque est le seul adaptateur et ne porte que sur la projection gate des blocs.",
+    "citation": "Deletion Tuning, learns a binary mask over the gate projection of transformer blocks."
+   },
+   {
+    "affirmation": "Sur Llama 8B GSM8K, 83,55 % contre 83,24 % pour FFT.",
+    "citation": "Deletion Tuning scores 83.55% against FFT’s 83.24% on Llama8B GSM8K and 52.32% against 51.89% on Qwen7B SimpleRL-Zoo."
+   },
+   {
+    "affirmation": "Après compression, le masque pèse 1,0 Mo (Llama 1B) et 8,4 Mo (Llama 8B).",
+    "citation": "zstd compresses it to 1.0 MB at Llama1B and 8.4 MB at Llama8B."
+   },
+   {
+    "affirmation": "Aux petites tailles, la méthode atteint 90 à 99 % de la précision de FFT ; l'écart se referme avec l'échelle.",
+    "citation": "At smaller backbones, Deletion Tuning recovers 90% to 99% of FFT’s accuracy."
+   },
+   {
+    "affirmation": "Le masque appris, et non l'initialisation Wanda, produit les gains.",
+    "citation": "The best Wanda mask stays within 2.4 points of the base on all six backbones, while Deletion Tuning, starting from the same Wanda scores, gains up to 53.2 points."
+   },
+   {
+    "affirmation": "L'entraînement utilise plus de mémoire que LoRA car un logit est conservé par poids masqué.",
+    "citation": "Training keeps one logit per masked weight, so Deletion Tuning uses less training memory than FFT but more than LoRA."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Deletion Tuning",
+    "definition": "Méthode d'adaptation d'un LLM qui apprend uniquement quels poids préentraînés mettre à zéro, sans écrire de nouvelle valeur."
+   },
+   {
+    "terme": "Fine-tuning complet (FFT)",
+    "definition": "Entraînement qui modifie tous les poids du modèle ; référence de qualité, mais checkpoint de plusieurs Go par tâche."
+   },
+   {
+    "terme": "LoRA",
+    "definition": "Adaptation par une petite mise à jour de faible rang, ajoutée aux poids gelés ; le rang r fixe la taille de l'adaptateur."
+   },
+   {
+    "terme": "RLVR / GRPO",
+    "definition": "Apprentissage par renforcement avec récompense vérifiable par règle ; GRPO compare chaque réponse à celles du même groupe, sans modèle de valeur."
+   },
+   {
+    "terme": "Distillation on-policy (SDFT)",
+    "definition": "Le modèle apprend sur ses propres réponses en imitant un enseignant ; en SDFT, l'enseignant est une moyenne glissante du modèle lui-même."
+   },
+   {
+    "terme": "Wanda",
+    "definition": "Score d'importance d'un poids (magnitude × norme de l'activation d'entrée), utilisé pour l'élagage ; ici seulement pour initialiser les logits."
+   },
+   {
+    "terme": "MTH",
+    "definition": "Multiple Ticket Hypothesis : baseline qui entraîne un petit sous-ensemble de poids choisi au hasard."
+   },
+   {
+    "terme": "Divergence KL avant",
+    "definition": "Mesure de l'écart entre les réponses du modèle entraîné et du modèle de base ; plus elle est faible, moins le modèle oublie."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "The Surprising Effectiveness of Deleting Weights in LLM Post-Training",
+    "url": "https://arxiv.org/abs/2611.10866",
+    "type": "primaire",
+    "date": "2026-11-07"
+   },
+   {
+    "titre": "Reddit r/LocalLLaMA : The Surprising Effectiveness of Deleting Weights in LLM Post-Training",
+    "url": "https://www.reddit.com/r/LocalLLaMA/comments/1xswmb7/the_surprising_effectiveness_of_deleting_weights/",
+    "type": "secondaire",
+    "date": "2026-11-10"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-07",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un masque appris de suppression de poids (gate_proj) égale-t-il LoRA et le fine-tuning complet en français sur une tâche à réponse exacte, avec moins d'oubli ?",
+  "hypothese": "Sur Qwen3-0.6B en SFT, le masque atteint au moins 95 % de l'exactitude du fine-tuning complet sur la classification d'intentions, avec une perte de précision hors tâche (HellaSwag français) inférieure de 1 point à celle de LoRA r=1.",
+  "reference": {
+   "nom": "LoRA rang 1 et fine-tuning complet",
+   "description": "Deux références du même modèle de départ : LoRA r=1 sur les projections MLP et fine-tuning complet, à données et pas égaux.",
+   "implementation": "transformers + peft ; SFT sur « texte → nom de classe », perte sur la réponse, 1 époque sur 3000 exemples, batch 16 ; FFT lr 1e-5, LoRA lr 2e-4 ; décodage glouton, correspondance exacte du nom.",
+   "modeles_hf": [
+    "Qwen/Qwen3-0.6B"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Deletion tuning (masque sur gate_proj)",
+   "description": "Un logit par poids de gate_proj, masque doux sigmoïde progressivement durci, initialisé par un score Wanda ; seul le masque est entraîné, le modèle reste gelé.",
+   "implementation": "Réimplémentation : remplacement de gate_proj par une couche masquée (W·sigmoid(logit/τ)), τ décroissant, init des logits depuis |W|×norme d'activation sur 128 exemples avec ~0,2 % de suppression, durcissement final à seuil 0 ; logits en fp32, lr 0,05 ; taille du masque compressée rapportée.",
+   "modeles_hf": [
+    "Qwen/Qwen3-0.6B"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "utterance, label (noms de classes via mteb/banking77 label_text, alignés par indice) ; pour l'oubli : jeu manu/french_bench_hellaswag (split validation) colonnes ctx, endings, label",
+   "representativite": "Tâche française à réponse exacte et vérifiable proche du routage, 77 classes proches, plus test d'oubli de bon sens.",
+   "ecarts_donnees_reelles": "Traduction automatique, textes courts, classes plates, modèle 0,6 B où la méthode n'égale pas le fine-tuning complet selon les auteurs ; SFT et non GRPO ; licences des jeux à clarifier.",
+   "jeux_explores": [
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "Étiquette exacte en français, 10 003 + 3 080 exemples.",
+     "decision": "retenu",
+     "raison": "Récompense/étiquette vérifiable la plus proche du routage."
+    },
+    {
+     "nom": "cea-list-ia/MathAleaQA",
+     "url": "https://huggingface.co/datasets/cea-list-ia/MathAleaQA",
+     "acces": "hub_libre",
+     "adequation": "Maths françaises, grande taille, réponse vérifiable.",
+     "decision": "ecarte",
+     "raison": "Gabarits, bruit, cc-by-sa et pas de lien métier ; modèle 0,6 B trop faible."
+    },
+    {
+     "nom": "juletxara/mgsm",
+     "url": "https://huggingface.co/datasets/juletxara/mgsm",
+     "acces": "hub_libre",
+     "adequation": "250 problèmes en français.",
+     "decision": "ecarte",
+     "raison": "Trop petit, pas de train français."
+    },
+    {
+     "nom": "openai/gsm8k",
+     "url": "https://huggingface.co/datasets/openai/gsm8k",
+     "acces": "hub_libre",
+     "adequation": "Benchmark de l'article, anglais.",
+     "decision": "ecarte",
+     "raison": "Anglais, GRPO hors budget."
+    },
+    {
+     "nom": "kurakurai/IFEval-FR",
+     "url": "https://huggingface.co/datasets/kurakurai/IFEval-FR",
+     "acces": "hub_libre",
+     "adequation": "235 consignes vérifiables.",
+     "decision": "ecarte",
+     "raison": "Vérificateur à implémenter, trop petit."
+    },
+    {
+     "nom": "manu/french_bench_hellaswag",
+     "url": "https://huggingface.co/datasets/manu/french_bench_hellaswag",
+     "acces": "hub_libre",
+     "adequation": "Bon sens en français, 9 338 exemples de validation.",
+     "decision": "retenu",
+     "raison": "Test d'oubli par log-vraisemblance, usage d'évaluation seul (licence non précisée)."
+    },
+    {
+     "nom": "FreedomIntelligence/MMLU_French",
+     "url": "https://huggingface.co/datasets/FreedomIntelligence/MMLU_French",
+     "acces": "hub_libre",
+     "adequation": "QCM traduits.",
+     "decision": "ecarte",
+     "raison": "En-têtes mal formés, traduction automatique."
+    }
+   ]
+  },
+  "metriques": [
+   "exact_match_accuracy",
+   "macro_f1",
+   "hellaswag_fr_accuracy",
+   "hellaswag_fr_accuracy_drop",
+   "adapter_size_mb",
+   "trainable_parameters"
+  ],
+  "metrique_principale": "exact_match_accuracy",
+  "sens": "max",
+  "protocole": "Entraînement : 3000 exemples tirés du split train de banking77_fr. Évaluation : 1000 exemples tirés du split test. Oubli : 500 exemples du split validation de manu/french_bench_hellaswag, score par log-vraisemblance des 4 fins, mesuré avant/après entraînement. Quatre bras : modèle sans entraînement (few-shot 5), LoRA r=1, fine-tuning complet, masque, à mêmes exemples, pas et ordre. Bootstrap sur le test pour les intervalles ; une seule exécution par bras (pas de répétition) donc conclusion limitée aux écarts supérieurs à l'intervalle. Libellés alignés sur mteb/banking77 par indice. Sorties hors liste de classes comptées comme erreurs.",
+  "niveau_sandbox": "complet",
+  "adaptation_sandbox": "Même modèle ; reduced : 100 exemples d'entraînement, 100 de test, 50 d'oubli, masque sur 4 couches seulement si la mémoire l'exige. Coût GPU full : 3000 ex × 60 tokens × 4 bras × 3 passes ≈ 2,2 M tokens ≈ 15 min, évaluation 1000 ex générées × 4 bras ≈ 10 min, oubli 500×4 candidats×4 bras ≈ 5 min ; mémoire FFT fp32 ~10 Go sur T4.",
+  "dependances": [
+   "peft"
+  ],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte à classer, anonymisé"
+    },
+    {
+     "colonne": "label",
+     "type": "string",
+     "description": "Classe cible exacte"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception"
+    }
+   ],
+   "volume_conseille": "≥ 5 000 textes d'entraînement, ≥ 20 par classe, 1 500 en test",
+   "metriques_metier": "Exactitude de routage, taille d'adaptateur par tâche, dégradation sur un jeu de contrôle interne non lié.",
+   "garde_fous": "Contrôler la régression sur tâches hors périmètre ; sorties hors liste rejetées ; modèle local seulement.",
+   "prescriptions": [
+    "Au moins 20 textes par classe en entraînement",
+    "Découpage temporel pour le test",
+    "Jeu de contrôle hors tâche interne distinct pour mesurer l'oubli",
+    "Étiquettes validées et noms de classes stables",
+    "Anonymisation avant extraction",
+    "Répéter sur plusieurs échantillons d'entraînement si possible"
+   ],
+   "preparation": "Extraire textes et classe finale validée, anonymiser, découper par date, constituer un jeu de contrôle de tâches voisines non entraînées, aligner les noms de classes."
+  },
+  "duree_estimee_minutes": 120,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "Qwen/Qwen3-0.6B": {
+    "id": "Qwen/Qwen3-0.6B",
+    "sha": "c1899de289a04d12100db370d81485cdf75e47ca",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 751632384,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "label": "Value",
+    "utterance": "Value"
+   },
+   "exemple": {
+    "label": 0,
+    "utterance": "S'il vous plaît, aidez-moi avec ma carte.  Il ne s'activera pas."
+   },
+   "lignes": {
+    "train": 10003,
+    "test": 3080
+   }
+  },
+  "paquets": {
+   "peft": {
+    "paquet": "peft",
+    "derniere_version": "0.21.2",
+    "licence": "Apache",
+    "auteur": "The HuggingFace team",
+    "source": "https://github.com/huggingface/peft"
+   }
+  }
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

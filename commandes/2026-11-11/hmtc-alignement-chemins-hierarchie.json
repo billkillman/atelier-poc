@@ -1,0 +1,334 @@
+{
+ "version": 1,
+ "jour": "2026-11-11",
+ "sujet_id": "hmtc-alignement-chemins-hierarchie",
+ "depot": "20261111_hierarchical_path_alignment_camembert_massive",
+ "fiche": {
+  "sujet_id": "hmtc-alignement-chemins-hierarchie",
+  "titre": "Classification hiérarchique : des pertes d'entraînement par chemins racine-feuille, +0,7 à +2,3 points F1 sur trois jeux publics anglais",
+  "en_une_phrase": "Deux pertes auxiliaires, utilisées seulement à l'entraînement, améliorent un encodeur RoBERTa en classification hiérarchique, sans coût à l'inférence. Gains modestes, jeux anglais, cohérence parent-enfant non garantie.",
+  "probleme": "Un classifieur standard traite chaque étiquette comme indépendante, alors que « carte → opposition carte » partage un contexte. Les noms d'étiquettes seuls distinguent mal les catégories fines. Les méthodes existantes traitent structure et sémantique séparément.",
+  "comment_ca_marche": "Un **chemin** est la suite des étiquettes de la racine à une étiquette (ex. carte → opposition). Le modèle garde un encodeur RoBERTa et un classifieur multi-étiquettes standard, entraînés avec la perte BCE (entropie croisée binaire, une décision oui/non par étiquette). Deux pertes s'y ajoutent, uniquement à l'entraînement :\n\n1. **PathSimNCE** : chaque chemin a un vecteur appris. Le texte est rapproché de ses chemins corrects, mais aussi, à degré moindre, des chemins proches dans l'arbre (distance via l'ancêtre commun). Des chemins voisins mal classés servent de contre-exemples.\n2. **Alignement de descriptions** : GPT-4o génère hors ligne, pour chaque paire texte-chemin, une phrase expliquant le lien. Le texte est rapproché de ces descriptions, par apprentissage contrastif (rapprocher les paires correctes, éloigner les autres).\n\nÀ l'inférence, rien d'autre que l'encodeur et le classifieur.",
+  "demarche_experimentale": "Trois jeux publics anglais : WOS (profondeur 2, 141 étiquettes), BGC (4, 146), NYT (8, 166). Encodeur RoBERTa-base, 3 exécutions, une GPU H100. Les baselines sont ré-exécutées par les auteurs, sauf HYDRA Local. Métriques : micro-F1 et macro-F1.",
+  "resultats": [
+   {
+    "metrique": "Micro-F1 / Macro-F1 (plus haut = mieux)",
+    "valeur": "NYT : 82,52 / 73,18",
+    "comparaison": "BCE seul : 81,79 / 72,06 ; meilleure baseline Micro 81,87, Macro 72,71",
+    "conditions": "RoBERTa-base, moyenne de 3 exécutions (écart-type 0,22 / 0,26)",
+    "citation": "Ours | 88.15 ± 0.12 | 81.23 ± 0.27 | 82.39 ± 0.15 | 68.85 ± 0.33 | 82.52 ± 0.22 | 73.18 ± 0.26"
+   },
+   {
+    "metrique": "Micro-F1 / Macro-F1 sur WOS",
+    "valeur": "88,15 / 81,23",
+    "comparaison": "BCE seul : 86,45 / 78,89 ; LGSA : 88,11 / 82,93 (meilleur Macro)",
+    "conditions": "WOS, hiérarchie peu profonde, 3 exécutions",
+    "citation": "On WOS, our method obtains a Micro-F1 score of 88.15, slightly surpassing the strongest baseline by 0.04 points. Its Macro-F1 score of 81.23 remains competitive, although it is lower than the best baseline result of 82.93."
+   },
+   {
+    "metrique": "Ablation Micro-F1 : ajout des descriptions LLM à BCE+PathSimNCE",
+    "valeur": "+0,62 / +0,71 / +0,23",
+    "comparaison": "Descriptions par gabarit : dégradation sur WOS (Micro 86,17)",
+    "conditions": "WOS / BGC / NYT, 3 exécutions",
+    "citation": "LLM-generated descriptions consistently achieve the best results, improving over the variant without description alignment by 0.62, 0.71, and 0.23 Micro-F1 points on WOS, BGC, and NYT, respectively."
+   }
+  ],
+  "limites": [
+   "Gains souvent proches du bruit : +0,04 pt de Micro-F1 sur WOS face à la meilleure baseline, 3 exécutions seulement, Macro-F1 WOS inférieur à LGSA (donnée source).",
+   "Les prédictions ne sont pas contraintes : parent et enfant peuvent rester incohérents à l'inférence, et un arbre à parent unique est requis (limites des auteurs).",
+   "Jeux anglais (articles, résumés, quatrièmes de couverture), multi-étiquettes, RoBERTa-base. Rien sur le français, ~300 classes proches ni calibration. Descriptions GPT-4o : coût et bruit possibles."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "+1,70 pt",
+    "libelle": "Micro-F1 sur WOS (88,15 contre 86,45) face au RoBERTa-base entraîné classiquement"
+   },
+   {
+    "valeur": "+1,12 pt",
+    "libelle": "Macro-F1 sur NYT (73,18 contre 72,06), même baseline ; plus haut = mieux"
+   },
+   {
+    "valeur": "0",
+    "libelle": "composant ajouté à l'inférence : encodeur et classifieur standard seulement"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Les deux objectifs ne servent qu'à l'entraînement ; l'inférence utilise un encodeur et un classifieur multi-étiquettes standard.",
+    "citation": "At inference time, only the text encoder and multi-label classifier are retained."
+   },
+   {
+    "affirmation": "Les descriptions de chemins sont générées hors ligne par GPT-4o, conditionnées par le document.",
+    "citation": "Path descriptions are generated offline using GPT-4o (OpenAI, 2024)"
+   },
+   {
+    "affirmation": "Toutes les baselines utilisent le même encodeur RoBERTa-base, ré-exécutées par les auteurs sauf HYDRA Local ; résultats moyennés sur 3 exécutions.",
+    "citation": "all reproduced methods use the same RoBERTa-base encoder, regardless of the encoders originally adopted in their respective papers."
+   },
+   {
+    "affirmation": "PathSimNCE apporte l'essentiel du gain ; les descriptions apportent un complément.",
+    "citation": "structural path supervision provides the main improvement, while description alignment offers complementary semantic supervision."
+   },
+   {
+    "affirmation": "Sur WOS, le Macro-F1 est inférieur à la meilleure baseline et le gain en Micro-F1 est de 0,04 point.",
+    "citation": "Its Macro-F1 score of 81.23 remains competitive, although it is lower than the best baseline result of 82.93."
+   },
+   {
+    "affirmation": "La cohérence hiérarchique des prédictions n'est pas garantie, et un seul parent par étiquette est requis.",
+    "citation": "the resulting label set is not guaranteed to be hierarchically consistent at inference time."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "HMTC",
+    "definition": "Classification de textes multi-étiquettes où les étiquettes forment une hiérarchie (général vers précis) et où un texte peut en porter plusieurs."
+   },
+   {
+    "terme": "Chemin racine-feuille",
+    "definition": "Suite des étiquettes de la racine de l'arbre jusqu'à une étiquette donnée, par exemple motif puis sous-motif."
+   },
+   {
+    "terme": "Apprentissage contrastif",
+    "definition": "Entraînement qui rapproche dans l'espace des vecteurs les paires qui vont ensemble et éloigne les autres."
+   },
+   {
+    "terme": "InfoNCE",
+    "definition": "Perte contrastive classique : le modèle doit retrouver le bon élément parmi des candidats, via une softmax sur les similarités."
+   },
+   {
+    "terme": "BCE",
+    "definition": "Entropie croisée binaire : perte standard pour décider, étiquette par étiquette, présente ou non."
+   },
+   {
+    "terme": "Micro-F1 / Macro-F1",
+    "definition": "Scores combinant précision et rappel. Micro : global, dominé par les étiquettes fréquentes. Macro : moyenne par étiquette, sensible aux rares. Plus haut = mieux."
+   },
+   {
+    "terme": "Ancêtre commun (LCA)",
+    "definition": "Le nœud le plus bas de l'arbre dont descendent deux chemins ; sert à mesurer leur distance."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Path-Level Structural and Semantic Alignment for Hierarchical Multi-Label Text Classification",
+    "url": "https://arxiv.org/abs/2611.12420",
+    "type": "primaire",
+    "date": "2026-11-09"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-09",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Des pertes d'alignement par chemins racine-feuille améliorent-elles un CamemBERT sur une classification hiérarchique en français, à budget d'étiquettes variable ?",
+  "hypothese": "L'ajout de PathSimNCE (puis de l'alignement de descriptions) à une perte BCE sur nœuds augmente le macro-F1 des feuilles d'au moins 1 point et la cohérence parent-enfant d'au moins 2 points, surtout à 5 exemples par classe.",
+  "reference": {
+   "nom": "CamemBERT + BCE sur nœuds",
+   "description": "CamemBERT-base avec tête multi-étiquettes (scénario et intention) entraînée en entropie croisée binaire ; prédiction de la feuille de plus forte probabilité.",
+   "implementation": "transformers AutoModel + tête linéaire sur 78 nœuds (18 parents + 60 feuilles), BCE, 5 époques, lr 5e-5, batch 32, fp16.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "PathSimNCE + alignement de descriptions",
+   "description": "Perte contrastive texte↔chemins avec cibles pondérées par la proximité dans l'arbre, plus alignement texte↔descriptions de chemins, utilisés seulement à l'entraînement.",
+   "implementation": "Réimplémentation : un vecteur appris par chemin, InfoNCE avec poids de similarité selon l'ancêtre commun, négatifs durs parmi chemins voisins mal classés ; descriptions de chemins générées par gabarit à partir des libellés (pas de LLM propriétaire) et encodées par l'encodeur partagé, perte contrastive ; poids des pertes 0,5 ; inférence = tête BCE seule. En phase privée, les descriptions sont générées par le LLMaaS.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "llmaas"
+  },
+  "jeu_public": {
+   "hub_id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "text, label_text (scénario = préfixe avant le premier '_')",
+   "representativite": "Seul jeu français chargeable avec arbre à parent unique (18 scénarios → 60 intentions) et classes proches au sein d'un scénario.",
+   "ecarts_donnees_reelles": "Énoncés d'assistant vocal courts, hors services financiers, 60 classes et 2 niveaux, mono-étiquette, descriptions par gabarit et non générées par LLM.",
+   "jeux_explores": [
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "Arbre à 2 niveaux en français, 11 514 / 2 033 / 2 974 exemples.",
+     "decision": "retenu",
+     "raison": "Seule hiérarchie native française chargeable, licence apache-2.0."
+    },
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "77 classes proches de services financiers, sans arbre.",
+     "decision": "ecarte",
+     "raison": "Parents à inventer, cohérence artificielle."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "~113 intentions déséquilibrées, domaines dans un autre jeu.",
+     "decision": "ecarte",
+     "raison": "Appariement ligne à ligne non vérifié, licence inconnue."
+    },
+    {
+     "nom": "marcelsun/wos_hierarchical_multi_label_text_classification",
+     "url": "https://huggingface.co/datasets/marcelsun/wos_hierarchical_multi_label_text_classification",
+     "acces": "hub_libre",
+     "adequation": "WOS anglais, réplication de l'article.",
+     "decision": "ecarte",
+     "raison": "Anglais, hiérarchie à reconstruire."
+    },
+    {
+     "nom": "DeepPavlov/clinc150_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/clinc150_fr",
+     "acces": "hub_libre",
+     "adequation": "150 intentions françaises.",
+     "decision": "ecarte",
+     "raison": "Domaines absents des colonnes."
+    },
+    {
+     "nom": "BlurbGenreCollection-HMC",
+     "url": "https://github.com/uhh-lt/BlurbGenreCollection-HMC",
+     "acces": "telechargement_libre",
+     "adequation": "Hiérarchie profonde, anglais.",
+     "decision": "ecarte",
+     "raison": "Hors Hub, anglais."
+    },
+    {
+     "nom": "Corpus d'e-mails TALN 2026",
+     "url": "https://talnarchives.atala.org/TALN/TALN-2026/68.pdf",
+     "acces": "restreint",
+     "adequation": "E-mails français, 21 catégories.",
+     "decision": "ecarte",
+     "raison": "Non commercial, sans hiérarchie."
+    }
+   ]
+  },
+  "metriques": [
+   "leaf_macro_f1",
+   "leaf_micro_f1",
+   "parent_accuracy",
+   "hierarchical_consistency_rate",
+   "rare_class_macro_f1"
+  ],
+  "metrique_principale": "leaf_macro_f1",
+  "sens": "max",
+  "protocole": "Trois variantes (BCE, +PathSimNCE, +descriptions) × trois budgets : 5 et 20 exemples par classe tirés du split train, puis train complet. Le split validation sert à choisir l'époque (même règle pour toutes les variantes) ; évaluation sur le split test. Cohérence = part des prédictions dont le parent prédit (argmax des nœuds parents) est le parent de la feuille prédite. Intervalles par bootstrap du test, test apparié par exemple. Une exécution par configuration : conclusions prudentes sous 1 point.",
+  "niveau_sandbox": "complet",
+  "adaptation_sandbox": "Même modèle ; reduced : 5 exemples par classe, 1 époque, 300 exemples de test, un seul budget. Échelle complète : textes de ~20 tokens, 9 entraînements (≤ 11 514 exemples, 5 époques) sur T4, nettement sous 45 min.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte du message ou e-mail anonymisé"
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif (niveau 1)"
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif (niveau 2)"
+    },
+    {
+     "colonne": "sub_reason_description",
+     "type": "string",
+     "description": "Description courte du sous-motif pour l'alignement"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception"
+    }
+   ],
+   "volume_conseille": "≥ 30 000 textes, ≥ 20 par sous-motif pour l'entraînement complet, taxonomie à parent unique",
+   "metriques_metier": "Macro-F1 par motif, taux d'incohérence motif/sous-motif, taux de routage correct.",
+   "garde_fous": "Descriptions générées par le service interne, jamais par une API externe ; vérifier la cohérence avant routage.",
+   "prescriptions": [
+    "Taxonomie à parent unique, figée sur la période",
+    "Au moins 20 textes par sous-motif en entraînement et 10 en test",
+    "Annotations contrôlées par double lecture sur 5 % des textes",
+    "Découpage temporel entre entraînement et test",
+    "Anonymisation des données personnelles",
+    "Conserver les classes rares pour mesurer leur F1 à part"
+   ],
+   "preparation": "Extraire les textes avec motif et sous-motif validés, vérifier l'unicité du parent, rédiger ou générer les descriptions de sous-motifs, découper par date, sous-échantillonner pour simuler les budgets."
+  },
+  "duree_estimee_minutes": 60,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "splits": [
+    "train",
+    "test",
+    "validation"
+   ],
+   "licence": "apache-2.0",
+   "colonnes": {
+    "id": "Value",
+    "label": "Value",
+    "label_text": "Value",
+    "text": "Value",
+    "lang": "Value"
+   },
+   "exemple": {
+    "id": "1",
+    "label": "alarm_set",
+    "label_text": "alarm_set",
+    "text": "réveille-moi à neuf heures du matin le vendredi",
+    "lang": "fr"
+   },
+   "lignes": {
+    "train": 11514,
+    "test": 2974,
+    "validation": 2033
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
