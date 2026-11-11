@@ -5,10 +5,10 @@
  "depot": "20261111_deletion_tuning_vs_lora_french_classification",
  "titre": "Un masque appris de suppression de poids (gate_proj) égale-t-il LoRA et le fine-tuning complet en français sur une tâche à réponse exacte, avec moins d'oubli ?",
  "debut": "2026-11-11T02:12:32Z",
- "maj": "2026-11-11T03:09:16Z",
+ "maj": "2026-11-11T03:19:17Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 3 : phase publique sur le jeu public (échelle réduite, CPU)",
+ "detail": "itération 3 : phase privée sur données factices, contre le faux service",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.83,
+ "progression": 0.875,
  "estimation_fin": "2026-11-11T03:47:47Z",
  "resultat": null
 }
