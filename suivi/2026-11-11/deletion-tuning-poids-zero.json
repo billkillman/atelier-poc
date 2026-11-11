@@ -5,10 +5,10 @@
  "depot": "20261111_deletion_tuning_vs_lora_french_classification",
  "titre": "Un masque appris de suppression de poids (gate_proj) égale-t-il LoRA et le fine-tuning complet en français sur une tâche à réponse exacte, avec moins d'oubli ?",
  "debut": "2026-11-11T02:12:32Z",
- "maj": "2026-11-11T03:29:18Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-11T03:30:45Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,72 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-11T03:03:08Z",
-   "fin": null
+   "fin": "2026-11-11T03:30:36Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-11T03:30:36Z",
+   "fin": "2026-11-11T03:30:45Z"
   }
  ],
- "progression": 0.99,
- "estimation_fin": "2026-11-11T03:31:21Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261111_deletion_tuning_vs_lora_french_classification",
+  "depot": "20261111_deletion_tuning_vs_lora_french_classification",
+  "en_bref": "Aucune approche entraînée n'a réellement appris à cette échelle : l'hypothèse sur le masque et l'oubli reste non tranchée. La méthode n'est ni confirmée ni infirmée ; la capacité d'apprentissage du masque reste à vérifier.",
+  "synthese": "exact_match_accuracy : Deletion tuning (masque gate_proj) 0 contre 0,03 pour Fine-tuning complet (100 exemples, échelle réduite, CPU du sandbox).",
+  "metrique_principale": "exact_match_accuracy",
+  "libelle_metrique": "Exactitude (correspondance exacte)",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "Modèle de base (few-shot 5)",
+    "role": "reference",
+    "valeur": 0.07,
+    "ic95": [
+     0.02,
+     0.12
+    ]
+   },
+   {
+    "nom": "LoRA r=1",
+    "role": "reference",
+    "valeur": 0.0,
+    "ic95": [
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "nom": "Fine-tuning complet",
+    "role": "reference",
+    "valeur": 0.03,
+    "ic95": [
+     0.0,
+     0.07
+    ]
+   },
+   {
+    "nom": "Deletion tuning (masque gate_proj)",
+    "role": "nouvelle",
+    "valeur": 0.0,
+    "ic95": [
+     0.0,
+     0.0
+    ]
+   }
+  ],
+  "n_exemples": 100,
+  "jeu": "DeepPavlov/banking77_fr",
+  "materiel": "CPU du sandbox",
+  "echelle": "reduite",
+  "confiance": "faible",
+  "tentatives": 1
+ }
 }
