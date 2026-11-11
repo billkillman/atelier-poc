@@ -1,0 +1,62 @@
+{
+ "version": 1,
+ "jour": "2026-11-11",
+ "sujet_id": "deletion-tuning-poids-zero",
+ "depot": "20261111_deletion_tuning_vs_lora_french_classification",
+ "titre": "Un masque appris de suppression de poids (gate_proj) égale-t-il LoRA et le fine-tuning complet en français sur une tâche à réponse exacte, avec moins d'oubli ?",
+ "debut": "2026-11-11T02:12:32Z",
+ "maj": "2026-11-11T02:12:32Z",
+ "statut": "en_cours",
+ "etape": "ecriture",
+ "detail": "le modèle écrit le notebook : protocole, deux approches, évaluation",
+ "iteration": 0,
+ "iterations_max": 3,
+ "sous_progression": null,
+ "etapes": [
+  {
+   "code": "ecriture",
+   "libelle": "Écriture du notebook",
+   "statut": "en_cours",
+   "debut": "2026-11-11T02:12:32Z",
+   "fin": null
+  },
+  {
+   "code": "essai",
+   "libelle": "Exécution à échelle réduite",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue_prealable",
+   "libelle": "Relecture avant l'échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "complete",
+   "libelle": "Échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue",
+   "libelle": "Revue de méthode",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "publication",
+   "libelle": "Publication",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  }
+ ],
+ "progression": 0.0,
+ "estimation_fin": "2026-11-11T05:07:32Z",
+ "resultat": null
+}
