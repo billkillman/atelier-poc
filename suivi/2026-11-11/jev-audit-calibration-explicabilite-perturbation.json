@@ -5,10 +5,10 @@
  "depot": "20261111_typed_decider_calibration_noise_camembert",
  "titre": "Un décideur typé à probabilités par option est-il mieux calibré et plus robuste au bruit qu'un CamemBERT entièrement entraîné, avant et après recalibrage ?",
  "debut": "2026-11-11T04:23:04Z",
- "maj": "2026-11-11T05:04:06Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-11T05:05:16Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 2,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,54 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-11T05:04:06Z",
-   "fin": null
+   "fin": "2026-11-11T05:05:09Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-11T05:05:09Z",
+   "fin": "2026-11-11T05:05:16Z"
   }
  ],
- "progression": 0.982,
- "estimation_fin": "2026-11-11T05:07:06Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261111_typed_decider_calibration_noise_camembert",
+  "depot": "20261111_typed_decider_calibration_noise_camembert",
+  "en_bref": "L'expérience ne permet pas de dire si le décideur typé est mieux calibré que CamemBERT. À cette échelle, la référence n'a presque rien appris, donc son ECE basse est triviale. Verdict non concluant.",
+  "synthese": "expected_calibration_error_recalibrated : Décideur typé Qwen3-0.6B + LoRA 0,143 contre 0,0225 pour CamemBERT-base fine-tuné (100 exemples, échelle réduite, CPU du sandbox).",
+  "metrique_principale": "expected_calibration_error_recalibrated",
+  "libelle_metrique": "ECE recalibrée (bruité)",
+  "sens": "min",
+  "approches": [
+   {
+    "nom": "CamemBERT-base fine-tuné",
+    "role": "reference",
+    "valeur": 0.02251330986618997,
+    "ic95": [
+     0.006672488823533052,
+     0.06761009357869624
+    ]
+   },
+   {
+    "nom": "Décideur typé Qwen3-0.6B + LoRA",
+    "role": "nouvelle",
+    "valeur": 0.14315435409545899,
+    "ic95": [
+     0.10687247306108474,
+     0.2042891914397478
+    ]
+   }
+  ],
+  "n_exemples": 100,
+  "jeu": "DeepPavlov/banking77_fr",
+  "materiel": "CPU du sandbox",
+  "echelle": "reduite",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
