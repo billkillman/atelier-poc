@@ -5,10 +5,10 @@
  "depot": "20261111_hierarchical_path_alignment_camembert_massive",
  "titre": "Des pertes d'alignement par chemins racine-feuille améliorent-elles un CamemBERT sur une classification hiérarchique en français, à budget d'étiquettes variable ?",
  "debut": "2026-11-11T03:34:56Z",
- "maj": "2026-11-11T03:49:10Z",
+ "maj": "2026-11-11T03:53:50Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 1 sur 3",
+ "detail": "itération 1 : phase publique sur le jeu public (échelle réduite, CPU)",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.217,
+ "progression": 0.258,
  "estimation_fin": "2026-11-11T05:19:10Z",
  "resultat": null
 }
