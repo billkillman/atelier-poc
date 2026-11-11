@@ -3,6 +3,82 @@
  "pocs": [
   {
    "jour": "2026-11-11",
+   "sujet_id": "jev-audit-calibration-explicabilite-perturbation",
+   "depot": "20261111_typed_decider_calibration_noise_camembert",
+   "titre": "Un décideur typé à probabilités par option est-il mieux calibré et plus robuste au bruit qu'un CamemBERT entièrement entraîné, avant et après recalibrage ?",
+   "statut": "valide",
+   "niveau_sandbox": "complet",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné)",
+    "raison": "exception (cellule 52, section new_approach)"
+   },
+   "iterations": 2,
+   "metrique_principale": "expected_calibration_error_recalibrated",
+   "sens": "min",
+   "approches": [
+    {
+     "nom": "CamemBERT-base fine-tuné",
+     "role": "reference",
+     "valeur": 0.02251330986618997,
+     "ic95": [
+      0.006672488823533052,
+      0.06761009357869624
+     ]
+    },
+    {
+     "nom": "Décideur typé Qwen3-0.6B + LoRA",
+     "role": "nouvelle",
+     "valeur": 0.14315435409545899,
+     "ic95": [
+      0.10687247306108474,
+      0.2042891914397478
+     ]
+    }
+   ],
+   "n_exemples": 100,
+   "jeu": "DeepPavlov/banking77_fr",
+   "synthese": "expected_calibration_error_recalibrated : Décideur typé Qwen3-0.6B + LoRA 0,143 contre 0,0225 pour CamemBERT-base fine-tuné (100 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (100 messages de test, 96 exemples pour le décideur, 500 pour CamemBERT, CPU), les chiffres ne permettent pas de trancher. CamemBERT, entraîné une seule époque pour 77 classes, atteint 0,11 d'exactitude : son ECE recalibrée très basse (0,023, contre 0,143 pour le décideur) est triviale, car il est proche du hasard. Le décideur Qwen3-0.6B + LoRA atteint 0,40 d'exactitude, mais les intervalles sont larges. Le verdict automatique « non concluant » est justifié. Le protocole est correct dans son principe (mêmes candidats, température ajustée sur du texte propre), mais l'hypothèse d'une ECE bruitée inférieure de 30 % ne peut être jugée qu'avec une référence convergée à l'échelle complète. Les chiffres de la source (modèles de décision commerciaux, anglais) ne sont pas comparables.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "L'expérience ne permet pas de dire si le décideur typé est mieux calibré que CamemBERT. À cette échelle, la référence n'a presque rien appris, donc son ECE basse est triviale. Verdict non concluant.",
+   "libelle_metrique": "ECE recalibrée (bruité)",
+   "reserves": [
+    "La référence est quasiment non entraînée : son ECE basse et l'avantage du décideur en exactitude ne disent rien sur la comparaison réelle. Ces chiffres ne permettent pas de trancher."
+   ],
+   "duree_minutes": 42.2,
+   "consommation": {
+    "claude:poc_code:jev-audit-calibration-explicabilite-perturbation": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1072.0,
+     "cout_equivalent_usd": 3.8163,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:jev-audit-calibration-explicabilite-perturbation": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 265.4,
+     "cout_equivalent_usd": 1.193,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:jev-audit-calibration-explicabilite-perturbation": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 122.3,
+     "cout_equivalent_usd": 0.5915,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261111_typed_decider_calibration_noise_camembert",
+   "tentatives": 1
+  },
+  {
+   "jour": "2026-11-11",
    "sujet_id": "hmtc-alignement-chemins-hierarchie",
    "depot": "20261111_hierarchical_path_alignment_camembert_massive",
    "titre": "Des pertes d'alignement par chemins racine-feuille améliorent-elles un CamemBERT sur une classification hiérarchique en français, à budget d'étiquettes variable ?",
