@@ -5,10 +5,10 @@
  "depot": "20261111_hierarchical_path_alignment_camembert_massive",
  "titre": "Des pertes d'alignement par chemins racine-feuille améliorent-elles un CamemBERT sur une classification hiérarchique en français, à budget d'étiquettes variable ?",
  "debut": "2026-11-11T03:34:56Z",
- "maj": "2026-11-11T04:19:07Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-11T04:19:56Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,63 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-11T04:19:07Z",
-   "fin": null
+   "fin": "2026-11-11T04:19:49Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-11T04:19:49Z",
+   "fin": "2026-11-11T04:19:56Z"
   }
  ],
- "progression": 0.974,
- "estimation_fin": "2026-11-11T04:22:07Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261111_hierarchical_path_alignment_camembert_massive",
+  "depot": "20261111_hierarchical_path_alignment_camembert_massive",
+  "en_bref": "Les pertes par chemins améliorent nettement le macro-F1 en français, mais dégradent la cohérence parent-enfant, donc l'hypothèse complète n'est pas confirmée. Les descriptions par gabarit n'apportent rien de plus, et une seule exécution par configuration limite la portée.",
+  "synthese": "leaf_macro_f1 : BCE + PathSimNCE + descriptions 0,825 contre 0,802 pour CamemBERT + BCE (référence) (2974 exemples, GPU T4 (Google Colab)).",
+  "metrique_principale": "leaf_macro_f1",
+  "libelle_metrique": "Macro-F1 des feuilles",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "CamemBERT + BCE (référence)",
+    "role": "reference",
+    "valeur": 0.8023340039853357,
+    "ic95": [
+     0.7857055907989858,
+     0.8299287394341179
+    ]
+   },
+   {
+    "nom": "BCE + PathSimNCE",
+    "role": "nouvelle",
+    "valeur": 0.8355308706579126,
+    "ic95": [
+     0.8144480315464274,
+     0.8642459881536275
+    ]
+   },
+   {
+    "nom": "BCE + PathSimNCE + descriptions",
+    "role": "nouvelle",
+    "valeur": 0.8247910396468204,
+    "ic95": [
+     0.8035363012102493,
+     0.8564352840368854
+    ]
+   }
+  ],
+  "n_exemples": 2974,
+  "jeu": "mteb/amazon_massive_intent",
+  "materiel": "GPU T4 (Google Colab)",
+  "echelle": "complete",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
