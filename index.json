@@ -3,6 +3,93 @@
  "pocs": [
   {
    "jour": "2026-11-11",
+   "sujet_id": "hmtc-alignement-chemins-hierarchie",
+   "depot": "20261111_hierarchical_path_alignment_camembert_massive",
+   "titre": "Des pertes d'alignement par chemins racine-feuille améliorent-elles un CamemBERT sur une classification hiérarchique en français, à budget d'étiquettes variable ?",
+   "statut": "valide",
+   "niveau_sandbox": "complet",
+   "echelle": "complete",
+   "materiel": "GPU T4 (Google Colab)",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT + BCE sur nœuds)",
+    "raison": ""
+   },
+   "iterations": 1,
+   "metrique_principale": "leaf_macro_f1",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "CamemBERT + BCE (référence)",
+     "role": "reference",
+     "valeur": 0.8023340039853357,
+     "ic95": [
+      0.7857055907989858,
+      0.8299287394341179
+     ]
+    },
+    {
+     "nom": "BCE + PathSimNCE",
+     "role": "nouvelle",
+     "valeur": 0.8355308706579126,
+     "ic95": [
+      0.8144480315464274,
+      0.8642459881536275
+     ]
+    },
+    {
+     "nom": "BCE + PathSimNCE + descriptions",
+     "role": "nouvelle",
+     "valeur": 0.8247910396468204,
+     "ic95": [
+      0.8035363012102493,
+      0.8564352840368854
+     ]
+    }
+   ],
+   "n_exemples": 2974,
+   "jeu": "mteb/amazon_massive_intent",
+   "synthese": "leaf_macro_f1 : BCE + PathSimNCE + descriptions 0,825 contre 0,802 pour CamemBERT + BCE (référence) (2974 exemples, GPU T4 (Google Colab)).",
+   "conclusion": "À l'échelle complète (tout le jeu de test, 2 974 exemples, GPU T4), PathSimNCE améliore le macro-F1 des feuilles de la référence de +2,3 pts (5 exemples par feuille), +6,1 pts (20) et +3,3 pts (train complet), avec des intervalles appariés au-dessus de zéro. Les descriptions par gabarit n'ajoutent rien (+5,1, +5,9 et +2,2 pts). En revanche, la cohérence parent-enfant baisse partout (de -1,0 à -4,8 pts), donc l'hypothèse complète n'est pas soutenue, et le gain en exactitude globale reste faible (+0,7 pt au train complet). Une seule exécution par configuration et un jeu d'assistant vocal en français rendent l'ampleur des gains incertaine. Les chiffres ne se comparent pas à ceux de la source (autres jeux, autre tâche), et l'échelle réduite, sous le niveau du hasard, n'apporte aucune information.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Les pertes par chemins améliorent nettement le macro-F1 en français, mais dégradent la cohérence parent-enfant, donc l'hypothèse complète n'est pas confirmée. Les descriptions par gabarit n'apportent rien de plus, et une seule exécution par configuration limite la portée.",
+   "libelle_metrique": "Macro-F1 des feuilles",
+   "reserves": [
+    "Le gain de macro-F1 est réel sur ce jeu, mais il s'accompagne d'une baisse de la cohérence parent-enfant. L'hypothèse complète n'est donc pas confirmée, et un contrôle au routage devient plus nécessaire.",
+    "Le sens du gain de PathSimNCE sur la référence est plausible, mais son ampleur (de +2 à +6 pts) reste incertaine. Rien ne permet de classer PathSimNCE seul et PathSimNCE avec descriptions.",
+    "Sur l'ensemble des énoncés, l'amélioration est faible (moins d'un point d'exactitude). Le gain de macro-F1 est surtout porté par un petit nombre de classes, souvent rares, avec peu d'exemples de test."
+   ],
+   "duree_minutes": 44.9,
+   "consommation": {
+    "claude:poc_code:hmtc-alignement-chemins-hierarchie": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 854.0,
+     "cout_equivalent_usd": 2.2919,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:hmtc-alignement-chemins-hierarchie": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 279.8,
+     "cout_equivalent_usd": 1.2763,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:hmtc-alignement-chemins-hierarchie": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 74.2,
+     "cout_equivalent_usd": 0.5451,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261111_hierarchical_path_alignment_camembert_massive",
+   "tentatives": 1
+  },
+  {
+   "jour": "2026-11-11",
    "sujet_id": "deletion-tuning-poids-zero",
    "depot": "20261111_deletion_tuning_vs_lora_french_classification",
    "titre": "Un masque appris de suppression de poids (gate_proj) égale-t-il LoRA et le fine-tuning complet en français sur une tâche à réponse exacte, avec moins d'oubli ?",
