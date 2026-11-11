@@ -1,0 +1,62 @@
+{
+ "version": 1,
+ "jour": "2026-11-11",
+ "sujet_id": "hmtc-alignement-chemins-hierarchie",
+ "depot": "20261111_hierarchical_path_alignment_camembert_massive",
+ "titre": "Des pertes d'alignement par chemins racine-feuille améliorent-elles un CamemBERT sur une classification hiérarchique en français, à budget d'étiquettes variable ?",
+ "debut": "2026-11-11T03:34:56Z",
+ "maj": "2026-11-11T03:34:56Z",
+ "statut": "en_cours",
+ "etape": "ecriture",
+ "detail": "le modèle écrit le notebook : protocole, deux approches, évaluation",
+ "iteration": 0,
+ "iterations_max": 3,
+ "sous_progression": null,
+ "etapes": [
+  {
+   "code": "ecriture",
+   "libelle": "Écriture du notebook",
+   "statut": "en_cours",
+   "debut": "2026-11-11T03:34:56Z",
+   "fin": null
+  },
+  {
+   "code": "essai",
+   "libelle": "Exécution à échelle réduite",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue_prealable",
+   "libelle": "Relecture avant l'échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "complete",
+   "libelle": "Échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue",
+   "libelle": "Revue de méthode",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "publication",
+   "libelle": "Publication",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  }
+ ],
+ "progression": 0.0,
+ "estimation_fin": "2026-11-11T05:29:56Z",
+ "resultat": null
+}
