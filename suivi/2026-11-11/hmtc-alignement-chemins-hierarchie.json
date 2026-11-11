@@ -5,10 +5,10 @@
  "depot": "20261111_hierarchical_path_alignment_camembert_massive",
  "titre": "Des pertes d'alignement par chemins racine-feuille améliorent-elles un CamemBERT sur une classification hiérarchique en français, à budget d'étiquettes variable ?",
  "debut": "2026-11-11T03:34:56Z",
- "maj": "2026-11-11T03:57:16Z",
+ "maj": "2026-11-11T03:59:35Z",
  "statut": "en_cours",
- "etape": "essai",
- "detail": "itération 1 : phase privée sur données factices, contre le faux service",
+ "etape": "complete",
+ "detail": "sur GPU GPU T4 (Google Colab)",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -23,22 +23,22 @@
   {
    "code": "essai",
    "libelle": "Exécution à échelle réduite",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-11T03:49:10Z",
-   "fin": null
+   "fin": "2026-11-11T03:59:03Z"
   },
   {
    "code": "revue_prealable",
    "libelle": "Relecture avant l'échelle complète",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-11T03:59:03Z",
+   "fin": "2026-11-11T03:59:35Z"
   },
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-11T03:59:35Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.288,
- "estimation_fin": "2026-11-11T05:19:10Z",
+ "progression": 0.452,
+ "estimation_fin": "2026-11-11T05:02:35Z",
  "resultat": null
 }
