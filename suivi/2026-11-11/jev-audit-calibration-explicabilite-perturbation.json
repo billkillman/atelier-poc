@@ -5,26 +5,26 @@
  "depot": "20261111_typed_decider_calibration_noise_camembert",
  "titre": "Un décideur typé à probabilités par option est-il mieux calibré et plus robuste au bruit qu'un CamemBERT entièrement entraîné, avant et après recalibrage ?",
  "debut": "2026-11-11T04:23:04Z",
- "maj": "2026-11-11T04:23:04Z",
+ "maj": "2026-11-11T04:40:56Z",
  "statut": "en_cours",
- "etape": "ecriture",
- "detail": "le modèle écrit le notebook : protocole, deux approches, évaluation",
- "iteration": 0,
+ "etape": "essai",
+ "detail": "itération 1 : correction du notebook (il ne respecte pas les règles de l'atelier (contrôle avant exécution))",
+ "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
  "etapes": [
   {
    "code": "ecriture",
    "libelle": "Écriture du notebook",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-11T04:23:04Z",
-   "fin": null
+   "fin": "2026-11-11T04:40:56Z"
   },
   {
    "code": "essai",
    "libelle": "Exécution à échelle réduite",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-11T04:40:56Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.0,
- "estimation_fin": "2026-11-11T06:48:04Z",
+ "progression": 0.172,
+ "estimation_fin": "2026-11-11T06:40:56Z",
  "resultat": null
 }
