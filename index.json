@@ -2,6 +2,101 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-11",
+   "sujet_id": "deletion-tuning-poids-zero",
+   "depot": "20261111_deletion_tuning_vs_lora_french_classification",
+   "titre": "Un masque appris de suppression de poids (gate_proj) égale-t-il LoRA et le fine-tuning complet en français sur une tâche à réponse exacte, avec moins d'oubli ?",
+   "statut": "valide",
+   "niveau_sandbox": "complet",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : LoRA rang 1 et fine-tuning complet)",
+    "raison": "exception (cellule 45, section reference)"
+   },
+   "iterations": 3,
+   "metrique_principale": "exact_match_accuracy",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "Modèle de base (few-shot 5)",
+     "role": "reference",
+     "valeur": 0.07,
+     "ic95": [
+      0.02,
+      0.12
+     ]
+    },
+    {
+     "nom": "LoRA r=1",
+     "role": "reference",
+     "valeur": 0.0,
+     "ic95": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "nom": "Fine-tuning complet",
+     "role": "reference",
+     "valeur": 0.03,
+     "ic95": [
+      0.0,
+      0.07
+     ]
+    },
+    {
+     "nom": "Deletion tuning (masque gate_proj)",
+     "role": "nouvelle",
+     "valeur": 0.0,
+     "ic95": [
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "n_exemples": 100,
+   "jeu": "DeepPavlov/banking77_fr",
+   "synthese": "exact_match_accuracy : Deletion tuning (masque gate_proj) 0 contre 0,03 pour Fine-tuning complet (100 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (100 exemples d'entraînement, 7 pas, 100 de test, 16 de contrôle d'oubli), aucun bras entraîné n'a appris la tâche. L'exactitude est de 0 % pour le masque et LoRA r=1 et de 3 % pour le fine-tuning complet, contre 7 % pour le modèle de base, avec 96 à 100 % de sorties hors liste. Le masque pèse 0,13 Mo (contre 0,69 Mo pour LoRA) pour 88 M de paramètres entraînés, mais seuls 1 223 poids ont basculé depuis l'initialisation Wanda. Les deux volets de l'hypothèse (95 % du fine-tuning complet, moins d'oubli que LoRA) sont donc non concluants. Ces chiffres ne permettent pas de trancher et ne sont pas comparables à ceux de l'article (autre tâche, autre taille, SFT). Les points ouverts avant toute décision sont la capacité d'apprentissage du masque avec ces réglages, le contrôle d'oubli sur trop peu d'exemples et l'absence de répétition.",
+   "confiance": "faible",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Aucune approche entraînée n'a réellement appris à cette échelle : l'hypothèse sur le masque et l'oubli reste non tranchée. La méthode n'est ni confirmée ni infirmée ; la capacité d'apprentissage du masque reste à vérifier.",
+   "libelle_metrique": "Exactitude (correspondance exacte)",
+   "reserves": [
+    "Si le masque ne réussit pas à apprendre, il se comporte comme un simple élagage Wanda. Un mauvais score serait alors dû aux réglages de cette réimplémentation, pas à la méthode des auteurs.",
+    "Le volet « moins d'oubli » n'est pas mesurable avec 16 exemples : le moindre écart observé est du bruit."
+   ],
+   "duree_minutes": 78.1,
+   "consommation": {
+    "claude:poc_code:deletion-tuning-poids-zero": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 911.8,
+     "cout_equivalent_usd": 2.3064,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:deletion-tuning-poids-zero": {
+     "appels": 3,
+     "echecs": 0,
+     "secondes": 839.4,
+     "cout_equivalent_usd": 3.6193,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:deletion-tuning-poids-zero": {
+     "appels": 4,
+     "echecs": 0,
+     "secondes": 265.3,
+     "cout_equivalent_usd": 1.1975,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261111_deletion_tuning_vs_lora_french_classification",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-10",
    "sujet_id": "jev-decision-models-audits-equite-garde-fou-ordre",
    "depot": "20261110_typed_decision_option_shuffle_camembert",
