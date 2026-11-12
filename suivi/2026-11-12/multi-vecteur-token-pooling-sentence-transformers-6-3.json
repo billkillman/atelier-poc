@@ -5,10 +5,10 @@
  "depot": "20261112_multivector_token_pooling_aware_french",
  "titre": "Le gain d'un entraînement multi-vecteur conscient du token pooling (index ÷4) se retrouve-t-il en français ?",
  "debut": "2026-11-12T03:17:50Z",
- "maj": "2026-11-12T04:17:54Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-12T04:18:20Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,54 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-12T04:17:54Z",
-   "fin": null
+   "fin": "2026-11-12T04:18:12Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-12T04:18:12Z",
+   "fin": "2026-11-12T04:18:20Z"
   }
  ],
- "progression": 0.985,
- "estimation_fin": "2026-11-12T04:20:54Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261112_multivector_token_pooling_aware_french",
+  "depot": "20261112_multivector_token_pooling_aware_french",
+  "en_bref": "Le gain annoncé n'est pas retrouvé en français : l'écart est négligeable et non significatif, et la compression coûte déjà peu à un modèle ordinaire. Résultat non concluant, limité par un seul entraînement et une perte réimplémentée.",
+  "synthese": "ndcg_at_10 : Multi-vecteur entraîné avec MultiVectorTokenPoolingLoss 77,2 contre 77 pour Multi-vecteur entraîné normalement (1204 exemples, GPU T4 (Google Colab)).",
+  "metrique_principale": "ndcg_at_10",
+  "libelle_metrique": "nDCG@10 à pool_factor=4",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "Multi-vecteur entraîné normalement",
+    "role": "reference",
+    "valeur": 76.95569940951944,
+    "ic95": [
+     74.96977433954437,
+     78.78876776481982
+    ]
+   },
+   {
+    "nom": "Multi-vecteur entraîné avec MultiVectorTokenPoolingLoss",
+    "role": "nouvelle",
+    "valeur": 77.16452915506868,
+    "ic95": [
+     75.2593180001643,
+     79.05740432859191
+    ]
+   }
+  ],
+  "n_exemples": 1204,
+  "jeu": "sujet-ai/Sujet-Financial-RAG-FR-Dataset",
+  "materiel": "GPU T4 (Google Colab)",
+  "echelle": "complete",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
