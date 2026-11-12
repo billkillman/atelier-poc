@@ -1,0 +1,407 @@
+{
+ "version": 1,
+ "jour": "2026-11-12",
+ "sujet_id": "google-gemini-decisions-api",
+ "depot": "20261112_typed_decision_camembert_intent_calibration",
+ "fiche": {
+  "sujet_id": "google-gemini-decisions-api",
+  "titre": "Google lance son modèle de décision typé multimodal : mieux calibré selon lui, mais API fermée et rien en français",
+  "en_une_phrase": "Google ouvre une API qui ne génère pas de texte mais rend des probabilités sur des réponses fixées d'avance. Les chiffres sont flatteurs mais auto-déclarés, l'API est américaine et fermée, et rien n'est mesuré en français.",
+  "probleme": "Pour router un e-mail, choisir un outil ou vérifier une règle, on avait deux options. Un classifieur entraîné comme CamemBERT est rapide, mais il exige des données annotées et un réentraînement à chaque nouvelle classe. Un LLM génératif se contente d'une consigne, mais il est lent, coûteux, rend du texte à analyser et donne une confiance peu fiable. Les modèles de décision typés (Jev de TypeSafe AI, puis OpenAI) visent l'entre-deux. On décrit les options en langage courant, sans entraînement, et on récupère des probabilités *calibrées*, c'est-à-dire fidèles au taux de réussite réel : « 80 % » doit être juste 8 fois sur 10.",
+  "comment_ca_marche": "Un *modèle de décision typé* ne rédige pas de réponse. Il choisit parmi des options fixées par le développeur et rend une probabilité pour chacune. Le code de l'application agit directement sur ces nombres, sans analyser de texte.\n\n1. **L'entrée partagée.** Le développeur envoie un seul contenu de 256 000 tokens au plus (le token est l'unité de découpage du texte, environ trois quarts de mot). Ce contenu peut être du texte, une image, de l'audio, de la vidéo ou un PDF, éventuellement combinés. Google cite l'exemple d'un enregistrement d'appel joint à des données de compte.\n2. **Les questions.** Il y joint jusqu'à 1 000 questions indépendantes, de trois types :\n   - `noul` : une question oui/non, qui rend la probabilité du « oui ». Selon la documentation citée par MarkTechPost, elle est bornée entre 0,01 et 0,99 ;\n   - `choice` : un choix parmi 2 à 255 options décrites en clair, avec une probabilité par option ;\n   - `score` : une note sur une grille ordonnée (niveaux 0, 1, 2…), qui rend un score pondéré et la probabilité de chaque niveau.\n3. **Le calcul.** Le modèle lit l'entrée et évalue toutes les options en un seul passage dans le réseau (*forward pass*), au lieu de générer des mots un à un. Les questions sont traitées en parallèle et ne voient pas les réponses des autres.\n4. **La sortie.** Chaque réponse porte un indice de confiance de 0 à 1. Google suggère d'envoyer les cas incertains vers un modèle de repli ou vers un humain.\n\nLa facturation suit la même logique. L'entrée est payée une seule fois, quel que soit le nombre de questions, et la sortie est gratuite.\n\n**Ce qui est nouveau.** Sur le principe, rien : Simon Willison juge l'API « presque identique » à Jev, dont elle reprend même le terme `noul`. Le seul vrai différenciateur est le multimodal natif, alors que Jev ne traite que du texte et OpenAI du texte et des images. Google ne publie ni l'architecture ni la taille du modèle.",
+  "demarche_experimentale": "Google compare son modèle à trois concurrents : Jev 1.14 (TypeSafe AI), GPT-6 Luna via l'API de décision d'OpenAI et Gemini 3.5 Flash-Lite, un LLM génératif classique. Neuf benchmarks publics sont utilisés. Sept sont partagés par les quatre modèles : routage d'agents et appel d'outils, raisonnement, classement de produits, questions médicales, questions multilingues. Deux, en audio et en vidéo, ne sont comparés qu'à Flash-Lite. Les métriques sont l'exactitude, le Macro-F1 sur Amazon ESCI et l'ECE, l'erreur de calibration sur la réponse retenue. Les refus comptent comme des erreurs. Le prix total est calculé sur les sept tests partagés. Ni la taille des jeux, ni les consignes, ni le nombre d'exécutions ne sont précisés. Tout est auto-déclaré : le tableau, publié en image sur le blog, est recopié par MarkTechPost.",
+  "resultats": [
+   {
+    "metrique": "Exactitude JevBench (partie publique)",
+    "valeur": "92,2 %",
+    "comparaison": "Jev 1.14 : 90,0 % ; GPT-6 Luna : 90,9 % ; Flash-Lite : 86,6 %",
+    "conditions": "Benchmark créé par TypeSafe (Jev), partie publique ; chiffres Google",
+    "citation": "| JevBench (public split) | 92.2% | 90.0% | 90.9% | 86.6% |"
+   },
+   {
+    "metrique": "When2Call, savoir quand appeler un outil (exactitude)",
+    "valeur": "79,9 %",
+    "comparaison": "Jev 1.14 devant : 82,0 %",
+    "conditions": "Benchmark d'agents ; chiffres Google",
+    "citation": "It also trails Jev 1.14 on When2Call (79.9% vs 82.0%)."
+   },
+   {
+    "metrique": "Macro-F1 Amazon ESCI (pertinence de produits)",
+    "valeur": "58,7 %",
+    "comparaison": "Jev 1.14 : 56,7 % ; GPT-6 Luna : 54,7 %",
+    "conditions": "Plus faible score du modèle ; plus haut = mieux",
+    "citation": "Worst: 58.7% Macro-F1 on Amazon ESCI, its lowest score."
+   },
+   {
+    "metrique": "Global-MMLU-Lite, langues autres que l'anglais (exactitude)",
+    "valeur": "86,0 %",
+    "comparaison": "Jev 1.14 : 85,0 % ; GPT-6 Luna : 79,6 %",
+    "conditions": "Agrégat multilingue, pas de détail sur le français",
+    "citation": "| Global-MMLU-Lite (non-English) | 86.0% | 85.0% | 79.6% | 78.8% |"
+   },
+   {
+    "metrique": "Erreur de calibration top-1 (ECE, plus bas = mieux)",
+    "valeur": "0,0250",
+    "comparaison": "Jev 1.14 : 0,0494 ; GPT-6 Luna : 0,0721 ; Flash-Lite : 0,2104",
+    "conditions": "Sur les benchmarks de Google",
+    "citation": "Calibration error of 0.0250 is half that of TypeSafe Jev 1.14."
+   },
+   {
+    "metrique": "Prix total des 7 tests partagés",
+    "valeur": "0,88 $",
+    "comparaison": "Jev 1.14 : 0,68 $ ; GPT-6 Luna : 0,93 $ ; Flash-Lite : 4,14 $",
+    "conditions": "Prix public, sans cache",
+    "citation": "Worst: not the cheapest; Jev 1.14 costs $0.68 vs $0.88 on the shared suite."
+   }
+  ],
+  "limites": [
+   "Tous les chiffres viennent de Google, sur des benchmarks qu'il a choisis, dont la partie publique de JevBench (risque de contamination). Aucune évaluation indépendante n'est repérée à ce jour.",
+   "Rien sur le français : un seul agrégat « non anglais » (Global-MMLU-Lite), aucun test sur des e-mails ou de l'audio téléphonique en français.",
+   "API hébergée par Google uniquement (v1beta), sans poids publiés. Google Cloud arrive « bientôt », sans date. Région d'hébergement et usage des données non précisés : inutilisable en l'état sur des données clients.",
+   "Limite de 255 options par question et questions aveugles les unes aux autres : la hiérarchie motif/sous-motif est à construire soi-même. Calibration à revérifier sur des classes proches. Pas de cache (analyse)."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "0,025",
+    "libelle": "Erreur de calibration annoncée par Google, contre 0,049 pour Jev (plus bas = mieux)"
+   },
+   {
+    "valeur": "0,10 $",
+    "libelle": "Par million de tokens d'entrée, sortie gratuite ; Jev reste moins cher (0,042 $)"
+   },
+   {
+    "valeur": "150–250 ms",
+    "libelle": "Latence de bout en bout annoncée, jusqu'à 16K tokens d'entrée"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Le modèle ne génère pas de texte : il évalue les options candidates en un seul passage et rend probabilités et scores de confiance.",
+    "citation": "Rather than generating answer text token by token, Gemini Decision 1 scores your candidate options in a single forward pass, returning probabilities and confidence scores in 150-250 ms end-to-end latency at $0.10 per 1M input tokens with zero output tokens billed."
+   },
+   {
+    "affirmation": "Une requête accepte une entrée multimodale de 256K tokens au plus et jusqu'à 1 000 questions indépendantes.",
+    "citation": "You can pass one multimodal input across text, images, audio, video, and PDFs (up to 256K tokens) along with up to 1,000 independent questions."
+   },
+   {
+    "affirmation": "La question à choix accepte de 2 à 255 options.",
+    "citation": "choice (Multiple Choice): Selects from 2 to 255 choices, returning the winner and normalized probabilities for every candidate."
+   },
+   {
+    "affirmation": "L'API reprend le format de Jev, jusqu'au terme « noul ».",
+    "citation": "This new model API is almost identical to Jev: it supports the same three types of questions (yes/no, choice, and rubric-scoring) and even reuses Jev's term \"Noul\" for a yes/no question."
+   },
+   {
+    "affirmation": "Seule l'API hébergée par Google est disponible : ni poids ouverts ni auto-hébergement.",
+    "citation": "Runs on: Google-hosted API only (Gemini Developer API, v1beta). No open weights or self-hosting."
+   },
+   {
+    "affirmation": "Les chiffres de benchmark sont auto-déclarés par Google.",
+    "citation": "All figures below are self-reported by Google. Refusals and safety blocks count as incorrect."
+   },
+   {
+    "affirmation": "Le support dans Google Cloud est annoncé sans date.",
+    "citation": "Ecosystem integrations are rolling out across OpenRouter, LangChain, Vercel, LiteLLM, Pydantic AI, Pipecat, LiveKit, and OpenCode alongside the google-genai SDKs, with support coming soon to Gemini in Google Cloud."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision typé",
+    "definition": "Modèle qui ne génère pas de texte : il choisit parmi des réponses fixées d'avance (oui/non, options, niveaux) et rend une probabilité pour chacune."
+   },
+   {
+    "terme": "Calibration",
+    "definition": "Accord entre la confiance annoncée et le taux de réussite réel : un modèle bien calibré qui dit « 80 % » a raison 8 fois sur 10."
+   },
+   {
+    "terme": "ECE",
+    "definition": "Expected Calibration Error : écart moyen entre la confiance annoncée et l'exactitude observée. Plus bas = mieux calibré."
+   },
+   {
+    "terme": "Forward pass",
+    "definition": "Un seul passage des données à travers le réseau de neurones, sans la boucle qui génère les mots un à un."
+   },
+   {
+    "terme": "Token",
+    "definition": "Unité de découpage du texte par un modèle, environ trois quarts de mot en anglais ; sert d'unité de facturation."
+   },
+   {
+    "terme": "Macro-F1",
+    "definition": "Moyenne, sur toutes les classes, du compromis entre précision et rappel ; chaque classe pèse autant, même rare. Plus haut = mieux."
+   },
+   {
+    "terme": "When2Call",
+    "definition": "Benchmark qui mesure si un modèle sait quand appeler un outil, quand poser une question et quand s'abstenir."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Gemini Decisions API: Fast, calibrated multimodal decisions (Google)",
+    "url": "https://blog.google/innovation-and-ai/technology/developers-tools/gemini-decisions-api/",
+    "type": "primaire",
+    "date": "2026-11-11"
+   },
+   {
+    "titre": "Gemini Decisions API (Simon Willison)",
+    "url": "https://simonwillison.net/2026/Nov/11/gemini-decisions-api/",
+    "type": "secondaire",
+    "date": "2026-11-11"
+   },
+   {
+    "titre": "Google Launches Gemini Decisions API With Gemini Decision 1 at $0.10/M Tokens (MarkTechPost)",
+    "url": "https://www.marktechpost.com/2026/11/11/google-gemini-decisions-api-gemini-decision-1/",
+    "type": "secondaire",
+    "date": "2026-11-11"
+   },
+   {
+    "titre": "Gemini Decision 1: Price, Benchmarks and Limits (CellCog)",
+    "url": "https://cellcog.ai/blog/gemini-decision-1/",
+    "type": "secondaire",
+    "date": "2026-11"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-11",
+   "source": "blog.google"
+  }
+ },
+ "plan": {
+  "titre": "Un modèle de décision ouvert (choix parmi options décrites, une seule passe) peut-il égaler un classifieur CamemBERT fine-tuné sur des intentions françaises à 60 classes hiérarchisées ?",
+  "hypothese": "Un petit LLM ouvert (Qwen3-1.7B) utilisé comme modèle de décision typé, sans entraînement, avec 60 options décrites et probabilités lues en une passe, atteint au moins 90 % de l'exactitude du CamemBERT-base fine-tuné sur MASSIVE-fr, avec une ECE inférieure ou égale à 0,05 après calibration par température ; la décision hiérarchique (scénario puis intention) améliore l'exactitude de plus d'un point par rapport au choix à plat.",
+  "reference": {
+   "nom": "Classifieur CamemBERT-base fine-tuné",
+   "description": "Classifieur de séquence à 60 classes fine-tuné sur l'ensemble d'entraînement, avec variante CamemBERTa v2. Probabilités par softmax, calibration par température sur validation.",
+   "implementation": "transformers AutoModelForSequenceClassification, 3 époques, lr 3e-5, batch 32, longueur max 64, bf16/fp16 selon matériel ; température ajustée sur validation ; modèles évalués sur le test complet et sur le sous-échantillon commun.",
+   "modeles_hf": [
+    "almanach/camembert-base",
+    "almanach/camembertav2-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Modèle de décision typé ouvert (LLM, choix parmi options décrites)",
+   "description": "Équivalent ouvert d'une question à choix : le prompt liste les classes décrites en texte avec un code à un seul token ; une seule passe donne la distribution sur les codes (softmax restreint). Variante hiérarchique : choix du scénario puis de l'intention parmi ses enfants.",
+   "implementation": "transformers AutoModelForCausalLM en bfloat16 ; prompt chat avec liste d'options (libellés lisibles en français déduits de scenario_intention), codes A-Z a-z 0-9 vérifiés mono-token ; logits du dernier token restreints aux codes ; probabilité hiérarchique = P(scénario)×P(intention|scénario) ; calibration par température sur validation ; latence mesurée par exemple. Équivalence : l'API Google propriétaire n'est pas testée, seule l'idée l'est.",
+   "modeles_hf": [
+    "Qwen/Qwen3-1.7B"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen3-0.6B"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "llmaas"
+  },
+  "jeu_public": {
+   "hub_id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "text, label_text (scénario_intention, le scénario est le préfixe), label",
+   "representativite": "Seul jeu chargeable à arbre natif à deux niveaux (18 scénarios, 60 intentions) avec étiquettes propres et licence apache-2.0 : permet de mesurer exactitude à plat, par niveau, cohérence parent/enfant et calibration.",
+   "ecarts_donnees_reelles": "Énoncés d'assistant vocal courts et traduits, domaine non financier, 60 classes (pas ~300), pas d'e-mails ni de pièces jointes, classes assez séparables ; contamination possible des LLM.",
+   "jeux_explores": [
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "60 intentions en arbre à 2 niveaux, 11,5k exemples d'entraînement, français.",
+     "decision": "retenu",
+     "raison": "Hiérarchie native, licence apache-2.0, chargeable."
+    },
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "77 intentions internes proches, mais à plat, étiquettes entières.",
+     "decision": "ecarte",
+     "raison": "Pas de hiérarchie, noms de classes à reconstruire depuis mteb/banking77, licence floue ; reste le complément naturel en suite d'expérience."
+    },
+    {
+     "nom": "DeepPavlov/clinc150_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/clinc150_fr",
+     "acces": "hub_libre",
+     "adequation": "150 intentions, utile au passage à l'échelle.",
+     "decision": "ecarte",
+     "raison": "Libellés et domaines absents (entiers), licence non précisée."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "~113 intentions déséquilibrées, domaines séparés.",
+     "decision": "ecarte",
+     "raison": "Licence inconnue, libellés entiers, jointure domaine/intention à reconstruire."
+    },
+    {
+     "nom": "JevBench/jevbench",
+     "url": "https://huggingface.co/datasets/JevBench/jevbench",
+     "acces": "hub_libre",
+     "adequation": "Cohérence métamorphique de décisions typées, anglais/chinois.",
+     "decision": "ecarte",
+     "raison": "Pas de classification française ; lien avec le JevBench cité non établi."
+    },
+    {
+     "nom": "Mozilla/query-intent-detection-dataset-french",
+     "url": "https://huggingface.co/datasets/Mozilla/query-intent-detection-dataset-french",
+     "acces": "hub_libre",
+     "adequation": "2 classes seulement.",
+     "decision": "ecarte",
+     "raison": "Ne teste ni classes nombreuses ni hiérarchie."
+    }
+   ]
+  },
+  "metriques": [
+   "accuracy",
+   "macro_f1",
+   "expected_calibration_error",
+   "scenario_accuracy",
+   "hierarchical_consistency_rate",
+   "latency_ms_per_example"
+  ],
+  "metrique_principale": "accuracy",
+  "sens": "max",
+  "protocole": "Découpage : entraînement des encodeurs sur le split train (11 514 exemples) ; calibration par température sur le split validation (2 033) ; évaluation sur le split test, test complet (2 974) pour les encodeurs et sous-échantillon stratifié commun de 500 énoncés pour toutes les méthodes, LLM compris. Systèmes : CamemBERT-base, CamemBERTa v2, décision ouverte à plat (60 options), décision ouverte hiérarchique. Intervalles de confiance par bootstrap (1 000 rééchantillonnages), test apparié de McNemar entre la référence et la décision ouverte. ECE à 15 intervalles, avant et après température. Courbe exactitude/couverture par seuil de confiance. Résultats par scénario pour repérer les classes proches. Échelle réduite : 200 exemples d'entraînement par modèle, 100 de test, une époque.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Qwen3-0.6B remplace Qwen3-1.7B, CamemBERT-base fine-tuné sur quelques centaines d'exemples une époque, 100 énoncés de test. Calcul GPU de l'échelle complète : ~1 200 tokens par exemple (≈800 à plat + ≈400 en hiérarchique) × 500 exemples = 0,6 M tokens ÷ ~700-1 000 tok/s ≈ 10-14 min, + fine-tuning de deux encodeurs (≈8 min) + chargements : ≈ 30 min sous le budget de 45 min. Test LLM limité à 500 exemples pour cette raison.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte du message ou de l'e-mail, anonymisé."
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif de niveau 1 (étiquette validée)."
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif de niveau 2 (étiquette validée)."
+    },
+    {
+     "colonne": "sub_reason_description",
+     "type": "string",
+     "description": "Libellé détaillé du sous-motif, utilisé dans le prompt de décision."
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception, pour le découpage temporel."
+    }
+   ],
+   "volume_conseille": "≥ 30 textes par sous-motif (≥ 10 pour les classes rares), soit 6 000 à 15 000 textes pour ~300 classes ; test d'au moins 2 000 textes.",
+   "metriques_metier": "Exactitude et F1 macro par motif et sous-motif, taux de cohérence motif/sous-motif, ECE, part de textes traités automatiquement à précision cible (par ex. 95 %), latence p95, coût par 1 000 textes.",
+   "garde_fous": "Aucune donnée interne envoyée à une API externe : seuls des modèles locaux ou le service interne ; pas de décision automatique sans seuil de confiance ; vérifier la limite de 255 options si une API tierce est testée ; contrôle de la contamination impossible, conclusions prudentes.",
+   "prescriptions": [
+    "Étiquettes validées par deux annotateurs sur un échantillon, accord inter-annotateurs (kappa) rapporté par sous-motif.",
+    "Au moins 30 textes par sous-motif, 10 minimum pour les classes rares, suivies à part.",
+    "Découpage temporel : apprentissage et validation avant la date de coupure, test sur la période suivante.",
+    "Descriptions de classes rédigées par les métiers (une à deux phrases), identiques pour tous les systèmes.",
+    "Anonymisation des identifiants clients, IBAN, noms et numéros avant extraction ; exclure les pièces jointes dans cette version.",
+    "Distribution de test fidèle à la production (déséquilibre conservé), plus un test équilibré pour les classes rares.",
+    "Textes de plus de 2 000 tokens tronqués de façon identique pour tous les systèmes."
+   ],
+   "preparation": "Extraire les demandes traitées sur une période de 6 à 12 mois depuis les outils de gestion de la relation client, joindre le motif et le sous-motif saisis puis validés, filtrer les étiquettes douteuses (reclassements fréquents), anonymiser, échantillonner de façon stratifiée par sous-motif et réserver la période la plus récente au test."
+  },
+  "duree_estimee_minutes": 60,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "almanach/camembertav2-base": {
+    "id": "almanach/camembertav2-base",
+    "sha": "54cc91d6ac45a540c7e0faeb677f4dd8201d3d61",
+    "tache": "feature-extraction",
+    "bibliotheque": "transformers",
+    "parametres": 110617600,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "Qwen/Qwen3-1.7B": {
+    "id": "Qwen/Qwen3-1.7B",
+    "sha": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 2031739904,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "Qwen/Qwen3-0.6B": {
+    "id": "Qwen/Qwen3-0.6B",
+    "sha": "c1899de289a04d12100db370d81485cdf75e47ca",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 751632384,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "splits": [
+    "train",
+    "test",
+    "validation"
+   ],
+   "licence": "apache-2.0",
+   "colonnes": {
+    "id": "Value",
+    "label": "Value",
+    "label_text": "Value",
+    "text": "Value",
+    "lang": "Value"
+   },
+   "exemple": {
+    "id": "1",
+    "label": "alarm_set",
+    "label_text": "alarm_set",
+    "text": "réveille-moi à neuf heures du matin le vendredi",
+    "lang": "fr"
+   },
+   "lignes": {
+    "train": 11514,
+    "test": 2974,
+    "validation": 2033
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

@@ -1,0 +1,343 @@
+{
+ "version": 1,
+ "jour": "2026-11-12",
+ "sujet_id": "multi-vecteur-token-pooling-sentence-transformers-6-3",
+ "depot": "20261112_multivector_token_pooling_aware_french",
+ "fiche": {
+  "sujet_id": "multi-vecteur-token-pooling-sentence-transformers-6-3",
+  "titre": "Index ColBERT réduit de 4× : un entraînement « conscient du pooling » limite la perte à 2 % (anglais seulement)",
+  "en_une_phrase": "Sentence-transformers 6.3.0 permet d'entraîner un modèle multi-vecteur à survivre à la fusion de ses vecteurs : 97,8 % du score conservé avec 4× moins de vecteurs, mais sur un seul test en anglais.",
+  "probleme": "Un modèle multi-vecteur (type ColBERT) stocke un vecteur par token de document : des centaines de millions de vecteurs pour des millions de documents. Fusionner les vecteurs similaires réduit l'index, mais dégrade la qualité si le modèle n'y a pas été préparé.",
+  "comment_ca_marche": "1. Le modèle encode chaque document en un vecteur par token.\n2. Le *token pooling* regroupe les vecteurs proches par clustering hiérarchique de Ward (fusion répétée des deux groupes les plus compacts), puis remplace chaque groupe par sa moyenne normalisée. Seuls les documents sont compressés, pas les requêtes.\n3. À l'entraînement, `MultiVectorTokenPoolingLoss` calcule deux pertes de recherche : sur les vecteurs d'origine et sur les vecteurs fusionnés (facteur 4), puis les moyenne à parts égales.\n4. Le clustering n'est pas dérivable : un *straight-through estimator* (on fait comme si la fusion était transparente) renvoie le gradient aux tokens d'origine.\n5. À la recherche, chaque token de requête prend son meilleur vecteur de document (score MaxSim), et ces scores sont additionnés.",
+  "demarche_experimentale": "Deux modèles ModernBERT-base (projection 128 dimensions) entraînés une époque sur les mêmes 120 000 triplets MS MARCO, graine 42, seule la perte diffère. Évaluation sur NanoBEIR (13 jeux), nDCG@10 moyen. Pas de recherche d'hyperparamètres.",
+  "resultats": [
+   {
+    "metrique": "nDCG@10 moyen (plus haut = mieux), pool_factor=4",
+    "valeur": "51,23 vs 49,03 (+2,20 pts)",
+    "comparaison": "Modèle entraîné normalement, même budget de 48,68 vecteurs en moyenne",
+    "conditions": "NanoBEIR 13 jeux, ModernBERT-base, 120 000 triplets MS MARCO, anglais",
+    "citation": "At the trained pool_factor=4, nDCG@10 improves from 49.03 to 51.23, while storing 74.8% fewer document vectors than unpooled retrieval."
+   },
+   {
+    "metrique": "Score conservé par rapport au non compressé",
+    "valeur": "97,8 % vs 94,6 %",
+    "comparaison": "Entraînement ordinaire vs conscient du pooling",
+    "conditions": "pool_factor=4 ; non compressé : 52,39 vs 51,84",
+    "citation": "This increases score retention from 94.6% to 97.8%, where retention is the pooled mean nDCG@10 divided by each model's own unpooled mean."
+   },
+   {
+    "metrique": "nDCG@10 avec 4 vecteurs max par document",
+    "valeur": "43,00 vs 37,22 (+5,78 pts)",
+    "comparaison": "Entraînement ordinaire, compression extrême",
+    "conditions": "max_tokens=4, même protocole",
+    "citation": "| max_tokens=4 | 4.00 | 37.22 | 43.00 | +5.78 |"
+   }
+  ],
+  "limites": [
+   "Un seul modèle de base, une époque, un seul jeu d'entraînement anglais, une graine, sans recherche d'hyperparamètres : les auteurs ne montrent ni variance ni français.",
+   "Rapporté par l'auteur du blog, mainteneur de la bibliothèque, sans reproduction tierce ; NanoBEIR est un petit jeu de test, et aucun test sur documents internes.",
+   "Gain de stockage de l'index seulement : latence de requête, qualité face à Elasticsearch hybride et coût du clustering à l'indexation ne sont pas comparés."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "97,8 %",
+    "libelle": "du score nDCG@10 non compressé conservé avec 4× moins de vecteurs (contre 94,6 % en entraînement ordinaire)"
+   },
+   {
+    "valeur": "−74,8 %",
+    "libelle": "de vecteurs de documents stockés à pool_factor=4 (193 à 49 en moyenne)"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "À pool_factor=4, le modèle ordinaire conserve 94,6 % de son nDCG@10 non compressé, l'entraînement conscient du pooling 97,8 %.",
+    "citation": "With pool_factor=4, my normally trained model retains 94.6% of its unpooled NanoBEIR nDCG@10, with a 4x reduction in document vectors. Token pooling-aware training raises that retention to 97.8% at the same storage budget!"
+   },
+   {
+    "affirmation": "La perte d'entraînement est la moyenne d'une perte sur vecteurs d'origine et d'une perte sur vecteurs fusionnés au facteur 4.",
+    "citation": "Retrieval using the original document embeddings. Retrieval after compressing documents to approximately one quarter of their original vectors."
+   },
+   {
+    "affirmation": "Les deux modèles ont été entraînés sur les mêmes 120 000 triplets MS MARCO, sans recherche d'hyperparamètres.",
+    "citation": "Both runs use one epoch over the same 120,000 MS MARCO triplets, seed 42, and matching initialization and optimization settings. [...] I didn't run a hyperparameter search."
+   },
+   {
+    "affirmation": "Le noyau CUDA de clustering de Ward est 30 à 150 fois plus rapide que SciPy selon le réglage.",
+    "citation": "We're talking about 30-150x faster than SciPy depending on the setting."
+   },
+   {
+    "affirmation": "Le pooling adaptatif fonctionne aussi avec un modèle entraîné sans objectif conscient du pooling.",
+    "citation": "It can be used with any multi-vector model, including one trained without a pooling-aware objective."
+   },
+   {
+    "affirmation": "L'entraînement Matryoshka multi-vecteur conserve 96,2 % du score à 64 dimensions contre 93,8 % en ordinaire (30 000 triplets).",
+    "citation": "| Matryoshka | 48.95 | 47.11 | 96.2% |"
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Multi-vecteur (ColBERT)",
+    "definition": "Modèle de recherche qui garde un vecteur par token de document, au lieu d'un seul vecteur par document, pour un appariement plus fin."
+   },
+   {
+    "terme": "MaxSim",
+    "definition": "Score de late interaction : chaque token de requête prend la meilleure similarité avec un vecteur du document, puis on additionne."
+   },
+   {
+    "terme": "Token pooling",
+    "definition": "Fusion des vecteurs de tokens similaires en leur moyenne pour réduire le nombre de vecteurs stockés par document."
+   },
+   {
+    "terme": "Clustering de Ward",
+    "definition": "Regroupement hiérarchique qui fusionne à chaque étape les deux groupes augmentant le moins la dispersion interne."
+   },
+   {
+    "terme": "nDCG@10",
+    "definition": "Qualité du classement des 10 premiers résultats, de 0 à 100 : plus haut = mieux."
+   },
+   {
+    "terme": "Straight-through estimator",
+    "definition": "Astuce d'entraînement qui laisse passer le gradient à travers une opération discrète non dérivable, comme une affectation de clusters."
+   },
+   {
+    "terme": "Matryoshka",
+    "definition": "Entraînement qui garde un embedding utile même tronqué à ses premières dimensions, pour réduire la taille des vecteurs."
+   },
+   {
+    "terme": "NanoBEIR",
+    "definition": "Version réduite du benchmark BEIR de recherche d'information, sur 13 petits jeux de données."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Token Pooling-Aware Training for Multi-Vector Embedding Models",
+    "url": "https://huggingface.co/blog/token-pooling",
+    "type": "primaire",
+    "date": "2026-11-11"
+   },
+   {
+    "titre": "sentence-transformers v6.3.0 release notes",
+    "url": "https://github.com/huggingface/sentence-transformers/releases/tag/v6.3.0",
+    "type": "primaire",
+    "date": "2026-11-11"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-11",
+   "source": "huggingface.co"
+  }
+ },
+ "plan": {
+  "titre": "Le gain d'un entraînement multi-vecteur conscient du token pooling (index ÷4) se retrouve-t-il en français ?",
+  "hypothese": "En français, à pool_factor=4, le modèle entraîné avec MultiVectorTokenPoolingLoss obtient au moins 2 points de nDCG@10 de plus que le modèle entraîné normalement puis compressé, et retient ≥ 97 % de son score non compressé contre ≤ 95 % pour le modèle ordinaire.",
+  "reference": {
+   "nom": "Multi-vecteur entraîné normalement",
+   "description": "Encodeur multi-vecteur de type ColBERT entraîné avec la perte de recherche standard, puis compressé après coup par token pooling (Ward).",
+   "implementation": "sentence-transformers 6.3+, MultiVectorEncoder avec projection 128 dimensions sur almanach/moderncamembert-base, perte de recherche multi-vecteur à négatifs dans le lot, 1 époque sur paires question/passage ; token pooling appliqué aux documents à pool_factor 1, 2, 4 et max_tokens 4 ; mêmes hyperparamètres que la nouvelle approche. Vérifier l'API réelle de la version installée avant usage.",
+   "modeles_hf": [
+    "almanach/moderncamembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Multi-vecteur entraîné avec MultiVectorTokenPoolingLoss",
+   "description": "Perte moyenne entre recherche sur vecteurs d'origine et sur vecteurs fusionnés (facteur 4), avec estimateur straight-through pour traverser le clustering.",
+   "implementation": "Même modèle de base, mêmes données, même graine ; seule la perte change (MultiVectorTokenPoolingLoss de sentence-transformers 6.3, pool_factor=4). Évaluation avec un évaluateur nDCG@10 maison sur corpus/queries/qrels remis à plat.",
+   "modeles_hf": [
+    "almanach/moderncamembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "sujet-ai/Sujet-Financial-RAG-FR-Dataset",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "question, context. Complément d'évaluation CATIE-AQ/NanoBEIR-fr : configs corpus (_id, text), queries (_id, text), qrels (query-id, corpus-id), splits NanoFiQA2018, NanoSciFact, NanoNFCorpus, NanoArguAna.",
+   "representativite": "Le split test (1 209 questions, corpus = passages du test) donne un corpus financier français sous licence MIT ; le sous-ensemble de NanoBEIR-fr reproduit le protocole de la source sur des domaines variés avec jugements de pertinence.",
+   "ecarts_donnees_reelles": "Un seul positif par question, questions probablement générées, tableaux mal alignés ; NanoBEIR-fr est traduit automatiquement, peu financier, licence non précisée ; entraînement sur un sous-échantillon de quelques milliers de paires au lieu de 120 000 triplets ; pas de comparaison à une recherche hybride.",
+   "jeux_explores": [
+    {
+     "nom": "sujet-ai/Sujet-Financial-RAG-FR-Dataset",
+     "url": "https://huggingface.co/datasets/sujet-ai/Sujet-Financial-RAG-FR-Dataset",
+     "acces": "hub_libre",
+     "adequation": "Paires financières françaises, MIT, 28 880 train / 1 209 test.",
+     "decision": "retenu",
+     "raison": "Entraînement et test français dans le domaine, chargeable en parquet."
+    },
+    {
+     "nom": "CATIE-AQ/NanoBEIR-fr",
+     "url": "https://huggingface.co/datasets/CATIE-AQ/NanoBEIR-fr",
+     "acces": "hub_libre",
+     "adequation": "13 jeux NanoBEIR traduits, avec qrels, protocole de la source.",
+     "decision": "retenu",
+     "raison": "Reproduit le protocole en français ; traduction automatique, licence à valider."
+    },
+    {
+     "nom": "lightonai/NanoBEIR-fr",
+     "url": "https://huggingface.co/datasets/lightonai/NanoBEIR-fr",
+     "acces": "hub_libre",
+     "adequation": "Seconde traduction de NanoBEIR.",
+     "decision": "ecarte",
+     "raison": "Redondant avec CATIE-AQ ; contrôle de robustesse ultérieur possible."
+    },
+    {
+     "nom": "mteb/MIRACLRetrieval",
+     "url": "https://huggingface.co/datasets/mteb/MIRACLRetrieval",
+     "acces": "hub_libre",
+     "adequation": "Requêtes françaises natives, grand corpus Wikipédia.",
+     "decision": "ecarte",
+     "raison": "Corpus trop volumineux pour l'encodage dans le budget T4 sans échantillonnage."
+    },
+    {
+     "nom": "mteb/SyntecRetrieval",
+     "url": "https://huggingface.co/datasets/mteb/SyntecRetrieval",
+     "acces": "hub_libre",
+     "adequation": "Corpus réglementaire français natif.",
+     "decision": "ecarte",
+     "raison": "90 documents : trop petit pour juger un index."
+    },
+    {
+     "nom": "unicamp-dl/mmarco",
+     "url": "https://huggingface.co/datasets/unicamp-dl/mmarco",
+     "acces": "restreint",
+     "adequation": "MS MARCO traduit, le plus proche de la source.",
+     "decision": "ecarte",
+     "raison": "Script de chargement, non parquet ; licence non commerciale à valider."
+    },
+    {
+     "nom": "vidore/vidore_v3_finance_fr",
+     "url": "https://huggingface.co/datasets/vidore/vidore_v3_finance_fr",
+     "acces": "hub_libre",
+     "adequation": "Pages financières longues avec qrels.",
+     "decision": "ecarte",
+     "raison": "Colonne image lourde à télécharger ; piste ultérieure via la colonne markdown."
+    }
+   ]
+  },
+  "metriques": [
+   "ndcg_at_10",
+   "score_retention_ratio",
+   "mean_vectors_per_document",
+   "recall_at_100",
+   "index_size_mb"
+  ],
+  "metrique_principale": "ndcg_at_10",
+  "sens": "max",
+  "protocole": "Deux modèles, mêmes données, même initialisation, mêmes hyperparamètres, une époque ; seule la perte diffère. Entraînement sur un sous-échantillon du split train (environ 6 000 paires, documents tronqués à 192 tokens, négatifs dans le lot). Évaluation à pool_factor 1, 2, 4 et max_tokens 4 sur le split test et quatre jeux NanoBEIR-fr ; nDCG@10 moyen, rétention = score compressé / score non compressé du même modèle, intervalle de bootstrap apparié sur les requêtes. Échelle réduite : 300 paires, 100 requêtes par jeu, sous-corpus de 500 documents.",
+  "niveau_sandbox": "complet",
+  "adaptation_sandbox": "Même modèle, volumes réduits (300 paires d'entraînement, longueur max 128, 100 requêtes, corpus échantillonné) ; aucun substitut de modèle. Échelle complète limitée à deux entraînements d'une époque sur ~6 000 paires pour tenir dans les 45 min du T4 (limite à signaler : un seul tirage, pas de variance entre graines).",
+  "dependances": [
+   "sentence-transformers>=6.3.0"
+  ],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "query",
+     "type": "string",
+     "description": "Question d'un utilisateur métier."
+    },
+    {
+     "colonne": "passage_id",
+     "type": "string",
+     "description": "Identifiant du passage ou document."
+    },
+    {
+     "colonne": "passage_text",
+     "type": "string",
+     "description": "Texte du passage."
+    },
+    {
+     "colonne": "relevance",
+     "type": "int",
+     "description": "Jugement de pertinence (0 à 3) requête/passage."
+    },
+    {
+     "colonne": "document_date",
+     "type": "datetime",
+     "description": "Date de version du document."
+    }
+   ],
+   "volume_conseille": "≥ 200 requêtes jugées, ≥ 20 000 passages, avec au moins 5 000 paires d'entraînement.",
+   "metriques_metier": "nDCG@10, rappel@100, taille d'index par million de passages, temps d'indexation et de requête.",
+   "garde_fous": "Pas de fuite entre passages d'entraînement et d'évaluation d'un même document ; index internes non exportés ; conclusion limitée si moins de 200 requêtes.",
+   "prescriptions": [
+    "Au moins 200 requêtes d'utilisateurs métier avec 2 jugements annotés ou plus par requête.",
+    "Jugements en trois niveaux de pertinence, vérifiés par deux annotateurs sur un échantillon.",
+    "Passages de plusieurs centaines de tokens, représentatifs des documents réels (procédures, conditions générales).",
+    "Découpage par document, pas par passage, pour éviter les fuites.",
+    "Retirer les données personnelles des documents et requêtes.",
+    "Inclure la version courante des documents uniquement, avec date de version.",
+    "Prévoir un lot d'entraînement distinct de 5 000 paires au moins."
+   ],
+   "preparation": "Rassembler les bases documentaires de procédures et de produits, découper en passages, collecter des requêtes issues de questions réelles, faire annoter les passages pertinents pour un échantillon, puis séparer entraînement et évaluation par document."
+  },
+  "duree_estimee_minutes": 150,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/moderncamembert-base": {
+    "id": "almanach/moderncamembert-base",
+    "sha": "8e70002226c4fc069b6920d142a83cbad1ce1266",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 136120832,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "sujet-ai/Sujet-Financial-RAG-FR-Dataset",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": "mit",
+   "colonnes": {
+    "question": "Value",
+    "context": "Value"
+   },
+   "exemple": {
+    "question": "Quel est le chiffre d'affaires total du Groupe Air France-KLM pour l'année 2023 ?",
+    "context": "xx Résultats annuels 2023 29 février 2024 Demande soutenue se traduisant par une progression de la marge opérationnelle à 5,7% Fonds propres du Groupe restaurés"
+   },
+   "lignes": {
+    "train": 28880,
+    "test": 1209
+   }
+  },
+  "paquets": {
+   "sentence-transformers>=6.3.0": {
+    "paquet": "sentence-transformers",
+    "derniere_version": "6.3.0",
+    "licence": "",
+    "auteur": "Nils Reimers <info@nils-reimers.de>, Tom Aarsen <tom.aarsen@",
+    "source": "https://www.SBERT.net"
+   }
+  }
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
