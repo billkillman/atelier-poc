@@ -5,10 +5,10 @@
  "depot": "20261112_multivector_token_pooling_aware_french",
  "titre": "Le gain d'un entraînement multi-vecteur conscient du token pooling (index ÷4) se retrouve-t-il en français ?",
  "debut": "2026-11-12T03:17:50Z",
- "maj": "2026-11-12T03:54:38Z",
+ "maj": "2026-11-12T03:55:49Z",
  "statut": "en_cours",
- "etape": "revue_prealable",
- "detail": "relecture de la méthode sur l'échelle réduite",
+ "etape": "complete",
+ "detail": "sur GPU GPU T4 (Google Colab)",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -30,15 +30,15 @@
   {
    "code": "revue_prealable",
    "libelle": "Relecture avant l'échelle complète",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-12T03:54:38Z",
-   "fin": null
+   "fin": "2026-11-12T03:55:49Z"
   },
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-12T03:55:49Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.249,
- "estimation_fin": "2026-11-12T06:28:38Z",
+ "progression": 0.254,
+ "estimation_fin": "2026-11-12T06:28:49Z",
  "resultat": null
 }
