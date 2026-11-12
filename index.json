@@ -3,6 +3,84 @@
  "pocs": [
   {
    "jour": "2026-11-12",
+   "sujet_id": "multi-vecteur-token-pooling-sentence-transformers-6-3",
+   "depot": "20261112_multivector_token_pooling_aware_french",
+   "titre": "Le gain d'un entraînement multi-vecteur conscient du token pooling (index ÷4) se retrouve-t-il en français ?",
+   "statut": "valide",
+   "niveau_sandbox": "complet",
+   "echelle": "complete",
+   "materiel": "GPU T4 (Google Colab)",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : Multi-vecteur entraîné normalement)",
+    "raison": ""
+   },
+   "iterations": 1,
+   "metrique_principale": "ndcg_at_10",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "Multi-vecteur entraîné normalement",
+     "role": "reference",
+     "valeur": 76.95569940951944,
+     "ic95": [
+      74.96977433954437,
+      78.78876776481982
+     ]
+    },
+    {
+     "nom": "Multi-vecteur entraîné avec MultiVectorTokenPoolingLoss",
+     "role": "nouvelle",
+     "valeur": 77.16452915506868,
+     "ic95": [
+      75.2593180001643,
+      79.05740432859191
+     ]
+    }
+   ],
+   "n_exemples": 1204,
+   "jeu": "sujet-ai/Sujet-Financial-RAG-FR-Dataset",
+   "synthese": "ndcg_at_10 : Multi-vecteur entraîné avec MultiVectorTokenPoolingLoss 77,2 contre 77 pour Multi-vecteur entraîné normalement (1204 exemples, GPU T4 (Google Colab)).",
+   "conclusion": "La comparaison est correcte sur le plan du protocole : mêmes données, même initialisation, mêmes lots, même nombre de pas (188), mêmes évaluations appariées, sans fuite apparente. À l'échelle complète (1 204 requêtes, GPU), à pool_factor=4, le nDCG@10 est de 77,16 pour la nouvelle approche contre 76,96 pour la référence, soit +0,21 point avec un intervalle apparié de [−0,57 ; +1,05]. Les rétentions sont presque identiques (98,2 % vs 98,0 %). L'hypothèse (≥ 2 points, 97 % vs ≤ 95 %) n'est pas confirmée et le résultat est non concluant, et non une preuve d'absence d'effet. La source (+2,2 points, 97,8 % vs 94,6 %) n'est pas reproduite, mais le protocole diffère (un seul entraînement de 6 000 paires, une perte réimplémentée, un jeu financier facile où la référence perd déjà peu). Sous max_tokens=4, l'avantage apparent (+1,8 point) reste non testé.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non",
+   "en_bref": "Le gain annoncé n'est pas retrouvé en français : l'écart est négligeable et non significatif, et la compression coûte déjà peu à un modèle ordinaire. Résultat non concluant, limité par un seul entraînement et une perte réimplémentée.",
+   "libelle_metrique": "nDCG@10 à pool_factor=4",
+   "reserves": [
+    "Le résultat concerne une réimplémentation de l'objectif, pas la perte livrée par la bibliothèque ; l'absence d'effet pourrait venir d'écarts d'implémentation.",
+    "L'écart observé est dans le bruit d'un seul entraînement ; on ne peut conclure ni à l'absence ni à la présence d'un petit effet réel.",
+    "Sur ce jeu facile, la compression coûte déjà peu à un modèle ordinaire ; l'absence de gain ne prouve pas que l'entraînement conscient du pooling soit inutile sur des corpus plus exigeants."
+   ],
+   "duree_minutes": 60.4,
+   "consommation": {
+    "claude:poc_code:multi-vecteur-token-pooling-sentence-transformers-6-3": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 873.9,
+     "cout_equivalent_usd": 2.3148,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:multi-vecteur-token-pooling-sentence-transformers-6-3": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 256.5,
+     "cout_equivalent_usd": 1.188,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:multi-vecteur-token-pooling-sentence-transformers-6-3": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 89.9,
+     "cout_equivalent_usd": 0.5452,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261112_multivector_token_pooling_aware_french",
+   "tentatives": 1
+  },
+  {
+   "jour": "2026-11-12",
    "sujet_id": "google-gemini-decisions-api",
    "depot": "20261112_typed_decision_camembert_intent_calibration",
    "titre": "Un modèle de décision ouvert (choix parmi options décrites, une seule passe) peut-il égaler un classifieur CamemBERT fine-tuné sur des intentions françaises à 60 classes hiérarchisées ?",
