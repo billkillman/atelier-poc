@@ -2,6 +2,102 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-12",
+   "sujet_id": "google-gemini-decisions-api",
+   "depot": "20261112_typed_decision_camembert_intent_calibration",
+   "titre": "Un modèle de décision ouvert (choix parmi options décrites, une seule passe) peut-il égaler un classifieur CamemBERT fine-tuné sur des intentions françaises à 60 classes hiérarchisées ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "complete",
+   "materiel": "GPU T4 (Google Colab)",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : Classifieur CamemBERT-base fine-tuné)",
+    "raison": ""
+   },
+   "iterations": 1,
+   "metrique_principale": "accuracy",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "CamemBERT-base fine-tuné",
+     "role": "reference",
+     "valeur": 0.712,
+     "ic95": [
+      0.672,
+      0.754
+     ]
+    },
+    {
+     "nom": "CamemBERTa v2 fine-tuné",
+     "role": "reference",
+     "valeur": 0.404,
+     "ic95": [
+      0.364,
+      0.448
+     ]
+    },
+    {
+     "nom": "Décision ouverte à plat",
+     "role": "nouvelle",
+     "valeur": 0.208,
+     "ic95": [
+      0.172,
+      0.244
+     ]
+    },
+    {
+     "nom": "Décision ouverte hiérarchique",
+     "role": "nouvelle",
+     "valeur": 0.368,
+     "ic95": [
+      0.326,
+      0.412
+     ]
+    }
+   ],
+   "n_exemples": 500,
+   "jeu": "mteb/amazon_massive_intent",
+   "synthese": "accuracy : Décision ouverte hiérarchique 0,368 contre 0,404 pour CamemBERTa v2 fine-tuné (500 exemples, GPU T4 (Google Colab)).",
+   "conclusion": "À l'échelle complète (tout le jeu d'entraînement, test commun de 500 énoncés, GPU T4), la décision ouverte à plat avec Qwen3-1.7B atteint 20,8 % d'exactitude, contre 71,2 % pour CamemBERT-base fine-tuné (écart très significatif, McNemar p < 1e-50). Elle est loin des 90 % de la référence, avec une ECE de 0,105 pour un seuil de 0,05. La variante hiérarchique est meilleure (36,8 %) mais reste très en dessous et se calibre mal (ECE 0,21). La référence est elle-même sous-entraînée et le contrôle positif (65 %) signale un problème de mise en œuvre du modèle de décision. Le sens de l'écart est donc probable, mais ces chiffres ne mesurent ni le potentiel de l'idée ni celui de l'API de Google. Ils ne se comparent pas aux chiffres de la source, qui portent sur d'autres modèles, d'autres jeux et ne sont pas indépendants. L'échelle réduite (5 % pour la référence) ne servait qu'à valider le protocole.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Le petit modèle ouvert utilisé comme modèle de décision est très en dessous du classifieur fine-tuné, et sa confiance n'est pas fiable. Mais la référence est sous-entraînée et le contrôle positif est faible : l'idée n'est pas vraiment testée.",
+   "libelle_metrique": "Exactitude",
+   "reserves": [
+    "Le faible score de la décision ouverte peut venir de la mise en œuvre (gabarit, codes, précision numérique) autant que de l'idée. Il ne dit pas ce que donnerait un vrai modèle de décision typé.",
+    "La référence est probablement bien en dessous de ce qu'un classifieur fine-tuné sait faire. L'écart réel avec la décision ouverte est sans doute plus grand que celui mesuré, et le classement entre les deux encodeurs n'est pas fiable.",
+    "Le gain apparent de la hiérarchie vient surtout de ce que le choix à plat est très mal réussi. Rien ne prouve qu'il persisterait avec un modèle plus capable, et la confiance devient moins fiable."
+   ],
+   "duree_minutes": 70.1,
+   "consommation": {
+    "claude:poc_code:google-gemini-decisions-api": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1751.9,
+     "cout_equivalent_usd": 4.6549,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:google-gemini-decisions-api": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 250.8,
+     "cout_equivalent_usd": 1.1441,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:google-gemini-decisions-api": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 111.1,
+     "cout_equivalent_usd": 0.5773,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261112_typed_decision_camembert_intent_calibration",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-11",
    "sujet_id": "jev-audit-calibration-explicabilite-perturbation",
    "depot": "20261111_typed_decider_calibration_noise_camembert",
