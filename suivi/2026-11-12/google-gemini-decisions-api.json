@@ -5,10 +5,10 @@
  "depot": "20261112_typed_decision_camembert_intent_calibration",
  "titre": "Un modèle de décision ouvert (choix parmi options décrites, une seule passe) peut-il égaler un classifieur CamemBERT fine-tuné sur des intentions françaises à 60 classes hiérarchisées ?",
  "debut": "2026-11-12T02:03:13Z",
- "maj": "2026-11-12T02:36:36Z",
+ "maj": "2026-11-12T02:49:40Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 1 : phase publique sur le jeu public (échelle réduite, CPU)",
+ "detail": "itération 1 : phase privée sur données factices, contre le faux service",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.254,
+ "progression": 0.368,
  "estimation_fin": "2026-11-12T04:02:25Z",
  "resultat": null
 }
