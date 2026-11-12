@@ -5,10 +5,10 @@
  "depot": "20261112_typed_decision_camembert_intent_calibration",
  "titre": "Un modèle de décision ouvert (choix parmi options décrites, une seule passe) peut-il égaler un classifieur CamemBERT fine-tuné sur des intentions françaises à 60 classes hiérarchisées ?",
  "debut": "2026-11-12T02:03:13Z",
- "maj": "2026-11-12T02:59:44Z",
+ "maj": "2026-11-12T03:12:17Z",
  "statut": "en_cours",
- "etape": "complete",
- "detail": "sur GPU GPU T4 (Google Colab)",
+ "etape": "revue",
+ "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -37,15 +37,15 @@
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-12T02:59:44Z",
-   "fin": null
+   "fin": "2026-11-12T03:12:17Z"
   },
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-12T03:12:17Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.452,
- "estimation_fin": "2026-11-12T04:02:44Z",
+ "progression": 0.974,
+ "estimation_fin": "2026-11-12T03:15:17Z",
  "resultat": null
 }
