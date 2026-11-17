@@ -1,0 +1,377 @@
+{
+ "version": 1,
+ "jour": "2026-11-17",
+ "sujet_id": "ultrabert-jev-encodeur-decideur",
+ "depot": "20261117_encoder_option_masks_hierarchical_intents",
+ "fiche": {
+  "sujet_id": "ultrabert-jev-encodeur-decideur",
+  "titre": "Un encodeur de 380 M qui coche « oui » ou « non » devant chaque option bat Qwen3-0.6B à données égales, en anglais seulement",
+  "en_une_phrase": "Fine-tuné à noter chaque option par un masque « oui/non », UltraBERT-380M atteint 72,1 % contre 67,6 % pour Qwen3-0.6B, deux fois plus vite. Preprint en anglais, sans code publié.",
+  "probleme": "Router un ticket ou classer une intention revient à choisir parmi des options fixes. Un classifieur fine-tuné fige la liste des classes. Un LLM génératif doit écrire sa réponse, qu'il faut ensuite analyser. Les **modèles de décision typés** (style Jev, de TypeSafe AI) renvoient directement une probabilité par option, les options étant données dans le prompt. Les travaux récents (recette *LLM-as-Jev*) le font avec des décodeurs, des modèles conçus pour générer du texte, ce qui ne sert à rien ici. La question : un encodeur, qui lit le texte dans les deux sens sans générer, fait-il mieux à données égales ?",
+  "comment_ca_marche": "Le modèle de base est **UltraBERT-380M**, un encodeur anglais de 380 M paramètres qui lit jusqu'à 32 000 jetons. Il est entièrement fine-tuné.\n\n1. **Entrée.** Le contexte (passages), la question, puis chaque option, précédée d'un jeton masqué `[M]` : c'est le « trou » que l'encodeur a appris à remplir pendant son pré-entraînement. La consigne demande de marquer la bonne option « yes » et les autres « no ». Les options sont mélangées à chaque usage, pour que leur position ne trahisse pas la réponse.\n2. **Une seule passe.** L'encodeur lit tout ensemble. Aucune couche n'est ajoutée : on réutilise sa tête de prédiction de mots d'origine.\n3. **Lecture.** À chaque masque, on récupère les *logits* (scores bruts, avant conversion en probabilités) des mots « yes » et « no ».\n4. **Score et normalisation.** Quatre recettes sont comparées :\n   - logit « yes » seul, puis *softmax* (fonction qui transforme des scores en probabilités dont la somme vaut 1) ;\n   - « yes » moins « no », puis softmax ;\n   - « yes » moins « no », passé dans une *sigmoïde* (qui ramène chaque score entre 0 et 1), puis divisé par la somme sur les options ; c'est la forme de la fonction qui choisit les experts dans DeepSeek-V3 ;\n   - même schéma avec une racine de *softplus*, une fonction non bornée.\n5. **Décision.** L'option au score le plus haut l'emporte. L'entraînement ne fait que pousser la bonne option devant les autres : aucune option n'a de cible oui/non propre.\n6. **Preuves (en option).** Une petite tête ajoutée sur l'encodeur gelé note chaque phrase du document comme justification de l'option choisie, dans la même passe.\n\n**Ce qui est nouveau.** Laya et Von, deux encodeurs à un masque par option déjà publiés, ajoutent des couches. Ici, aucune couche n'est ajoutée, et l'encodeur est comparé à un décodeur entraîné sur exactement les mêmes exemples.",
+  "demarche_experimentale": "**Données** : le mélange d'entraînement de LLM-as-Jev plus Nimble, soit 13 jeux anglais. Ils couvrent le routage d'intentions (CLINC150, MASSIVE, Bitext), le raisonnement court et les documents longs (ContractNLI, MuSiQue, QuALITY). On garde 1 000 lignes par jeu (13 000 au total), dédoublonnées et filtrées contre les fuites vers l'évaluation. Le test compte 5 015 lignes tenues à l'écart, le dev 1 300.\n\n**Comparaisons** : Qwen3-0.6B entièrement fine-tuné sur les mêmes lignes, plus deux références LoRA (Qwen3-0.6B et Qwen3-4B) reproduites. Chaque modèle est entraîné une époque, sur plusieurs entraînements moyennés.\n\n**Métrique** : l'exactitude moyenne sur les 13 jeux, plus 6 benchmarks externes échantillonnés (BoolQ, MMLU…). Les écarts sont donnés avec un intervalle bootstrap à 95 % que l'auteur juge possiblement trop étroit. La latence est mesurée requête par requête sur une A100.",
+  "resultats": [
+   {
+    "metrique": "Exactitude test moyenne, 13 jeux (plus haut = mieux)",
+    "valeur": "69,7 % à 72,1 % selon la recette",
+    "comparaison": "Qwen3-0.6B full FT : 67,6 % ; Qwen3-4B LoRA : 77,3 %",
+    "conditions": "Mêmes 13 000 lignes d'entraînement ; 5 015 lignes de test ; anglais",
+    "citation": "Every encoder recipe is above fully fine-tuned Qwen3-0.6B, both on the test set (69.7% to 72.1% against 67.6%) and on the external benchmarks (57.8% to 59.6% against 56.1%), with fewer parameters (380M against 0.6B)."
+   },
+   {
+    "metrique": "Gain dû au score « yes » moins « no »",
+    "valeur": "+1,6 point test ; externe 57,8 % → 59,6 %",
+    "comparaison": "Logit « yes » seul, softmax",
+    "conditions": "UltraBERT-380M, les deux avec softmax",
+    "citation": "Changing the score from “yes” to “yes” minus “no”, both with the softmax, adds 1.6 test points and raises external accuracy from 57.8% to 59.6%."
+   },
+   {
+    "metrique": "Exactitude, intentions CLINC150 / MASSIVE",
+    "valeur": "91,8 % / 84,9 % (sigmoïde)",
+    "comparaison": "Qwen3-0.6B : 86,3 / 76,9 ; Qwen3-4B LoRA : 89,8 / 83,5",
+    "conditions": "Environ 400 lignes de test par jeu",
+    "citation": "They cover one encoder, one decoder family and one English training mixture, below one billion parameters; a 4B decoder is still more accurate except on the intent datasets."
+   },
+   {
+    "metrique": "Latence par décision ; pic mémoire GPU",
+    "valeur": "29 ms ; 2,8 GiB",
+    "comparaison": "Qwen3-0.6B : 68 ms ; 2,2 GiB",
+    "conditions": "Une requête à la fois, A100, entrées de 1 100 à 1 200 jetons, poids fp32",
+    "citation": "One row at a time, the encoder takes 29 ms per decision, against 68 ms for Qwen3-0.6B and 124 ms for Qwen3-4B (Table 3)"
+   },
+   {
+    "metrique": "Erreur de calibration de l'option choisie (plus bas = mieux)",
+    "valeur": "0,023 (sigmoïde)",
+    "comparaison": "0,027 (softmax « yes » moins « no ») ; 0,038 (« yes » seul)",
+    "conditions": "Jeu dev, un seul entraînement par réglage",
+    "citation": "On top of the score, the sigmoid raises dev accuracy from 71.5% to 72.9% and lowers the calibration error from 0.027 to 0.023."
+   },
+   {
+    "metrique": "Précision moyenne des phrases de preuve (plus haut = mieux)",
+    "valeur": "0,55 en 68 ms par ligne",
+    "comparaison": "ContextCite : 0,41 en 1 860 ms ; AT2 : 0,33",
+    "conditions": "889 lignes de test avec preuves annotées ; même encodeur softmax",
+    "citation": "On the softmax encoder, the head has a higher sentence AP than ContextCite and AT2 (0.55 against 0.41 and 0.33), in 68 ms per row against 1,860 ms for ContextCite."
+   }
+  ],
+  "limites": [
+   "Selon l'auteur, les résultats ne valent que pour un encodeur, une famille de décodeurs, un mélange anglais et moins de 1 Md de paramètres. Qwen3-4B reste devant (77,3 %), sauf sur les intentions.",
+   "Rien en français, rien à ~300 classes hiérarchiques. Le nombre d'options par ligne n'est pas précisé par la source. UltraBERT-380M est anglais seulement selon sa fiche Hugging Face.",
+   "Rapport technique d'un chercheur indépendant, non relu, sans code ni poids publiés.",
+   "Les poids doivent rester en fp32 : en bf16, l'exactitude sur MuSiQue varie jusqu'à 8 points. Aucun gain de mémoire. La tête de preuves n'est pas évaluée comme explication fidèle (auteur)."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "72,1 %",
+    "libelle": "Exactitude test moyenne (13 jeux), contre 67,6 % pour Qwen3-0.6B, mêmes données"
+   },
+   {
+    "valeur": "29 ms",
+    "libelle": "Par décision sur une A100, contre 68 ms pour Qwen3-0.6B"
+   },
+   {
+    "valeur": "91,8 %",
+    "libelle": "Intentions CLINC150, contre 86,3 % (Qwen3-0.6B) et 89,8 % (Qwen3-4B)"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "À données d'entraînement égales, toutes les recettes encodeur dépassent Qwen3-0.6B entièrement fine-tuné sur le test (69,7 à 72,1 % contre 67,6 %).",
+    "citation": "Against Qwen3-0.6B [34] fully fine-tuned on the same examples, every encoder recipe is more accurate (69.7% to 72.1% against 67.6% on a held-out test split) and faster (29 against 68 ms per decision), but not lighter in peak memory."
+   },
+   {
+    "affirmation": "Qwen3-4B LoRA reste plus précis que l'encodeur, sauf sur les jeux d'intentions.",
+    "citation": "a 4B decoder is still more accurate except on the intent datasets."
+   },
+   {
+    "affirmation": "La normalisation par sigmoïde ajoute 0,8 point de test, surtout grâce à MuSiQue.",
+    "citation": "Sigmoid normalisation adds a further 0.8 test points (95% interval [+0.2, +1.3], Section 3.3) and nothing on the external benchmarks."
+   },
+   {
+    "affirmation": "L'encodeur est plus rapide mais consomme plus de mémoire au pic (2,8 contre 2,2 GiB), car il lui faut des poids fp32.",
+    "citation": "Qwen3-0.6B peaks at 2.2 GiB, against 2.8 GiB for the encoder with the fp32 weights it needs for its accuracy, or 1.9 GiB with bf16 weights, which lose accuracy (Section 5.3)."
+   },
+   {
+    "affirmation": "Le mélange d'entraînement est uniquement en anglais.",
+    "citation": "They cover one encoder, one decoder family and one English training mixture, below one billion parameters"
+   },
+   {
+    "affirmation": "La tête de preuves n'est pas évaluée comme reflet de ce que le modèle utilise réellement.",
+    "citation": "We did not evaluate whether the evidence head reflects what the model used, and we measured only peak memory."
+   },
+   {
+    "affirmation": "Aucune couche n'est ajoutée : chaque option est notée en une passe via la tête de prédiction de masque existante.",
+    "citation": "UltraBERT-380M with one mask per option, scoring every option in one forward pass with no new head, for any number of options."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision typé (Jev)",
+    "definition": "Modèle qui ne génère pas de texte : il reçoit une liste d'options et renvoie une probabilité pour chacune. Le format Jev a été popularisé par TypeSafe AI."
+   },
+   {
+    "terme": "Masque [M]",
+    "definition": "Jeton « trou » qu'un encodeur apprend à remplir pendant son pré-entraînement. Ici, il est rempli par « yes » ou « no » devant chaque option."
+   },
+   {
+    "terme": "Logit",
+    "definition": "Score brut produit par le modèle pour un mot, avant sa conversion en probabilité."
+   },
+   {
+    "terme": "Softmax",
+    "definition": "Fonction qui transforme une liste de scores en probabilités positives dont la somme vaut 1. Elle met les options en compétition."
+   },
+   {
+    "terme": "Sigmoïde normalisée",
+    "definition": "Chaque score est ramené entre 0 et 1 par une sigmoïde, puis divisé par la somme sur les options. C'est la forme de la fonction qui choisit les experts dans DeepSeek-V3."
+   },
+   {
+    "terme": "LoRA",
+    "definition": "Fine-tuning économe : on entraîne de petites matrices ajoutées au modèle au lieu de tous ses poids."
+   },
+   {
+    "terme": "Erreur de calibration",
+    "definition": "Écart entre la confiance annoncée par le modèle et son taux réel de bonnes réponses. Plus bas = probabilités plus fiables."
+   },
+   {
+    "terme": "ContextCite / AT2",
+    "definition": "Méthodes existantes qui attribuent une réponse aux passages du contexte, en retirant des phrases ou en pondérant l'attention du modèle."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "UltraBERT-JEV: Encoder models for System One Applications (arXiv 2611.17867)",
+    "url": "https://arxiv.org/abs/2611.17867",
+    "type": "primaire",
+    "date": "2026-11-13"
+   },
+   {
+    "titre": "dmis-lab/UltraBERT-380M, fiche du modèle sur Hugging Face",
+    "url": "https://huggingface.co/dmis-lab/UltraBERT-380M",
+    "type": "primaire",
+    "date": ""
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-13",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un encodeur français qui note chaque option par un masque « oui/non » fait-il mieux qu'une tête de classification fixe, à budget d'étiquettes égal ?",
+  "hypothese": "À 5, 20 et 50 textes étiquetés par classe sur MASSIVE fr (60 intentions), le même encodeur CamemBERT-base utilisé en décideur à masques par option (score oui−non) obtient un macro_f1 supérieur d'au moins 2 points à la tête de classification fixe au plus petit budget, un écart qui se réduit à ≤1 point avec 50 par classe, avec une erreur de calibration (ECE) inférieure ou égale et une cohérence scénario/intention au moins égale.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné avec tête de classification",
+   "description": "Encodeur français avec une tête linéaire de 60 classes, fine-tuné entièrement en entropie croisée sur les mêmes textes étiquetés.",
+   "implementation": "transformers AutoModelForSequenceClassification sur almanach/camembert-base, entraînement complet, lr 3e-5, batch 16, 4 époques, longueur max 64 jetons, précision mixte fp16, calibration non corrigée (softmax brut).",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Encodeur décideur à un masque par option (score oui−non)",
+   "description": "Le texte puis la liste de toutes les options, chacune précédée d'un jeton masqué, sont lus en une seule passe ; le score d'une option est le logit « oui » moins le logit « non » de la tête MLM existante, sans nouvelle couche. Les options sont mélangées à chaque exemple et la perte pousse la bonne option devant les autres.",
+   "implementation": "transformers AutoModelForMaskedLM sur almanach/camembert-base ; entrée « texte </s> option_1 <mask> ; option_2 <mask> ; … » avec libellés lisibles (label_text, underscores remplacés par des espaces, préfixé du scénario) ; identifiants des jetons « oui » et « non » vérifiés dans le tokenizer (premier sous-mot) ; perte d'entropie croisée sur le softmax des scores ; variante sigmoïde normalisée (sigmoid(oui−non) divisé par la somme) évaluée à part ; mêmes réglages d'optimisation que la référence, poids en fp32, longueur max 512 jetons ; ordre des options mélangé à l'entraînement et moyenné sur 3 permutations à l'évaluation.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "text, label, label_text (le scénario parent est le préfixe de label_text avant le premier « _ »)",
+   "representativite": "Seul jeu français chargeable à étiquettes lisibles en arbre à deux niveaux (18 scénarios → 60 intentions) avec ~190 textes par classe en train : permet de tracer la performance selon le nombre d'étiquettes par classe, la calibration et la cohérence parent/enfant, ainsi que de lire le libellé des classes dans l'entrée.",
+   "ecarts_donnees_reelles": "Domaine assistant domestique et non services financiers, énoncés très courts, 60 classes seulement (pas ~300), peu de déséquilibre, libellés de classes en anglais, pas de pièces jointes ni d'e-mails ; favorable par construction aux encodeurs sur les intentions ; le budget d'étiquettes est simulé par sous-échantillonnage du train.",
+   "jeux_explores": [
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "60 intentions en arbre à 2 niveaux, libellés lisibles, 11 514/2 033/2 974 textes, Apache-2.0.",
+     "decision": "retenu",
+     "raison": "Seul jeu français avec hiérarchie explicite, libellés exploitables et licence commerciale claire."
+    },
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "77 intentions internes proches, traduit en français, mais plat et étiquettes entières.",
+     "decision": "ecarte",
+     "raison": "Pas de hiérarchie ni de libellés, licence de la traduction à clarifier ; reste une piste pour une extension."
+    },
+    {
+     "nom": "DeepPavlov/clinc150_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/clinc150_fr",
+     "acces": "hub_libre",
+     "adequation": "150 intentions traduites, utile pour tester la longueur d'entrée.",
+     "decision": "ecarte",
+     "raison": "Plat, classes bien séparées, étiquettes entières sans libellés, licence non précisée."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "~113 intentions déséquilibrées en français.",
+     "decision": "ecarte",
+     "raison": "Étiquettes entières, alignement avec les domaines non validé, licence inconnue."
+    },
+    {
+     "nom": "DeepPavlov/hwu64_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/hwu64_fr",
+     "acces": "hub_libre",
+     "adequation": "64 intentions scénario → intention traduites.",
+     "decision": "ecarte",
+     "raison": "Parent et libellés absents, pas de validation, licence non précisée."
+    },
+    {
+     "nom": "coastalcph/multi_eurlex",
+     "url": "https://huggingface.co/datasets/coastalcph/multi_eurlex",
+     "acces": "hub_libre",
+     "adequation": "Hiérarchie profonde en français mais documents juridiques longs, multi-label.",
+     "decision": "ecarte",
+     "raison": "Non chargeable en parquet (viewer désactivé, script) et hors sujet pour du routage de demandes."
+    },
+    {
+     "nom": "Benchmark d'intentions logistiques hiérarchique (arXiv 2603.23172)",
+     "url": "https://arxiv.org/abs/2603.23172",
+     "acces": "sur_demande",
+     "adequation": "Vraies requêtes de service client à deux niveaux mais 17 feuilles, sans français.",
+     "decision": "ecarte",
+     "raison": "Accès sur demande, licence inconnue, pas de français."
+    }
+   ]
+  },
+  "metriques": [
+   "macro_f1",
+   "accuracy",
+   "scenario_accuracy",
+   "hierarchical_consistency",
+   "expected_calibration_error",
+   "rare_class_macro_f1",
+   "inference_latency_ms"
+  ],
+  "metrique_principale": "macro_f1",
+  "sens": "max",
+  "protocole": "Budgets de 5, 20 et 50 textes étiquetés par intention tirés du train (sans remise, stratifiés) ; plafond : entraînement sur tout le train. Même texte, même nombre d'époques et mêmes réglages d'optimisation pour la référence et la nouvelle approche ; test complet de 2 974 textes. Métriques : macro_f1 et accuracy sur 60 intentions, scenario_accuracy sur les 18 scénarios, hierarchical_consistency (part des erreurs d'intention restant dans le bon scénario), ECE à 15 classes de confiance (avec et sans mise à l'échelle par température ajustée sur validation), macro_f1 sur les 10 intentions les moins fréquentes du test, latence par exemple. Intervalles de confiance par bootstrap (1 000 rééchantillonnages) et test apparié (McNemar). Ablation : softmax vs sigmoïde normalisée. Réduit : budgets 2 et 5 par classe, 1 époque, 300 textes de test (au moins 100).",
+  "niveau_sandbox": "complet",
+  "adaptation_sandbox": "Même modèle (camembert-base, 110 M) à l'échelle réduite, mais budgets 2 et 5 par classe, 1 époque et 300 textes de test sur CPU. Calcul GPU complet : budgets 5/20/50 par classe = 300+1 200+3 000 exemples × 4 époques ≈ 18 000 passes × ~400 jetons (60 options) ≈ 7,2 M jetons à ~8 000 jetons/s en entraînement ≈ 15 min, référence ≈ 3 min, évaluation 3 budgets × 2 974 × 400 jetons × 3 permutations ≈ 10 M jetons à ~25 000 jetons/s ≈ 7 min, plafond plein train limité à 2 époques ≈ ~5 min : total ≈ 30 min sous le budget de 45 min ; les permutations passent à 1 si dépassement.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte de la demande client (message, e-mail nettoyé ou verbatim), anonymisé."
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif (niveau 1 de l'arbre), libellé lisible."
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif (niveau 2), libellé lisible, unique dans son motif."
+    },
+    {
+     "colonne": "sub_reason_description",
+     "type": "string",
+     "description": "Courte description du sous-motif, utilisable comme option dans l'entrée."
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception, pour le découpage temporel."
+    },
+    {
+     "colonne": "is_labeled",
+     "type": "bool",
+     "description": "Vrai si l'étiquette a été validée par un annotateur."
+    }
+   ],
+   "volume_conseille": "Au moins 20 000 textes étiquetés couvrant 100 à 300 sous-motifs, avec au moins 30 textes par sous-motif retenu pour le budget le plus fort et un ensemble de test d'au moins 5 000 textes.",
+   "metriques_metier": "macro_f1 sur sous-motifs, accuracy sur motifs, cohérence motif/sous-motif, ECE, taux de routage correct à seuil de confiance fixé, latence p95 par décision, longueur d'entrée selon le nombre d'options.",
+   "garde_fous": "Vérifier que la longueur d'entrée avec toutes les options reste dans la limite du contexte de l'encodeur (sinon présélectionner les options par motif) ; ne pas déployer sur la seule moyenne : lire les classes rares ; aucune donnée personnelle dans le texte ; poids conservés en fp32.",
+   "prescriptions": [
+    "Au moins 30 textes par sous-motif (et un échantillon séparé de sous-motifs rares avec 5 à 10 textes) pour tracer la courbe selon le budget d'étiquettes.",
+    "Étiquettes validées par deux annotateurs sur au moins 10 % des textes, avec accord inter-annotateurs (kappa) rapporté.",
+    "Découpage temporel : entraînement sur les périodes anciennes, test sur les 2 à 3 derniers mois, pour éviter les fuites et mesurer la dérive.",
+    "Libellés et descriptions de sous-motifs rédigés de manière homogène et non ambiguë, avec leur motif parent.",
+    "Anonymisation des noms, IBAN, numéros de carte, adresses et téléphones avant extraction ; exclusion des textes juridiques ou sensibles non nécessaires.",
+    "Conserver la distribution réelle des classes dans le test (ne pas rééquilibrer) et tenir à part un lot de sous-motifs jamais vus pour tester l'évolution de la taxonomie."
+   ],
+   "preparation": "Extraire les demandes entrantes (messages, e-mails, verbatim de contact) de plusieurs mois depuis les outils de relation client, joindre le motif et le sous-motif saisis ou validés, filtrer les étiquettes non fiables et les doublons, anonymiser, puis échantillonner par sous-motif pour fixer les budgets d'étiquettes et réserver un test temporel."
+  },
+  "duree_estimee_minutes": 240,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "splits": [
+    "train",
+    "test",
+    "validation"
+   ],
+   "licence": "apache-2.0",
+   "colonnes": {
+    "id": "Value",
+    "label": "Value",
+    "label_text": "Value",
+    "text": "Value",
+    "lang": "Value"
+   },
+   "exemple": {
+    "id": "1",
+    "label": "alarm_set",
+    "label_text": "alarm_set",
+    "text": "réveille-moi à neuf heures du matin le vendredi",
+    "lang": "fr"
+   },
+   "lignes": {
+    "train": 11514,
+    "test": 2974,
+    "validation": 2033
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
