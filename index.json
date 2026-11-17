@@ -2,6 +2,110 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-17",
+   "sujet_id": "ultrabert-jev-encodeur-decideur",
+   "depot": "20261117_encoder_option_masks_hierarchical_intents",
+   "titre": "Un encodeur français qui note chaque option par un masque « oui/non » fait-il mieux qu'une tête de classification fixe, à budget d'étiquettes égal ?",
+   "statut": "valide",
+   "niveau_sandbox": "complet",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné avec tête de classification)",
+    "raison": "approches ou métriques différentes de celles de l'échelle réduite"
+   },
+   "iterations": 1,
+   "metrique_principale": "macro_f1",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "Référence (tête fixe) — 2 par classe",
+     "role": "reference",
+     "valeur": 0.029277922773204845,
+     "ic95": [
+      0.012549847525216984,
+      0.05106651339528052
+     ]
+    },
+    {
+     "nom": "Décideur oui−non (softmax) — 2 par classe",
+     "role": "nouvelle",
+     "valeur": 0.023375500903590793,
+     "ic95": [
+      0.015715467328370557,
+      0.03124790301295099
+     ]
+    },
+    {
+     "nom": "Décideur oui−non (sigmoïde normalisée) — 2 par classe",
+     "role": "nouvelle",
+     "valeur": 0.02284453897357123,
+     "ic95": [
+      0.01583710407239819,
+      0.031131544943699636
+     ]
+    },
+    {
+     "nom": "Référence (tête fixe) — 5 par classe",
+     "role": "reference",
+     "valeur": 0.07770600892124808,
+     "ic95": [
+      0.058804892901818784,
+      0.0958708962512208
+     ]
+    },
+    {
+     "nom": "Décideur oui−non (softmax) — 5 par classe",
+     "role": "nouvelle",
+     "valeur": 0.07843700510451902,
+     "ic95": [
+      0.040832366770278135,
+      0.11729069558327722
+     ]
+    }
+   ],
+   "n_exemples": 300,
+   "jeu": "mteb/amazon_massive_intent",
+   "synthese": "macro_f1 : Décideur oui−non (softmax) — 5 par classe 0,0784 contre 0,0777 pour Référence (tête fixe) — 5 par classe (300 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (CPU, une dizaine de classes de MASSIVE fr, 2 et 5 textes par classe, une époque, 300 textes de test), les deux approches sont proches du hasard : exactitude d'environ 8 à 18 %, IC de l'écart de macro-F1 centrés sur zéro (−0,006 à 2 par classe, +0,001 à 5 par classe). L'expérience ne permet pas de dire si le décideur à masques bat la tête fixe en français avec peu d'étiquettes ; ces chiffres valident le code, pas la méthode. Aucun défaut bloquant n'a été relevé dans le protocole, mais le filtre « au-dessus du trivial » est trop permissif et la variance d'entraînement n'est pas mesurée. Les chiffres ne sont pas comparables à la source (autre encodeur, autre langue, autre tâche, autre échelle de données).",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Aucun avantage du décideur à masques sur la tête fixe n'est établi : les deux modèles restent près du hasard à cette échelle. Seul le code est validé ; la question reste ouverte.",
+   "libelle_metrique": "macro-F1 (classes)",
+   "reserves": [
+    "Le fait d'être « au-dessus du trivial » ne prouve pas que le modèle ait appris : à cette échelle, les modèles sont proches du hasard et aucun chiffre ne permet de classer les deux approches.",
+    "Les intervalles affichés sous-estiment l'incertitude réelle : un écart apparent entre approches pourrait changer de signe avec une autre graine ou un autre tirage d'exemples."
+   ],
+   "duree_minutes": 57.6,
+   "consommation": {
+    "claude:poc_code:ultrabert-jev-encodeur-decideur": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 978.7,
+     "cout_equivalent_usd": 2.6161,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:ultrabert-jev-encodeur-decideur": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 273.2,
+     "cout_equivalent_usd": 1.2455,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:ultrabert-jev-encodeur-decideur": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 151.8,
+     "cout_equivalent_usd": 0.6628,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261117_encoder_option_masks_hierarchical_intents",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-12",
    "sujet_id": "multi-vecteur-token-pooling-sentence-transformers-6-3",
    "depot": "20261112_multivector_token_pooling_aware_french",
