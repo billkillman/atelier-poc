@@ -5,10 +5,10 @@
  "depot": "20261117_encoder_option_masks_hierarchical_intents",
  "titre": "Un encodeur français qui note chaque option par un masque « oui/non » fait-il mieux qu'une tête de classification fixe, à budget d'étiquettes égal ?",
  "debut": "2026-11-17T02:05:36Z",
- "maj": "2026-11-17T02:21:55Z",
+ "maj": "2026-11-17T02:26:29Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 1 sur 3",
+ "detail": "itération 1 : phase publique sur le jeu public (échelle réduite, CPU)",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.085,
+ "progression": 0.1,
  "estimation_fin": "2026-11-17T06:51:55Z",
  "resultat": null
 }
