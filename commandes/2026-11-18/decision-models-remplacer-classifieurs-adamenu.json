@@ -1,0 +1,403 @@
+{
+ "version": 1,
+ "jour": "2026-11-18",
+ "sujet_id": "decision-models-remplacer-classifieurs-adamenu",
+ "depot": "20261118_adaptive_menu_decision_camembert_intents",
+ "fiche": {
+  "sujet_id": "decision-models-remplacer-classifieurs-adamenu",
+  "titre": "Modèles de décision typés : un prompt remplace le classifieur fine-tuné sur 12 jeux sur 46, aucun au-delà de 300 classes",
+  "en_une_phrase": "Sur 46 jeux de test anglais, un modèle de décision typé sans entraînement égale ou bat le classifieur publié dans 12 cas, jamais au-delà de 300 classes. Le fine-tuning reste devant. Rien sur le français.",
+  "probleme": "Pour classer des textes dans une liste fixe de classes, la recherche NLP fine-tune encore un classifieur dédié : un LLM interrogé par simple prompt reste derrière sur la plupart des benchmarks. Une nouvelle famille d'interfaces, les **modèles de décision typés**, promet un classifieur sans entraînement qui rend une probabilité par option. Trois questions restent ouvertes :\n- Sur quelles tâches remplacent-ils réellement un classifieur entraîné ?\n- Que faire quand les classes se comptent par centaines, au-delà de la limite d'options d'un appel ?\n- Le fine-tuning d'un tel modèle bat-il une baseline simple ?",
+  "comment_ca_marche": "Un **modèle de décision typé** ne génère pas de texte. Il reçoit l'entrée sous forme d'objet JSON, avec des questions dont les réponses possibles sont fixées, et renvoie une probabilité par option. Il existe trois types de questions :\n- *Choice* : jusqu'à 255 options nommées, chacune avec un critère ;\n- *Score* : 2 à 10 niveaux ordonnés ;\n- *Noul* : oui/non.\n\nJev (TypeSafe) est une API fermée. Clef (Cloudflare, 27 Md de paramètres, post-entraîné à partir de Qwen3.8-27B) accepte les mêmes requêtes, avec des poids ouverts.\n\nL'étude principale augmente l'effort par paliers, sans jamais entraîner le modèle :\n1. **Question de base** : rédigée à partir des définitions de labels de l'article, sans exemple (*zero-shot*).\n2. **Calibration** : sur 400 exemples, on corrige un biais par classe ou on ajuste une « température », un facteur qui adoucit ou durcit les probabilités.\n3. **Questions optimisées** : pendant 4 tours, un LLM propose chaque fois 20 variantes de questions. Les probabilités obtenues alimentent une petite régression logistique, et chaque variante est notée par validation croisée. La nouveauté par rapport à GEPA, un optimiseur de prompts existant, est là : on note une question *après* avoir ajusté la régression, et non sur le label qu'elle fait choisir. Ce palier n'a été testé que jusqu'à 40 labels.\n\nPour les grands espaces de labels, **AdaMenu** (un autre article) évite de présenter toutes les classes au modèle :\n1. une recherche lexicale (BM25, le classement par mots communs des moteurs de recherche) retrouve les 50 exemples étiquetés les plus proches ;\n2. on additionne leurs scores par label et on garde le plus petit groupe de labels qui atteint une fraction fixée du total ;\n3. un seul appel au modèle choisit dans ce menu réduit.\n\nAdaMenu remplace la descente hiérarchique recommandée par TypeSafe, qui suit l'arbre des labels appel après appel.\n\nLa troisième étude, elle, fine-tune des modèles de décision par LoRA, une méthode qui n'entraîne que de petites matrices ajoutées au modèle.",
+  "demarche_experimentale": "**Étude principale** : 24 articles ACL, EMNLP, NAACL et EACL (2024-2026), choisis à la main parmi 18 201 avant toute requête, dont 15 jugés difficiles. Ils fournissent 46 jeux de test anglais. Le prédicteur de chaque article est remplacé par Jev 1.13, avec le même découpage, les mêmes définitions de labels et la même métrique, puis comparé au score publié (tests statistiques corrigés pour comparaisons multiples). Sur 13 configurations, avec 500 étiquettes plus une validation, les auteurs comparent : calibration, questions optimisées (3 graines), RoBERTa-large ou DeBERTa-v3-large fine-tunés, et LoRA sur Qwen3.8-27B (une graine). Les mêmes requêtes sont envoyées à Clef, Luna et Microsoft-Decision-1.\n\n**AdaMenu** : 6 modèles de décision, 4 jeux anglais de 77 à 1 016 labels.\n\n**Étude pré-enregistrée** : 722 e-mails d'un seul utilisateur (italien, anglais), test fixe de 135 e-mails, face à une régression logistique sur TF-IDF.",
+  "resultats": [
+   {
+    "metrique": "Jeux où le prompt seul égale ou bat la méthode publiée",
+    "valeur": "12 sur 46 ; 5 sur 6 en binaire ; 0 sur 5 au-delà de 300 labels",
+    "comparaison": "Méthode de chaque article (souvent fine-tunée)",
+    "conditions": "Jev 1.13 zero-shot, métrique de l'article, tolérance 0,5 point, anglais",
+    "citation": "It replaced the predictor on 5 of the 6 test sets with two labels and on none of the 5 with over 300 possible labels."
+   },
+   {
+    "metrique": "Score de Jev en fraction du score publié (médiane)",
+    "valeur": "0,87 jusqu'à 10 labels ; 0,61 à partir de 100",
+    "comparaison": "Méthode de l'article (1 = égalité)",
+    "conditions": "46 jeux de test, zero-shot",
+    "citation": "from a median of 0.87 with at most ten answers to 0.61 with a hundred or more."
+   },
+   {
+    "metrique": "Part médiane de l'écart comblée avec 500 étiquettes (plus haut = mieux)",
+    "valeur": "72 % questions optimisées ; 59 % encodeur ; 97 % LoRA-Qwen",
+    "comparaison": "De Jev zero-shot (0 %) à la méthode publiée (100 %)",
+    "conditions": "13 configurations, 40 labels au plus ; 1,66 $ par recherche contre 1,03 h de GPU H100 pour LoRA",
+    "citation": "On all 13 configurations, calibration and optimized questions, which need no user-managed GPU, close a median 72% of the gap (95% interval 41–97), a fine-tuned encoder 59% and LoRA fine-tuning 97% (Table 4)."
+   },
+   {
+    "metrique": "Macro-F1 sur intentions internes BANKING77 (plus haut = mieux)",
+    "valeur": "71,2 (Jev zero-shot)",
+    "comparaison": "83,2 pour la méthode publiée, 69,4 pour le LLM avec prompt",
+    "conditions": "39 intentions connues plus hors périmètre, 770 requêtes, jeu de test reconstruit",
+    "citation": "Navigating the Unknown BANKING77 (ID+OOD) ( Sali and Toraman, 2025 ) | 39-way | 770 | macro-F1 | 71.2 | 83.2 | 69.4 | − - 12.0"
+   },
+   {
+    "metrique": "Exactitude d'AdaMenu (plus haut = mieux) et tokens d'entrée",
+    "valeur": "+16,6 à +34,3 points ; −0,5 à +7,2 points ; tokens divisés par 3,2 à 22,9",
+    "comparaison": "Gains face à la descente hiérarchique de TypeSafe, puis écarts face au menu complet",
+    "conditions": "6 modèles de décision, 4 jeux anglais jusqu'à 1 016 labels",
+    "citation": "It outperforms TypeSafe’s beam-search baseline on all 16 model and label-set pairs where both methods run, improving accuracy by 16.6–34.3 percentage points."
+   },
+   {
+    "metrique": "Exactitude moyenne sur les 3 décisions d'action d'un agent e-mail",
+    "valeur": "0,904 et 0,899 (Tev1 0,8 Md et 4 Md, LoRA)",
+    "comparaison": "0,931 pour TF-IDF + régression logistique ; 306 et 1 681 ms contre moins de 1 ms",
+    "conditions": "587 étiquettes, test de 135 e-mails italiens et anglais, GPU T4, pré-enregistré",
+    "citation": "On the three action switches the baseline is ahead at every label budget for both models (0.931 vs. 0.904 and 0.899 mean accuracy with all labels), at under a millisecond per question against 306 and 1681 ms."
+   }
+  ],
+  "limites": [
+   "Selon les auteurs, toutes les données sont en anglais. La troisième étude porte sur un seul utilisateur et 135 e-mails de test (italien, anglais). Rien sur le français interne ni sur des taxonomies de ~300 classes.",
+   "Selon les auteurs, l'échantillon a été choisi à la main (15 cas difficiles sur 24). La recherche de questions a été mise au point sur les mêmes 8 configurations, tests compris : risque de sur-ajustement.",
+   "L'optimiseur de questions n'a tourné que sur des jeux de 40 labels au plus. AdaMenu est plafonné par la présence du bon label dans le menu, sans mécanisme de rejet (dit par ses auteurs).",
+   "Jev est une API qui change : 173 labels sur 6 324 diffèrent entre deux appels identiques. Contamination non testée (Clef a publié des résultats sur BANKING77, CLINC150), latence non mesurée, code annoncé mais introuvable."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "12/46",
+    "libelle": "jeux de test où le prompt seul égale ou bat le classifieur publié"
+   },
+   {
+    "valeur": "0/5",
+    "libelle": "jeux à plus de 300 classes remplacés sans entraînement"
+   },
+   {
+    "valeur": "72 % / 97 %",
+    "libelle": "écart comblé avec 500 étiquettes : questions optimisées sans GPU / LoRA sur Qwen 27B"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Sans étiquette, Jev égale ou bat la méthode publiée sur 12 des 46 jeux de test.",
+    "citation": "Jev directly replaced the predictor on 12 of the 46 test sets"
+   },
+   {
+    "affirmation": "Aucun des 5 jeux de plus de 300 labels n'est remplacé par Jev en zero-shot.",
+    "citation": "It replaced the predictor on 5 of the 6 test sets with two labels and on none of the 5 with over 300 possible labels."
+   },
+   {
+    "affirmation": "Jev remplace rarement une méthode entraînée sur les étiquettes de l'article : 4 jeux sur 38.",
+    "citation": "Of the 38 test sets whose method was trained on the paper’s labelled data, Jev replaced 4"
+   },
+   {
+    "affirmation": "Avec 500 étiquettes, les questions optimisées comblent 72 % de l'écart, un encodeur fine-tuné 59 % et LoRA sur Qwen3.8-27B 97 %.",
+    "citation": "On all 13 configurations, calibration and optimized questions, which need no user-managed GPU, close a median 72% of the gap (95% interval 41–97), a fine-tuned encoder 59% and LoRA fine-tuning 97% (Table 4)."
+   },
+   {
+    "affirmation": "Toutes les données de test de l'étude principale sont en anglais.",
+    "citation": "All test data are English."
+   },
+   {
+    "affirmation": "Clef, Clef-flash et Qwen3.8-27B sont des modèles à poids ouverts sous Apache-2.0.",
+    "citation": "Clef, Clef-flash and Qwen3.8-27B are open-weight models under Apache-2.0 that we ran at pinned revisions."
+   },
+   {
+    "affirmation": "Jev n'est pas reproductible à l'identique : deux envois identiques changent 173 labels sur 6 324.",
+    "citation": "When we sent identical requests to Jev twice, 173 of 6,324 labels changed, almost all of them at low confidence."
+   },
+   {
+    "affirmation": "AdaMenu bat la descente hiérarchique recommandée par TypeSafe sur les 16 couples modèle et jeu comparables, de 16,6 à 34,3 points.",
+    "citation": "It outperforms TypeSafe’s beam-search baseline on all 16 model and label-set pairs where both methods run, improving accuracy by 16.6–34.3 percentage points."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision typé",
+    "definition": "Modèle qui ne génère pas de texte : il répond à une question aux options fixées (choix, note, oui/non) par une probabilité pour chaque option."
+   },
+   {
+    "terme": "Zero-shot",
+    "definition": "Utilisation d'un modèle sans aucun exemple étiqueté de la tâche, à partir de la seule consigne et des définitions de labels."
+   },
+   {
+    "terme": "Calibration",
+    "definition": "Ajustement des probabilités d'un modèle (biais par classe, température) pour qu'elles reflètent la fréquence réelle de bonnes réponses."
+   },
+   {
+    "terme": "Régression logistique",
+    "definition": "Classifieur linéaire simple ; ici il prend en entrée les probabilités rendues par le modèle et en déduit le label final."
+   },
+   {
+    "terme": "LoRA",
+    "definition": "Fine-tuning léger qui gèle le modèle et n'entraîne que de petites matrices ajoutées à ses couches."
+   },
+   {
+    "terme": "BM25",
+    "definition": "Score classique des moteurs de recherche, qui classe les documents selon les mots qu'ils partagent avec la requête."
+   },
+   {
+    "terme": "Macro-F1",
+    "definition": "Moyenne non pondérée du F1 de chaque classe : les classes rares comptent autant que les fréquentes. Plus haut = mieux."
+   },
+   {
+    "terme": "Pré-enregistrement",
+    "definition": "Publication des hypothèses, seuils et protocole avant toute expérience, pour empêcher d'ajuster l'analyse aux résultats."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Do We Still Need Fine-Tuned Classifiers? Swapping Typed Decision Models into 24 ACL-Venue Papers",
+    "url": "https://arxiv.org/abs/2611.20191",
+    "type": "primaire",
+    "date": "2026-11-15"
+   },
+   {
+    "titre": "AdaMenu: Query-Adaptive Menus for Decision Models over Large Label Spaces",
+    "url": "https://arxiv.org/html/2611.19005v1",
+    "type": "primaire",
+    "date": "2026-11-13"
+   },
+   {
+    "titre": "Train After You Measure: a Pre-Registered Learning Curve for Fine-Tuning Typed Decision Models on One User's Labels",
+    "url": "https://arxiv.org/abs/2611.21393",
+    "type": "primaire",
+    "date": "2026-11-16"
+   },
+   {
+    "titre": "Fiche Hugging Face Cloudflare/clef",
+    "url": "https://huggingface.co/Cloudflare/clef",
+    "type": "primaire",
+    "date": "2026-11-10"
+   },
+   {
+    "titre": "Dépôt TDM-Gauntlet (annoncé, renvoie 404 le 2026-11-18)",
+    "url": "https://github.com/NaiveNeuron/TDM-Gauntlet",
+    "type": "primaire",
+    "date": "2026-11-18"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-15",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un décideur typé à menu adaptatif, fondé sur un petit LLM ouvert sans entraînement, rattrape-t-il un CamemBERT fine-tuné sur 77 intentions proches avec peu d'étiquettes ?",
+  "hypothese": "Avec 5 textes étiquetés par classe, le décideur à menu BM25 (Qwen2.5-3B, sans entraînement) atteint une macro-F1 à moins de 3 points de CamemBERT-base fine-tuné et le dépasse avec 2 textes par classe ; à 20 textes par classe, CamemBERT reprend l'avantage. Le rappel du menu (classe correcte présente) doit dépasser 95 %.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné",
+   "description": "Classifieur à tête linéaire fine-tuné sur les textes étiquetés du budget considéré.",
+   "implementation": "transformers AutoModelForSequenceClassification, almanach/camembert-base, 77 sorties, lr 3e-5, 10 époques pour les petits budgets (3 pour le plafond), batch 32, max_length 64, sélection de l'époque sur une validation découpée dans l'entraînement ; même budget que le décideur, plus une version entraînée sur tout l'entraînement (plafond).",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Décideur typé à menu adaptatif (BM25) avec LLM ouvert",
+   "description": "Pour chaque texte, une recherche BM25 sur les textes étiquetés retient les 50 plus proches ; leurs classes forment un menu réduit (le plus petit ensemble couvrant 80 % du score cumulé). Un seul passage du LLM, sans génération, donne une probabilité par option du menu.",
+   "implementation": "BM25 implémenté en numpy. Prompt : consigne, menu de classes avec libellé en français et un exemple chacun, texte à classer, puis lecture des logits des identifiants d'options (A, B, C…) à la dernière position, softmax restreint au menu. Transformers, bfloat16/float16, lots triés par longueur. Libellés tirés de mteb/banking77 (label_text, même ordre des indices, vérifié sur quelques exemples) traduits par le LLM une fois. Aucun entraînement.",
+   "modeles_hf": [
+    "Qwen/Qwen2.5-3B-Instruct"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen2.5-0.5B-Instruct"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "llmaas"
+  },
+  "jeu_public": {
+   "hub_id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "utterance, label ; noms de classes via mteb/banking77 (label_text)",
+   "representativite": "77 intentions fines et voisines, requêtes de clients de services financiers en français, assez de textes pour des courbes de budgets d'étiquettes et de calibration sur classes proches.",
+   "ecarts_donnees_reelles": "Traduction automatique, requêtes d'une phrase, taxonomie plate (pas d'arbre motif/sous-motif), 77 classes au lieu de ~300, pas d'e-mails ni de pièces jointes, licence non précisée sur le Hub (original CC BY 4.0), classes bien équilibrées.",
+   "jeux_explores": [
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "Domaine financier, français, 77 classes proches, 10 003 + 3 080 textes.",
+     "decision": "retenu",
+     "raison": "Seul jeu chargeable réunissant domaine, langue, classes proches et taille pour des courbes à 2/5/20 par classe."
+    },
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "Hiérarchie native scénario → intention (18 → 60), français, apache-2.0.",
+     "decision": "ecarte",
+     "raison": ""
+    },
+    {
+     "nom": "DeepPavlov/clinc150_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/clinc150_fr",
+     "acces": "hub_libre",
+     "adequation": "150 classes mais bien séparées, traduction.",
+     "decision": "ecarte",
+     "raison": "Classes peu proches, noms de classes absents."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "~113 intentions déséquilibrées, français.",
+     "decision": "ecarte",
+     "raison": "Licence inconnue, pas de libellés de classes, hiérarchie à reconstruire."
+    },
+    {
+     "nom": "mteb/banking77",
+     "url": "https://huggingface.co/datasets/mteb/banking77",
+     "acces": "hub_libre",
+     "adequation": "Version anglaise avec libellés, licence mit.",
+     "decision": "ecarte",
+     "raison": "Anglais ; utilisé seulement pour les noms de classes."
+    },
+    {
+     "nom": "Benchmark d'intentions hiérarchiques J&T Express (arXiv 2603.23172)",
+     "url": "https://arxiv.org/abs/2603.23172",
+     "acces": "telechargement_libre",
+     "adequation": "Taxonomie à deux niveaux de service client réel, licence CC0.",
+     "decision": "ecarte",
+     "raison": "Pas de français, 17 feuilles seulement, lien de téléchargement non localisé."
+    }
+   ]
+  },
+  "metriques": [
+   "macro_f1",
+   "accuracy",
+   "expected_calibration_error",
+   "menu_recall",
+   "rare_class_macro_f1",
+   "latency_p95_ms"
+  ],
+  "metrique_principale": "macro_f1",
+  "sens": "max",
+  "protocole": "Évaluation sur un échantillon stratifié du split test (500 textes à l'échelle complète, 200 en réduit). Les textes étiquetés sont tirés dans le split train : 2, 5 et 20 par classe, le reste étant masqué ; une validation de 10 % est découpée dans chaque tirage ; le plafond utilise tout le split train. Trois tirages par budget pour la référence (un seul pour le décideur à l'échelle complète, faute de temps), même jeu de test pour toutes les approches. Intervalles par bootstrap sur le test ; écart apparié CamemBERT − décideur. Calibration par ECE à 10 tranches ; classes rares = 10 % des classes les moins bien rappelées. Rappel du menu mesuré à part.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Qwen2.5-0.5B-Instruct à la place du 3B, 20 classes tirées de banking77_fr, 200 textes de test, budgets 2 et 5, une époque pour CamemBERT. Calcul GPU complet : 3 budgets × 500 textes × ~400 tokens ≈ 600 k tokens ÷ 700 tok/s ≈ 15 min pour le 3B, plus ~10 min d'entraînements CamemBERT (3 budgets + plafond) : ~30 min dans les 45 min ; rien n'est réduit sinon le test à 500 textes.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte du message ou de l'e-mail, anonymisé"
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif de premier niveau (étiquette humaine)"
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif (étiquette humaine)"
+    },
+    {
+     "colonne": "sub_reason_description",
+     "type": "string",
+     "description": "Libellé et courte définition du sous-motif"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception, pour le découpage temporel"
+    }
+   ],
+   "volume_conseille": "≥ 20 000 textes étiquetés couvrant ~300 sous-motifs, dont un test de ≥ 3 000 textes.",
+   "metriques_metier": "Macro-F1 sur sous-motifs, exactitude du motif de premier niveau, cohérence motif/sous-motif, part de textes traités automatiquement à seuil d'erreur fixé, latence p95.",
+   "garde_fous": "Aucune donnée interne ne sort de l'environnement : le LLM est appelé via le service interne ; résultats agrégés uniquement ; pas de décision automatique sans validation.",
+   "prescriptions": [
+    "Au moins 20 textes par sous-motif dans le test pour les 100 sous-motifs les plus fréquents ; garder les classes rares dans un sous-ensemble séparé.",
+    "Étiquettes issues d'une annotation humaine à double lecture sur un échantillon, avec accord inter-annotateurs reporté.",
+    "Découpage temporel : entraînement sur la période ancienne, test sur les dernières semaines.",
+    "Fournir pour chaque sous-motif un libellé et une définition courte, nécessaires au menu.",
+    "Textes anonymisés (noms, IBAN, numéros), pièces jointes exclues dans cette première passe.",
+    "Reproduire les budgets 2, 5, 20 par classe en tirant sur la période d'entraînement."
+   ],
+   "preparation": "Extraire des tickets ou e-mails étiquetés depuis les outils de gestion de la relation client, joindre la taxonomie motif/sous-motif et ses définitions, filtrer les textes vides ou dupliqués, anonymiser, puis échantillonner par sous-motif avec découpage temporel."
+  },
+  "duree_estimee_minutes": 240,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "Qwen/Qwen2.5-3B-Instruct": {
+    "id": "Qwen/Qwen2.5-3B-Instruct",
+    "sha": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 3085938688,
+    "licence": "other",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   },
+   "Qwen/Qwen2.5-0.5B-Instruct": {
+    "id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "sha": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 494032768,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "label": "Value",
+    "utterance": "Value"
+   },
+   "exemple": {
+    "label": 0,
+    "utterance": "S'il vous plaît, aidez-moi avec ma carte.  Il ne s'activera pas."
+   },
+   "lignes": {
+    "train": 10003,
+    "test": 3080
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

@@ -1,0 +1,337 @@
+{
+ "version": 1,
+ "jour": "2026-11-18",
+ "sujet_id": "tabulaire-fondation-sequences-financieres-tbs",
+ "depot": "20261118_sequence_transformer_boosting_churn",
+ "fiche": {
+  "sujet_id": "tabulaire-fondation-sequences-financieres-tbs",
+  "titre": "Modèles de séquences de transactions : +2,1 points d'AUC sur LightGBM, surtout en combinaison",
+  "en_une_phrase": "Moyenner un LightGBM et un petit réseau de séquences pré-entraîné gagne +2,1 points d'AUC (médiane), mais les auteurs vendent la méthode, ne l'ont pas validée hors de leurs données, et le gain fond avec les étiquettes.",
+  "probleme": "Les gains annoncés par les modèles de fondation sur transactions reposent sur des données internes et des baselines inconnues. Les benchmarks publics (TabFormer, IBM AML) ont des protocoles qui biaisent la comparaison. On ignore donc ce que ces modèles ajoutent à un boosting solide.",
+  "comment_ca_marche": "TBS (Temporal Boosting–Sequence ensemble) combine deux modèles puis moyenne leurs rangs.\n\n1. **Branche boosting** : un LightGBM (arbres de décision successifs, chacun corrigeant les erreurs des précédents) reçoit des agrégats sur fenêtres (sommes, comptes sur 30, 90 jours…) plus des compteurs de transitions : combien de fois un type d'événement B suit un type A en moins de 1 h ou 24 h, sans utiliser l'étiquette.\n2. **Branche séquence** : un petit Transformer (0,4 M de paramètres) lit les 128 derniers événements. Il est pré-entraîné sans étiquette sur chaque jeu, puis ajusté sur l'étiquette avec les agrégats (« joint fusion »).\n3. **Fusion** : chaque entité est classée par chaque modèle, et TBS moyenne les deux rangs. Pas de poids à ajuster, mais pas de probabilité calibrée.",
+  "demarche_experimentale": "27 méthodes comparées sur 4 jeux (synthétique, MBD-mini public, 2 jeux propriétaires), 3 budgets d'étiquettes (1 000, 4 000, toutes), 5 graines appariées, intervalles bootstrap. Baseline : agrégats sans fuite temporelle + LightGBM, test hors période.",
+  "resultats": [
+   {
+    "metrique": "Gain médian d'AUC (plus haut = mieux) de TBS vs baseline",
+    "valeur": "+2,1 points ; 19 cellules sur 21 au-dessus de zéro",
+    "comparaison": "Réseau seul : 10 cellules sur 21 ; embeddings figés : 9 au plus",
+    "conditions": "7 cibles × 3 budgets, 5 graines, intervalle bootstrap 95 %, 0,4 M de paramètres",
+    "citation": "TBS clears it in 19 of 21 cells (18 after FDR adjustment), with a median gain of +2.1 AUC points, most of it from combining boosting with a fine-tuned sequence network and a smaller part from pretraining it."
+   },
+   {
+    "metrique": "Gain de TBS avec toutes les étiquettes et variables métier riches",
+    "valeur": "+0,7 (client A) et +0,8 point (client B, intervalle incluant zéro)",
+    "comparaison": "Contre +2,1 médian en transactions seules",
+    "conditions": "Jeux propriétaires, scénario complet, toutes étiquettes",
+    "citation": "Gains shrink as labels grow and with rich tabular data: with both, the gain on the proprietary datasets is +0.7 and +0.8 points, the latter with an interval including zero."
+   },
+   {
+    "metrique": "F1 de la classe blanchiment sur IBM AML HI-Small (plus haut = mieux)",
+    "valeur": "0,666 (LightGBM sans fuite temporelle)",
+    "comparaison": "Multi-PNA publié : 0,682 ± 0,027 ; règle « jour ≥ 10 » : 0,482",
+    "conditions": "Test complet, 3 graines, seuil choisi sur validation ; les GNN publiés voient des transactions postérieures",
+    "citation": "On the whole test, the point-in-time baseline reaches F1 0.666 on HI-Small and 0.373 on LI-Small, at the level of the best published GNN on HI-Small and above it on LI-Small, using only earlier transactions."
+   }
+  ],
+  "limites": [
+   "Conflit d'intérêts : les auteurs travaillent chez WeCogno, qui commercialise TBS. Méthode et hypothèses conçues après avoir vu les résultats sur ces mêmes données, sans enregistrement préalable (aveu des auteurs).",
+   "Aucun réglage d'hyperparamètres en étude principale ; baseline à agrégats génériques, et petits budgets possiblement défavorables au boosting. Modèles de 0,4 M de paramètres seulement : rien sur l'échelle ni la réutilisation.",
+   "Deux jeux sur quatre sont propriétaires, non reproductibles. Aucun test sur du français ou des clients de entreprise de détail. AUC seul : ni calibration ni valeur opérationnelle ; rang calculé par lot."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "+2,1 pts",
+    "libelle": "gain médian d'AUC de TBS sur le LightGBM de base, 21 cellules cible-budget"
+   },
+   {
+    "valeur": "19 / 21",
+    "libelle": "cellules où TBS bat la baseline (18 après correction des comparaisons multiples)"
+   },
+   {
+    "valeur": "+0,7 / +0,8",
+    "libelle": "gain sur données réelles, toutes étiquettes et variables métier riches (le second inclut zéro)"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "TBS bat la baseline LightGBM dans 19 cellules sur 21, avec un gain médian de +2,1 points d'AUC ; la plus grande part vient de la combinaison boosting + réseau ajusté.",
+    "citation": "TBS clears it in 19 of 21 cells (18 after FDR adjustment), with a median gain of +2.1 AUC points, most of it from combining boosting with a fine-tuned sequence network and a smaller part from pretraining it."
+   },
+   {
+    "affirmation": "Les embeddings auto-supervisés figés améliorent rarement la baseline ; le réseau ajusté seul la dépasse dans 10 cellules sur 21.",
+    "citation": "Frozen self-supervised embeddings rarely improve the baseline, and a fine-tuned sequence network alone clears it in 10 of 21 target–budget cells."
+   },
+   {
+    "affirmation": "Avec toutes les étiquettes et des variables tabulaires riches, le gain tombe à +0,7 et +0,8 point sur les jeux propriétaires.",
+    "citation": "Gains shrink as labels grow and with rich tabular data: with both, the gain on the proprietary datasets is +0.7 and +0.8 points, the latter with an interval including zero."
+   },
+   {
+    "affirmation": "Sur IBM AML, un artefact de simulation permet à une règle de date d'atteindre F1 0,482, et un LightGBM sans fuite temporelle égale le F1 des GNN publiés.",
+    "citation": "On IBM AML, a simulation artifact lets a date rule reach F1 0.482, and a point-in-time LightGBM reaches the F1 of graph neural networks whose test graph includes later transactions."
+   },
+   {
+    "affirmation": "Les modèles ont environ 0,4 M de paramètres, pré-entraînés par jeu ; l'étude ne dit rien de l'effet d'échelle.",
+    "citation": "Our results therefore say nothing about what scale or reuse buys."
+   },
+   {
+    "affirmation": "Les auteurs travaillent pour un éditeur qui commercialise TBS.",
+    "citation": "Both authors work for WeCogno, which sells modeling services and offers TBS, together with the transition features and the Mlm-Cl encoder, commercially under the name WeCogno Temporal Booster."
+   },
+   {
+    "affirmation": "Le coût de calcul est de quelques minutes de GPU par jeu.",
+    "citation": "For the per-client models of the main study, pretraining the Nep backbone took between 81 s and 10 min per dataset, one fine-tuning run with all labels between 29 s and 66 s, and one LightGBM fit a few seconds (Table 13)."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "AUC",
+    "definition": "Probabilité qu'un cas positif reçoive un score plus élevé qu'un cas négatif. Mesure le classement, pas la calibration. Plus haut = mieux ; 0,5 = hasard."
+   },
+   {
+    "terme": "LightGBM",
+    "definition": "Implémentation rapide de gradient boosting : ensemble d'arbres de décision construits successivement, chacun corrigeant les erreurs des précédents. Même famille que XGBoost."
+   },
+   {
+    "terme": "Agrégats sur fenêtres",
+    "definition": "Résumés de l'historique (sommes, moyennes, comptes) sur des périodes récentes comme 30 ou 90 jours, qui forment une ligne par client pour un modèle tabulaire."
+   },
+   {
+    "terme": "Point-in-time",
+    "definition": "Règle selon laquelle une variable n'utilise que ce qui était connu à la date de prédiction, en datant chaque événement par le moment où il est connu, pas celui auquel il se rapporte."
+   },
+   {
+    "terme": "Joint fusion",
+    "definition": "Entraînement conjoint, sur l'étiquette, d'un encodeur de séquences et d'un réseau sur variables tabulaires, pour que le modèle voie l'historique brut et les agrégats."
+   },
+   {
+    "terme": "Moyenne des rangs",
+    "definition": "On classe les clients selon chaque modèle puis on moyenne les positions. Évite les écarts d'échelle entre scores, mais ne donne pas de probabilité calibrée."
+   },
+   {
+    "terme": "Budget d'étiquettes",
+    "definition": "Nombre d'exemples étiquetés disponibles pour l'entraînement supervisé ; ici 1 000, 4 000 ou la totalité."
+   },
+   {
+    "terme": "Bootstrap apparié",
+    "definition": "Rééchantillonnage des lignes de test pour obtenir un intervalle de confiance sur la différence entre deux modèles évalués sur les mêmes graines et les mêmes lignes."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "How Much Do Foundation Models Add to Gradient Boosting on Financial Event Sequences?",
+    "url": "https://arxiv.org/abs/2611.18914",
+    "type": "primaire",
+    "date": "2026-11-13"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-13",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un petit Transformer de séquences de transactions, fusionné à un boosting sur agrégats, ajoute-t-il de l'AUC selon le budget d'étiquettes ?",
+  "hypothese": "La moyenne des rangs d'un XGBoost sur agrégats et d'un Transformer de 0,4 M de paramètres pré-entraîné puis ajusté gagne ≥ +1 point d'AUC médian sur XGBoost seul avec 500 et 1 500 étiquettes, avec un intervalle bootstrap au-dessus de zéro, et le gain fond avec toutes les étiquettes.",
+  "reference": {
+   "nom": "XGBoost sur agrégats",
+   "description": "Gradient boosting sur agrégats par client (comptes, sommes, moyennes par catégorie, fréquences de transition).",
+   "implementation": "xgboost XGBClassifier, 300 arbres max, profondeur 4, learning_rate 0.05, subsample 0.8, arrêt précoce sur validation ; agrégats par client : nombre, somme et moyenne des montants, par catégorie d'opération et par type de commerçant, fenêtres sur les 30 et 60 derniers jours, compteurs de transitions de catégories.",
+   "modeles_hf": [],
+   "modeles_hf_sandbox": [],
+   "entrainement": "autre",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "XGBoost + Transformer de séquences (fusion des rangs)",
+   "description": "Un petit Transformer lit les 128 derniers événements, pré-entraîné sans étiquette (événements masqués) sur tous les clients, ajusté sur l'étiquette ; son rang de score est moyenné avec celui du XGBoost.",
+   "implementation": "PyTorch : embeddings de catégorie d'opération, de commerçant et de canal + montant normalisé (log) + intervalle de temps ; 2 couches, 4 têtes, dimension 96 (~0,4 M de paramètres) ; pré-entraînement par prédiction de la catégorie masquée (15 %), 5 époques ; ajustement 10 époques, AdamW lr 1e-3 ; fusion par moyenne des rangs normalisés sur le test.",
+   "modeles_hf": [],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "pytorch-lifestream/rosbank-churn",
+   "config": "train",
+   "split_evaluation": "train",
+   "split_entrainement": "train",
+   "colonnes_utiles": "cl_id, TRDATETIME, MCC, trx_category, channel_type, currency, amount, target_flag",
+   "representativite": "Séquences de transactions carte réelles avec une cible de départ du client : proche de l'appétence produit et de l'attrition, avec des séquences non étiquetées exploitables. Le split Hub unique « train » est partitionné par client dans le notebook : test fixe de 20 % des clients étiquetés (stratifié), le reste pour l'entraînement ; tous les clients servent au pré-entraînement sans étiquette.",
+   "ecarts_donnees_reelles": "entreprise russe, environ 10 000 clients sur ~3 mois, découpage par client et non hors période (période trop courte), pas de variables métier riches, licence non précisée sur le Hub, pas de fraude ni de blanchiment.",
+   "jeux_explores": [
+    {
+     "nom": "pytorch-lifestream/rosbank-churn",
+     "url": "https://huggingface.co/datasets/pytorch-lifestream/rosbank-churn",
+     "acces": "hub_libre",
+     "adequation": "Séquences de transactions, cible de churn, séquences non étiquetées.",
+     "decision": "retenu",
+     "raison": "Chargeable en parquet, léger, adapté aux budgets d'étiquettes."
+    },
+    {
+     "nom": "ai-lab/MBD-mini",
+     "url": "https://huggingface.co/datasets/ai-lab/MBD-mini",
+     "acces": "hub_libre",
+     "adequation": "Jeu de la source, 4 cibles de propension produit.",
+     "decision": "ecarte",
+     "raison": "Viewer désactivé, archives de 3,4 Go non chargeables en parquet."
+    },
+    {
+     "nom": "pytorch-lifestream/alfa-scoring-trx",
+     "url": "https://huggingface.co/datasets/pytorch-lifestream/alfa-scoring-trx",
+     "acces": "hub_libre",
+     "adequation": "Scoring de défaut sur séquences.",
+     "decision": "ecarte",
+     "raison": "6,9 Go, cibles illisibles par le serveur de jeux, scoring crédit haut risque."
+    },
+    {
+     "nom": "eexzzm/IBM-Transactions-for-Anti-Money-Laundering-HI-Small-Trans",
+     "url": "https://huggingface.co/datasets/eexzzm/IBM-Transactions-for-Anti-Money-Laundering-HI-Small-Trans",
+     "acces": "hub_libre",
+     "adequation": "AML sur transactions, 5 M de lignes.",
+     "decision": "ecarte",
+     "raison": "Étiquettes par transaction, synthétique, hors du protocole par client."
+    },
+    {
+     "nom": "pytorch-lifestream/transactions-gender",
+     "url": "https://huggingface.co/datasets/pytorch-lifestream/transactions-gender",
+     "acces": "hub_libre",
+     "adequation": "Séquences avec cible genre.",
+     "decision": "ecarte",
+     "raison": "Cible sans lien métier."
+    },
+    {
+     "nom": "cestwc/bank-marketing",
+     "url": "https://huggingface.co/datasets/cestwc/bank-marketing",
+     "acces": "hub_libre",
+     "adequation": "Appétence tabulaire.",
+     "decision": "ecarte",
+     "raison": "Pas de séquences d'événements."
+    }
+   ]
+  },
+  "metriques": [
+   "roc_auc",
+   "average_precision",
+   "auc_gain_vs_baseline",
+   "expected_calibration_error"
+  ],
+  "metrique_principale": "roc_auc",
+  "sens": "max",
+  "protocole": "Le split Hub unique « train » est partitionné par client dans le notebook : test fixe = 20 % des clients étiquetés (stratifié) ; entraînement = 80 % restants, dont sont tirés des sous-échantillons de 500, 1 500 et toutes les étiquettes ; tous les clients (étiquetés ou non) servent au pré-entraînement sans étiquette. 5 tirages appariés par budget (mêmes clients pour toutes les approches), arrêt précoce sur 15 % de validation tirée du budget ; comparaison de XGBoost, Transformer seul et fusion des rangs sur le même test. Intervalle bootstrap à 95 % sur l'écart apparié d'AUC ; ECE rapportée (la fusion de rangs n'est pas calibrée).",
+  "niveau_sandbox": "complet",
+  "adaptation_sandbox": "Sous-échantillon de 1 500 clients, budgets de 200 et 500, 2 tirages, 1 époque de pré-entraînement et 3 d'ajustement, mêmes modèles (réseau de 0,4 M de paramètres, sans substitut).",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "client_id",
+     "type": "string",
+     "description": "Identifiant client pseudonymisé"
+    },
+    {
+     "colonne": "event_time",
+     "type": "datetime",
+     "description": "Horodatage de l'opération"
+    },
+    {
+     "colonne": "amount",
+     "type": "float",
+     "description": "Montant signé"
+    },
+    {
+     "colonne": "event_type",
+     "type": "string",
+     "description": "Type d'opération (carte, virement, prélèvement…)"
+    },
+    {
+     "colonne": "merchant_category",
+     "type": "string",
+     "description": "Catégorie du commerçant ou de la contrepartie"
+    },
+    {
+     "colonne": "channel",
+     "type": "string",
+     "description": "Canal (agence, mobile, internet…)"
+    },
+    {
+     "colonne": "target",
+     "type": "int",
+     "description": "1 si le client souscrit le produit dans le mois suivant la date de coupure, sinon 0 ; vide si inconnu"
+    },
+    {
+     "colonne": "cutoff_date",
+     "type": "date",
+     "description": "Date de coupure de l'observation"
+    }
+   ],
+   "volume_conseille": "≥ 50 000 clients sur ≥ 12 mois, ≥ 500 positifs par produit ; séquences non étiquetées pour tous les clients.",
+   "metriques_metier": "AUC, précision et gain en tête de liste (top 5 % ciblé), taux de conversion simulé, stabilité entre périodes.",
+   "garde_fous": "Données pseudonymisées, aucune variable sensible (origine, santé) ; contrôle d'équité par tranche d'âge ; branche réseau non explicable, donc usage comme aide à la décision uniquement avec explication SHAP de la branche boosting.",
+   "prescriptions": [
+    "Une date de coupure par client ; agrégats et séquences construits uniquement avec des événements antérieurs à la coupure.",
+    "Test hors période : coupures les plus récentes (≥ 2 mois) jamais vues à l'entraînement ni au pré-entraînement.",
+    "≥ 500 positifs par produit dans l'entraînement et ≥ 200 dans le test.",
+    "≥ 12 mois d'historique pour capter la saisonnalité.",
+    "Comparer à la baseline en production, réglée et avec toutes ses variables métier, pas seulement aux agrégats génériques.",
+    "Pseudonymiser les identifiants et retirer libellés libres et contreparties nominatives."
+   ],
+   "preparation": "Extraire les opérations des comptes et cartes des clients particuliers sur la période, joindre les souscriptions de produits pour fabriquer la cible à chaque date de coupure, filtrer les clients sans historique minimal, puis échantillonner par client en respectant la chronologie."
+  },
+  "duree_estimee_minutes": 25,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {},
+  "jeu": {
+   "id": "pytorch-lifestream/rosbank-churn",
+   "config": "train",
+   "splits": [
+    "train"
+   ],
+   "licence": null,
+   "colonnes": {
+    "PERIOD": "Value",
+    "cl_id": "Value",
+    "MCC": "Value",
+    "channel_type": "Value",
+    "currency": "Value",
+    "TRDATETIME": "Value",
+    "amount": "Value",
+    "trx_category": "Value",
+    "target_flag": "Value",
+    "target_sum": "Value"
+   },
+   "exemple": {
+    "PERIOD": "01/10/2017",
+    "cl_id": 0,
+    "MCC": 5200,
+    "channel_type": null,
+    "currency": 810,
+    "TRDATETIME": "21OCT17:00:00:00",
+    "amount": 5023.0,
+    "trx_category": "POS",
+    "target_flag": 0,
+    "target_sum": 0.0
+   },
+   "lignes": {
+    "train": 490513
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
