@@ -3,6 +3,84 @@
  "pocs": [
   {
    "jour": "2026-11-18",
+   "sujet_id": "tabulaire-fondation-sequences-financieres-tbs",
+   "depot": "20261118_sequence_transformer_boosting_churn",
+   "titre": "Un petit Transformer de séquences de transactions, fusionné à un boosting sur agrégats, ajoute-t-il de l'AUC selon le budget d'étiquettes ?",
+   "statut": "valide",
+   "niveau_sandbox": "complet",
+   "echelle": "complete",
+   "materiel": "GPU T4 (Google Colab)",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche nouvelle : XGBoost + Transformer de séquences (fusion des rangs))",
+    "raison": ""
+   },
+   "iterations": 1,
+   "metrique_principale": "roc_auc",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "XGBoost sur agrégats",
+     "role": "reference",
+     "valeur": 0.8212641236938237,
+     "ic95": [
+      0.7964417570749459,
+      0.846096590909091
+     ]
+    },
+    {
+     "nom": "XGBoost + Transformer (fusion des rangs)",
+     "role": "nouvelle",
+     "valeur": 0.8108155232188874,
+     "ic95": [
+      0.7859133296318961,
+      0.8374105437230919
+     ]
+    }
+   ],
+   "n_exemples": 1000,
+   "jeu": "pytorch-lifestream/rosbank-churn",
+   "synthese": "roc_auc : XGBoost + Transformer (fusion des rangs) 0,811 contre 0,821 pour XGBoost sur agrégats (1000 exemples, GPU T4 (Google Colab)).",
+   "conclusion": "À l'échelle complète (tout le jeu public, GPU T4, budgets de 500 et 1 500 étiquettes, 5 tirages appariés), la fusion des rangs n'améliore pas le XGBoost sur agrégats. Au budget de 1 500 étiquettes, l'AUC est de 0,811 contre 0,821, soit −1,04 pt, avec un intervalle bootstrap entièrement négatif [−1,79 ; −0,27]. Avec toutes les étiquettes, l'écart est nul (+0,03 pt, intervalle [−0,67 ; +0,78]). Le Transformer seul (0,775) est nettement en dessous du XGBoost, donc la moyenne à poids égaux dégrade la meilleure branche. Le gain d'environ +1 pt observé à l'échelle réduite n'était que du bruit d'échantillonnage. Le gain de +2,1 pts de la source n'est pas retrouvé ici, mais le protocole diffère (autres données, réseau non réglé, test non hors période), et l'intervalle ne couvre que l'échantillonnage du test.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non",
+   "en_bref": "Sur ce jeu public, la fusion avec un petit Transformer n'améliore pas le boosting sur agrégats et le dégrade légèrement avec peu d'étiquettes. Le gain annoncé n'est pas reproduit, avec la réserve d'un réseau non réglé.",
+   "libelle_metrique": "AUC ROC",
+   "reserves": [
+    "Le gain apparent à petite échelle disparaît, et s'inverse, sur le jeu complet. Il faut ne retenir que le résultat à l'échelle complète.",
+    "Le résultat négatif concerne un petit réseau non réglé fusionné à poids égaux. Il ne prouve pas qu'aucune configuration de séquences n'aiderait, mais aucun gain n'est établi ici.",
+    "Les intervalles sous-estiment l'incertitude totale. Le sens du résultat (aucun gain) est plausible, mais sa précision l'est moins."
+   ],
+   "duree_minutes": 26.2,
+   "consommation": {
+    "claude:poc_code:tabulaire-fondation-sequences-financieres-tbs": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 842.8,
+     "cout_equivalent_usd": 2.2727,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:tabulaire-fondation-sequences-financieres-tbs": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 265.4,
+     "cout_equivalent_usd": 1.2172,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:tabulaire-fondation-sequences-financieres-tbs": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 115.6,
+     "cout_equivalent_usd": 0.5791,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261118_sequence_transformer_boosting_churn",
+   "tentatives": 1
+  },
+  {
+   "jour": "2026-11-18",
    "sujet_id": "decision-models-remplacer-classifieurs-adamenu",
    "depot": "20261118_adaptive_menu_decision_camembert_intents",
    "titre": "Un décideur typé à menu adaptatif, fondé sur un petit LLM ouvert sans entraînement, rattrape-t-il un CamemBERT fine-tuné sur 77 intentions proches avec peu d'étiquettes ?",
