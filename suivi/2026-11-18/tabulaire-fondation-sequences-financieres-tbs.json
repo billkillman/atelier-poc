@@ -5,10 +5,10 @@
  "depot": "20261118_sequence_transformer_boosting_churn",
  "titre": "Un petit Transformer de séquences de transactions, fusionné à un boosting sur agrégats, ajoute-t-il de l'AUC selon le budget d'étiquettes ?",
  "debut": "2026-11-18T03:24:21Z",
- "maj": "2026-11-18T03:45:13Z",
+ "maj": "2026-11-18T03:46:16Z",
  "statut": "en_cours",
- "etape": "revue_prealable",
- "detail": "relecture de la méthode sur l'échelle réduite",
+ "etape": "complete",
+ "detail": "sur GPU GPU T4 (Google Colab)",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -30,15 +30,15 @@
   {
    "code": "revue_prealable",
    "libelle": "Relecture avant l'échelle complète",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-18T03:45:13Z",
-   "fin": null
+   "fin": "2026-11-18T03:46:16Z"
   },
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-18T03:46:16Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.638,
- "estimation_fin": "2026-11-18T04:14:13Z",
+ "progression": 0.65,
+ "estimation_fin": "2026-11-18T04:14:16Z",
  "resultat": null
 }
