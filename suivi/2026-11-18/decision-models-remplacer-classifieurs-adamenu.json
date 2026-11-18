@@ -5,10 +5,10 @@
  "depot": "20261118_adaptive_menu_decision_camembert_intents",
  "titre": "Un décideur typé à menu adaptatif, fondé sur un petit LLM ouvert sans entraînement, rattrape-t-il un CamemBERT fine-tuné sur 77 intentions proches avec peu d'étiquettes ?",
  "debut": "2026-11-18T02:13:13Z",
- "maj": "2026-11-18T02:59:03Z",
+ "maj": "2026-11-18T03:00:18Z",
  "statut": "en_cours",
- "etape": "revue_prealable",
- "detail": "relecture de la méthode sur l'échelle réduite",
+ "etape": "complete",
+ "detail": "sur GPU GPU T4 (Google Colab)",
  "iteration": 2,
  "iterations_max": 3,
  "sous_progression": null,
@@ -30,15 +30,15 @@
   {
    "code": "revue_prealable",
    "libelle": "Relecture avant l'échelle complète",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-18T02:59:03Z",
-   "fin": null
+   "fin": "2026-11-18T03:00:18Z"
   },
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-18T03:00:18Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.24,
- "estimation_fin": "2026-11-18T07:03:03Z",
+ "progression": 0.243,
+ "estimation_fin": "2026-11-18T07:03:18Z",
  "resultat": null
 }
