@@ -5,10 +5,10 @@
  "depot": "20261118_sequence_transformer_boosting_churn",
  "titre": "Un petit Transformer de séquences de transactions, fusionné à un boosting sur agrégats, ajoute-t-il de l'AUC selon le budget d'étiquettes ?",
  "debut": "2026-11-18T03:24:21Z",
- "maj": "2026-11-18T03:50:30Z",
- "statut": "en_cours",
+ "maj": "2026-11-18T03:50:57Z",
+ "statut": "valide",
  "etape": "publication",
- "detail": "dépôt public créé seulement si l'expérience est validée",
+ "detail": "",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -51,12 +51,47 @@
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-18T03:50:30Z",
-   "fin": null
+   "fin": "2026-11-18T03:50:57Z"
   }
  ],
- "progression": 0.975,
- "estimation_fin": "2026-11-18T03:52:30Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261118_sequence_transformer_boosting_churn",
+  "depot": "20261118_sequence_transformer_boosting_churn",
+  "en_bref": "Sur ce jeu public, la fusion avec un petit Transformer n'améliore pas le boosting sur agrégats et le dégrade légèrement avec peu d'étiquettes. Le gain annoncé n'est pas reproduit, avec la réserve d'un réseau non réglé.",
+  "synthese": "roc_auc : XGBoost + Transformer (fusion des rangs) 0,811 contre 0,821 pour XGBoost sur agrégats (1000 exemples, GPU T4 (Google Colab)).",
+  "metrique_principale": "roc_auc",
+  "libelle_metrique": "AUC ROC",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "XGBoost sur agrégats",
+    "role": "reference",
+    "valeur": 0.8212641236938237,
+    "ic95": [
+     0.7964417570749459,
+     0.846096590909091
+    ]
+   },
+   {
+    "nom": "XGBoost + Transformer (fusion des rangs)",
+    "role": "nouvelle",
+    "valeur": 0.8108155232188874,
+    "ic95": [
+     0.7859133296318961,
+     0.8374105437230919
+    ]
+   }
+  ],
+  "n_exemples": 1000,
+  "jeu": "pytorch-lifestream/rosbank-churn",
+  "materiel": "GPU T4 (Google Colab)",
+  "echelle": "complete",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
