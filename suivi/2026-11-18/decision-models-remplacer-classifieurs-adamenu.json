@@ -5,10 +5,10 @@
  "depot": "20261118_adaptive_menu_decision_camembert_intents",
  "titre": "Un décideur typé à menu adaptatif, fondé sur un petit LLM ouvert sans entraînement, rattrape-t-il un CamemBERT fine-tuné sur 77 intentions proches avec peu d'étiquettes ?",
  "debut": "2026-11-18T02:13:13Z",
- "maj": "2026-11-18T02:36:23Z",
+ "maj": "2026-11-18T02:36:31Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 1 : phase publique sur le jeu public (échelle réduite, CPU)",
+ "detail": "itération 1 : correction du notebook (son exécution dans le sandbox a échoué ou ne remplit pas les conditions de validation)",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.119,
+ "progression": 0.12,
  "estimation_fin": "2026-11-18T06:56:16Z",
  "resultat": null
 }
