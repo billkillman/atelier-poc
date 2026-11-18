@@ -2,6 +2,85 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-18",
+   "sujet_id": "decision-models-remplacer-classifieurs-adamenu",
+   "depot": "20261118_adaptive_menu_decision_camembert_intents",
+   "titre": "Un décideur typé à menu adaptatif, fondé sur un petit LLM ouvert sans entraînement, rattrape-t-il un CamemBERT fine-tuné sur 77 intentions proches avec peu d'étiquettes ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "complete",
+   "materiel": "GPU T4 (Google Colab)",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné)",
+    "raison": ""
+   },
+   "iterations": 2,
+   "metrique_principale": "macro_f1",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "CamemBERT-base fine-tuné (5 textes/classe)",
+     "role": "reference",
+     "valeur": 0.5091319700972465,
+     "ic95": [
+      0.45314254616031097,
+      0.5315083558471441
+     ]
+    },
+    {
+     "nom": "Décideur à menu BM25 (5 textes/classe)",
+     "role": "nouvelle",
+     "valeur": 0.5214983290375215,
+     "ic95": [
+      0.46379750341201015,
+      0.5447847393660484
+     ]
+    }
+   ],
+   "n_exemples": 500,
+   "jeu": "DeepPavlov/banking77_fr",
+   "synthese": "macro_f1 : Décideur à menu BM25 (5 textes/classe) 0,521 contre 0,509 pour CamemBERT-base fine-tuné (5 textes/classe) (500 exemples, GPU T4 (Google Colab)).",
+   "conclusion": "À l'échelle complète (77 classes, 500 textes de test, GPU T4), avec 5 textes par classe, le décideur à menu BM25 (Qwen2.5-3B) obtient un macro-F1 de 0,52 contre 0,51 pour CamemBERT sur le premier tirage. L'écart apparié (−0,012, intervalle −0,059 à +0,034) ne tranche pas, et la moyenne des 3 tirages de CamemBERT (0,54) le met légèrement devant. Le décideur est devant à 2 textes par classe (0,49 contre 0,43). CamemBERT le dépasse nettement à 20 textes par classe (0,80 contre 0,58). Le rappel du menu (0,91) reste sous l'objectif de 95 %, et la calibration est mauvaise (ECE 0,41), pour une latence environ 25 fois plus élevée. Ces résultats ne sont pas comparables à ceux de la source (anglais, modèles de décision typés, 46 jeux). Le décideur ne remplace donc pas un fine-tuning au-delà de quelques étiquettes par classe, avec les réserves de configuration (menu plafonné, un tirage, pas de baseline BM25 seule).",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Un petit LLM sans entraînement égale CamemBERT avec très peu d'étiquettes, puis décroche dès qu'on en ajoute. Les écarts à faible budget sont dans le bruit, la confiance du décideur est peu fiable, et l'apport du LLM face à BM25 seul n'est pas établi.",
+   "libelle_metrique": "Macro-F1",
+   "reserves": [
+    "À 5 textes par classe, les deux approches sont statistiquement indiscernables. Le léger avantage du décideur vient en partie du tirage défavorable choisi pour CamemBERT. L'avantage à 2 textes par classe repose aussi sur un seul tirage par approche.",
+    "Le recul du décideur à 20 textes par classe et l'échec sur le rappel du menu reflètent en partie des choix de configuration (plafond, un seul exemple par option). Ils ne mesurent pas seulement la limite de l'approche.",
+    "On ne peut pas dire si le LLM apporte quelque chose par rapport à une simple recherche lexicale. Le résultat compare deux approches choisies, pas le meilleur classifieur à peu d'étiquettes.",
+    "Les probabilités du décideur sont excessivement confiantes. Elles ne permettent pas de décider quels messages traiter automatiquement sans validation humaine."
+   ],
+   "duree_minutes": 67.2,
+   "consommation": {
+    "claude:poc_code:decision-models-remplacer-classifieurs-adamenu": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 783.7,
+     "cout_equivalent_usd": 2.1018,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:decision-models-remplacer-classifieurs-adamenu": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 1344.2,
+     "cout_equivalent_usd": 5.8736,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:decision-models-remplacer-classifieurs-adamenu": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 137.1,
+     "cout_equivalent_usd": 0.6765,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261118_adaptive_menu_decision_camembert_intents",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-17",
    "sujet_id": "ultrabert-jev-encodeur-decideur",
    "depot": "20261117_encoder_option_masks_hierarchical_intents",
