@@ -5,10 +5,10 @@
  "depot": "20261118_sequence_transformer_boosting_churn",
  "titre": "Un petit Transformer de séquences de transactions, fusionné à un boosting sur agrégats, ajoute-t-il de l'AUC selon le budget d'étiquettes ?",
  "debut": "2026-11-18T03:24:21Z",
- "maj": "2026-11-18T03:42:49Z",
+ "maj": "2026-11-18T03:44:13Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 1 : phase publique sur le jeu public (échelle réduite, CPU)",
+ "detail": "itération 1 : phase privée sur données factices, contre le faux service",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.368,
+ "progression": 0.385,
  "estimation_fin": "2026-11-18T04:33:23Z",
  "resultat": null
 }
