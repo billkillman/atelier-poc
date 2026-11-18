@@ -5,10 +5,10 @@
  "depot": "20261118_adaptive_menu_decision_camembert_intents",
  "titre": "Un décideur typé à menu adaptatif, fondé sur un petit LLM ouvert sans entraînement, rattrape-t-il un CamemBERT fine-tuné sur 77 intentions proches avec peu d'étiquettes ?",
  "debut": "2026-11-18T02:13:13Z",
- "maj": "2026-11-18T03:19:16Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-18T03:20:27Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 2,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,54 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-18T03:19:16Z",
-   "fin": null
+   "fin": "2026-11-18T03:20:19Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-18T03:20:19Z",
+   "fin": "2026-11-18T03:20:27Z"
   }
  ],
- "progression": 0.99,
- "estimation_fin": "2026-11-18T03:22:16Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261118_adaptive_menu_decision_camembert_intents",
+  "depot": "20261118_adaptive_menu_decision_camembert_intents",
+  "en_bref": "Un petit LLM sans entraînement égale CamemBERT avec très peu d'étiquettes, puis décroche dès qu'on en ajoute. Les écarts à faible budget sont dans le bruit, la confiance du décideur est peu fiable, et l'apport du LLM face à BM25 seul n'est pas établi.",
+  "synthese": "macro_f1 : Décideur à menu BM25 (5 textes/classe) 0,521 contre 0,509 pour CamemBERT-base fine-tuné (5 textes/classe) (500 exemples, GPU T4 (Google Colab)).",
+  "metrique_principale": "macro_f1",
+  "libelle_metrique": "Macro-F1",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "CamemBERT-base fine-tuné (5 textes/classe)",
+    "role": "reference",
+    "valeur": 0.5091319700972465,
+    "ic95": [
+     0.45314254616031097,
+     0.5315083558471441
+    ]
+   },
+   {
+    "nom": "Décideur à menu BM25 (5 textes/classe)",
+    "role": "nouvelle",
+    "valeur": 0.5214983290375215,
+    "ic95": [
+     0.46379750341201015,
+     0.5447847393660484
+    ]
+   }
+  ],
+  "n_exemples": 500,
+  "jeu": "DeepPavlov/banking77_fr",
+  "materiel": "GPU T4 (Google Colab)",
+  "echelle": "complete",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
