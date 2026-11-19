@@ -3,6 +3,93 @@
  "pocs": [
   {
    "jour": "2026-11-19",
+   "sujet_id": "rl-nemotron-3-5-super-lora-qwen38",
+   "depot": "20261119_grpo_vs_sft_lora_intent_classification",
+   "titre": "Le GRPO par LoRA à récompense vérifiable dépasse-t-il le fine-tuning supervisé LoRA, à calcul comparable, pour classer des requêtes en 77 intentions en français ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : SFT LoRA)",
+    "raison": "exception (cellule 47, section reference)"
+   },
+   "iterations": 1,
+   "metrique_principale": "accuracy",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "Modèle de base (zéro exemple)",
+     "role": "reference",
+     "valeur": 0.0,
+     "ic95": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "nom": "SFT LoRA",
+     "role": "reference",
+     "valeur": 0.19,
+     "ic95": [
+      0.11,
+      0.27
+     ]
+    },
+    {
+     "nom": "GRPO LoRA seul",
+     "role": "nouvelle",
+     "valeur": 0.0,
+     "ic95": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "nom": "SFT puis GRPO",
+     "role": "nouvelle",
+     "valeur": 0.16,
+     "ic95": [
+      0.09,
+      0.24
+     ]
+    }
+   ],
+   "n_exemples": 100,
+   "jeu": "DeepPavlov/banking77_fr",
+   "synthese": "accuracy : SFT puis GRPO 0,16 contre 0,19 pour SFT LoRA (100 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (substitut de 135 M de paramètres, 12 classes, 100 requêtes de test, 2 pas de GRPO), le SFT seul atteint 19 % d'accuracy. « SFT puis GRPO » atteint 16 %, écart de -3 points, IC95 [-7 ; 0], et seul le SFT dépasse le prédicteur trivial (9 %). « GRPO seul » est identique au modèle de base (0 %), faute de signal : la récompense reste nulle. Les hypothèses sont donc « non concluantes », sauf « GRPO seul < SFT », qui est triviale ici. Le code semble correct (mêmes requêtes, même prompt, même récompense, bootstrap apparié), mais ces chiffres testent le code et non l'hypothèse. Le protocole diffère de la source (RL sur un très grand modèle, tâches anglaises), donc aucune comparaison avec ses gains n'est possible.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Aucune des hypothèses ne peut être tranchée à l'échelle réduite : le RL seul n'a reçu aucun signal et « SFT puis GRPO » ne dépasse pas le SFT. Le protocole paraît sain, mais le coût n'est pas égalisé.",
+   "libelle_metrique": "Accuracy",
+   "reserves": [
+    "Si « SFT puis GRPO » l'emporte à l'échelle complète, une part du gain peut venir du calcul supplémentaire et non de la récompense vérifiable."
+   ],
+   "duree_minutes": 46.5,
+   "consommation": {
+    "claude:poc_code:rl-nemotron-3-5-super-lora-qwen38": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1794.9,
+     "cout_equivalent_usd": 4.6286,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:rl-nemotron-3-5-super-lora-qwen38": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 89.6,
+     "cout_equivalent_usd": 0.5402,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261119_grpo_vs_sft_lora_intent_classification",
+   "tentatives": 1
+  },
+  {
+   "jour": "2026-11-19",
    "sujet_id": "nvidia-kumo-tabular-fondation",
    "depot": "20261119_kumo_tabular_vs_xgboost_temporal",
    "titre": "Un modèle de fondation tabulaire sans entraînement (Kumo Tabular) égale-t-il un XGBoost réglé sur des tables financières, y compris hors-temps et avec un grand contexte ?",
