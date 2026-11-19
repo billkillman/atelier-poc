@@ -5,10 +5,10 @@
  "depot": "20261119_grpo_vs_sft_lora_intent_classification",
  "titre": "Le GRPO par LoRA à récompense vérifiable dépasse-t-il le fine-tuning supervisé LoRA, à calcul comparable, pour classer des requêtes en 77 intentions en français ?",
  "debut": "2026-11-19T03:38:32Z",
- "maj": "2026-11-19T04:21:02Z",
+ "maj": "2026-11-19T04:21:51Z",
  "statut": "en_cours",
- "etape": "revue_prealable",
- "detail": "relecture de la méthode sur l'échelle réduite",
+ "etape": "complete",
+ "detail": "sur GPU GPU T4 (Google Colab)",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -30,15 +30,15 @@
   {
    "code": "revue_prealable",
    "libelle": "Relecture avant l'échelle complète",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-19T04:21:02Z",
-   "fin": null
+   "fin": "2026-11-19T04:21:51Z"
   },
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-19T04:21:51Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.291,
- "estimation_fin": "2026-11-19T06:25:02Z",
+ "progression": 0.297,
+ "estimation_fin": "2026-11-19T06:24:51Z",
  "resultat": null
 }
