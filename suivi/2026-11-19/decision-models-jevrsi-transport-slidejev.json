@@ -5,10 +5,10 @@
  "depot": "20261119_typed_decision_vs_camembert_hierarchical",
  "titre": "Un modèle de décision typé ouvert (choix restreint parmi des options, probabilités) rivalise-t-il avec un encodeur CamemBERT sur une classification hiérarchique en français ?",
  "debut": "2026-11-19T02:11:34Z",
- "maj": "2026-11-19T02:58:59Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-19T02:59:55Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,54 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-19T02:58:59Z",
-   "fin": null
+   "fin": "2026-11-19T02:59:48Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-19T02:59:48Z",
+   "fin": "2026-11-19T02:59:55Z"
   }
  ],
- "progression": 0.983,
- "estimation_fin": "2026-11-19T03:01:59Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261119_typed_decision_vs_camembert_hierarchical",
+  "depot": "20261119_typed_decision_vs_camembert_hierarchical",
+  "en_bref": "Aucune conclusion possible : à l'échelle réduite, le substitut du LLM et la référence sous-entraînée restent au niveau du hasard. Le protocole paraît sain, mais l'hypothèse n'est pas tranchée.",
+  "synthese": "macro_f1 : Décision typée en deux étapes (LLM, sans entraînement) 0,00678 contre 0,000714 pour CamemBERT fine-tuné (5 textes/intention) (100 exemples, échelle réduite, CPU du sandbox).",
+  "metrique_principale": "macro_f1",
+  "libelle_metrique": "macro-F1 (intentions)",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "CamemBERT fine-tuné (5 textes/intention)",
+    "role": "reference",
+    "valeur": 0.0007136485280999108,
+    "ic95": [
+     0.0,
+     0.0022446689113355778
+    ]
+   },
+   {
+    "nom": "Décision typée en deux étapes (LLM, sans entraînement)",
+    "role": "nouvelle",
+    "valeur": 0.006779661016949153,
+    "ic95": [
+     0.0,
+     0.017609710550887024
+    ]
+   }
+  ],
+  "n_exemples": 100,
+  "jeu": "mteb/amazon_massive_intent",
+  "materiel": "CPU du sandbox",
+  "echelle": "reduite",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
