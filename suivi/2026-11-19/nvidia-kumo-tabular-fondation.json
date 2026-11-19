@@ -5,10 +5,10 @@
  "depot": "20261119_kumo_tabular_vs_xgboost_temporal",
  "titre": "Un modèle de fondation tabulaire sans entraînement (Kumo Tabular) égale-t-il un XGBoost réglé sur des tables financières, y compris hors-temps et avec un grand contexte ?",
  "debut": "2026-11-19T03:04:06Z",
- "maj": "2026-11-19T03:30:37Z",
- "statut": "en_cours",
- "etape": "essai",
- "detail": "itération 3 sur 3 : correction du notebook faite",
+ "maj": "2026-11-19T03:35:21Z",
+ "statut": "echec",
+ "etape": "publication",
+ "detail": "",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -23,40 +23,46 @@
   {
    "code": "essai",
    "libelle": "Exécution à échelle réduite",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-19T03:16:18Z",
-   "fin": null
+   "fin": "2026-11-19T03:35:21Z"
   },
   {
    "code": "revue_prealable",
    "libelle": "Relecture avant l'échelle complète",
-   "statut": "a_venir",
+   "statut": "saute",
    "debut": null,
    "fin": null
   },
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "a_venir",
+   "statut": "saute",
    "debut": null,
    "fin": null
   },
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "a_venir",
+   "statut": "saute",
    "debut": null,
    "fin": null
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "echec",
+   "debut": "2026-11-19T03:35:21Z",
+   "fin": "2026-11-19T03:35:21Z"
   }
  ],
- "progression": 0.2,
- "estimation_fin": "2026-11-19T06:08:18Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "echec",
+  "depot": "20261119_kumo_tabular_vs_xgboost_temporal",
+  "raison": "la phase publique a échoué",
+  "cause": "methode",
+  "tentatives": 1
+ }
 }
