@@ -5,10 +5,10 @@
  "depot": "20261119_grpo_vs_sft_lora_intent_classification",
  "titre": "Le GRPO par LoRA à récompense vérifiable dépasse-t-il le fine-tuning supervisé LoRA, à calcul comparable, pour classer des requêtes en 77 intentions en français ?",
  "debut": "2026-11-19T03:38:32Z",
- "maj": "2026-11-19T04:24:17Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-19T04:25:04Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,72 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-19T04:24:17Z",
-   "fin": null
+   "fin": "2026-11-19T04:24:57Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-19T04:24:57Z",
+   "fin": "2026-11-19T04:25:04Z"
   }
  ],
- "progression": 0.983,
- "estimation_fin": "2026-11-19T04:27:17Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261119_grpo_vs_sft_lora_intent_classification",
+  "depot": "20261119_grpo_vs_sft_lora_intent_classification",
+  "en_bref": "Aucune des hypothèses ne peut être tranchée à l'échelle réduite : le RL seul n'a reçu aucun signal et « SFT puis GRPO » ne dépasse pas le SFT. Le protocole paraît sain, mais le coût n'est pas égalisé.",
+  "synthese": "accuracy : SFT puis GRPO 0,16 contre 0,19 pour SFT LoRA (100 exemples, échelle réduite, CPU du sandbox).",
+  "metrique_principale": "accuracy",
+  "libelle_metrique": "Accuracy",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "Modèle de base (zéro exemple)",
+    "role": "reference",
+    "valeur": 0.0,
+    "ic95": [
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "nom": "SFT LoRA",
+    "role": "reference",
+    "valeur": 0.19,
+    "ic95": [
+     0.11,
+     0.27
+    ]
+   },
+   {
+    "nom": "GRPO LoRA seul",
+    "role": "nouvelle",
+    "valeur": 0.0,
+    "ic95": [
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "nom": "SFT puis GRPO",
+    "role": "nouvelle",
+    "valeur": 0.16,
+    "ic95": [
+     0.09,
+     0.24
+    ]
+   }
+  ],
+  "n_exemples": 100,
+  "jeu": "DeepPavlov/banking77_fr",
+  "materiel": "CPU du sandbox",
+  "echelle": "reduite",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
