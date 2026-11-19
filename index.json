@@ -3,6 +3,34 @@
  "pocs": [
   {
    "jour": "2026-11-19",
+   "sujet_id": "nvidia-kumo-tabular-fondation",
+   "depot": "20261119_kumo_tabular_vs_xgboost_temporal",
+   "titre": "Un modèle de fondation tabulaire sans entraînement (Kumo Tabular) égale-t-il un XGBoost réglé sur des tables financières, y compris hors-temps et avec un grand contexte ?",
+   "statut": "echec",
+   "iterations": 3,
+   "raison": "la phase publique a échoué",
+   "cause": "methode",
+   "duree_minutes": 31.3,
+   "consommation": {
+    "claude:poc_code:nvidia-kumo-tabular-fondation": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 731.6,
+     "cout_equivalent_usd": 2.0056,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:nvidia-kumo-tabular-fondation": {
+     "appels": 4,
+     "echecs": 0,
+     "secondes": 1079.8,
+     "cout_equivalent_usd": 5.2454,
+     "recherches_web": 0
+    }
+   },
+   "tentatives": 1
+  },
+  {
+   "jour": "2026-11-19",
    "sujet_id": "decision-models-jevrsi-transport-slidejev",
    "depot": "20261119_typed_decision_vs_camembert_hierarchical",
    "titre": "Un modèle de décision typé ouvert (choix restreint parmi des options, probabilités) rivalise-t-il avec un encodeur CamemBERT sur une classification hiérarchique en français ?",
