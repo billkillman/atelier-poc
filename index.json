@@ -2,6 +2,84 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-19",
+   "sujet_id": "decision-models-jevrsi-transport-slidejev",
+   "depot": "20261119_typed_decision_vs_camembert_hierarchical",
+   "titre": "Un modèle de décision typé ouvert (choix restreint parmi des options, probabilités) rivalise-t-il avec un encodeur CamemBERT sur une classification hiérarchique en français ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné)",
+    "raison": "exception (cellule 57, section new_approach)"
+   },
+   "iterations": 1,
+   "metrique_principale": "macro_f1",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "CamemBERT fine-tuné (5 textes/intention)",
+     "role": "reference",
+     "valeur": 0.0007136485280999108,
+     "ic95": [
+      0.0,
+      0.0022446689113355778
+     ]
+    },
+    {
+     "nom": "Décision typée en deux étapes (LLM, sans entraînement)",
+     "role": "nouvelle",
+     "valeur": 0.006779661016949153,
+     "ic95": [
+      0.0,
+      0.017609710550887024
+     ]
+    }
+   ],
+   "n_exemples": 100,
+   "jeu": "mteb/amazon_massive_intent",
+   "synthese": "macro_f1 : Décision typée en deux étapes (LLM, sans entraînement) 0,00678 contre 0,000714 pour CamemBERT fine-tuné (5 textes/intention) (100 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (100 énoncés de test, Qwen3-0.6B en substitut, CamemBERT à 5 textes par intention et une seule époque), les deux approches sont indiscernables du prédicteur trivial : macro-F1 de 0,007 pour la décision typée et de 0,001 pour CamemBERT, avec des IC95 qui incluent 0. L'accord entre ordres est de 0 % et le contrôle positif de 22 %, ce qui indique un biais de lettre du petit modèle. Aucun bug de calcul, fuite ou inéquité structurelle n'est identifié, et le code de la phase interne est prêt. Ces chiffres ne permettent pas de trancher l'hypothèse et ne reproduisent pas la source, qui porte sur d'autres jeux et tâches.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Aucune conclusion possible : à l'échelle réduite, le substitut du LLM et la référence sous-entraînée restent au niveau du hasard. Le protocole paraît sain, mais l'hypothèse n'est pas tranchée.",
+   "libelle_metrique": "macro-F1 (intentions)",
+   "reserves": [
+    "Les « vérifié » issus de l'échelle réduite ne confirment rien : ils comparent deux résultats au niveau du hasard. Seul le verdict « non concluant » est à retenir.",
+    "L'accord nul entre ordres reflète un petit modèle qui répond presque toujours la même lettre. Il ne mesure pas la stabilité du modèle de 1,7 Md visé.",
+    "La référence est quasiment non entraînée : on ne peut tirer aucune conclusion sur CamemBERT à 5 textes par intention, ni sur sa calibration."
+   ],
+   "duree_minutes": 48.3,
+   "consommation": {
+    "claude:poc_code:decision-models-jevrsi-transport-slidejev": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1767.2,
+     "cout_equivalent_usd": 4.6712,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:decision-models-jevrsi-transport-slidejev": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 246.0,
+     "cout_equivalent_usd": 1.1351,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:decision-models-jevrsi-transport-slidejev": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 91.5,
+     "cout_equivalent_usd": 0.5305,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261119_typed_decision_vs_camembert_hierarchical",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-18",
    "sujet_id": "tabulaire-fondation-sequences-financieres-tbs",
    "depot": "20261118_sequence_transformer_boosting_churn",
