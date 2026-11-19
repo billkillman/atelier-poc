@@ -5,11 +5,11 @@
  "depot": "20261119_kumo_tabular_vs_xgboost_temporal",
  "titre": "Un modèle de fondation tabulaire sans entraînement (Kumo Tabular) égale-t-il un XGBoost réglé sur des tables financières, y compris hors-temps et avec un grand contexte ?",
  "debut": "2026-11-19T03:04:06Z",
- "maj": "2026-11-19T03:26:12Z",
+ "maj": "2026-11-19T03:30:37Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 2 : correction du notebook (son exécution dans le sandbox a échoué ou ne remplit pas les conditions de validation)",
- "iteration": 2,
+ "detail": "itération 3 sur 3 : correction du notebook faite",
+ "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
  "etapes": [
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.204,
- "estimation_fin": "2026-11-19T05:42:18Z",
+ "progression": 0.2,
+ "estimation_fin": "2026-11-19T06:08:18Z",
  "resultat": null
 }
