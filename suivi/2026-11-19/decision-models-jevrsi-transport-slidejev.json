@@ -1,0 +1,62 @@
+{
+ "version": 1,
+ "jour": "2026-11-19",
+ "sujet_id": "decision-models-jevrsi-transport-slidejev",
+ "depot": "20261119_typed_decision_vs_camembert_hierarchical",
+ "titre": "Un modèle de décision typé ouvert (choix restreint parmi des options, probabilités) rivalise-t-il avec un encodeur CamemBERT sur une classification hiérarchique en français ?",
+ "debut": "2026-11-19T02:11:34Z",
+ "maj": "2026-11-19T02:11:34Z",
+ "statut": "en_cours",
+ "etape": "ecriture",
+ "detail": "le modèle écrit le notebook : protocole, deux approches, évaluation",
+ "iteration": 0,
+ "iterations_max": 3,
+ "sous_progression": null,
+ "etapes": [
+  {
+   "code": "ecriture",
+   "libelle": "Écriture du notebook",
+   "statut": "en_cours",
+   "debut": "2026-11-19T02:11:34Z",
+   "fin": null
+  },
+  {
+   "code": "essai",
+   "libelle": "Exécution à échelle réduite",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue_prealable",
+   "libelle": "Relecture avant l'échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "complete",
+   "libelle": "Échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue",
+   "libelle": "Revue de méthode",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "publication",
+   "libelle": "Publication",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  }
+ ],
+ "progression": 0.0,
+ "estimation_fin": "2026-11-19T05:06:34Z",
+ "resultat": null
+}
