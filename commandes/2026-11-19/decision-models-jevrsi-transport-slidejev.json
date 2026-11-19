@@ -1,0 +1,369 @@
+{
+ "version": 1,
+ "jour": "2026-11-19",
+ "sujet_id": "decision-models-jevrsi-transport-slidejev",
+ "depot": "20261119_typed_decision_vs_camembert_hierarchical",
+ "fiche": {
+  "sujet_id": "decision-models-jevrsi-transport-slidejev",
+  "titre": "Modèles de décision typés : un LLM les épaule et les rend meilleurs, mais ils restent fragiles hors cadre",
+  "en_une_phrase": "Un petit modèle de décision rapide, épaulé en tâche de fond par un LLM, rattrape parfois des agents LLM à bas coût, mais sur jeux textuels uniquement, en preprints non relus.",
+  "probleme": "Les modèles rapides (« System-1 ») décident vite mais échouent sur les tâches complexes ou inconnues. Un LLM raisonne bien mais coûte cher à chaque appel. Comment faire bénéficier le modèle rapide du raisonnement du LLM sans l'appeler à chaque décision ?",
+  "comment_ca_marche": "**JevRSI** associe deux acteurs. Le *System-1* est un modèle de décision de type Jev : il reçoit une liste d'actions possibles et renvoie la meilleure avec un score de confiance, sans générer de texte.\n\n1. Avant chaque décision, le système récupère des modules d'aide dans une bibliothèque partagée, selon leur pertinence et leur taux de réussite passé.\n2. Ces modules forment un contexte : le passé (mémoire des états visités), le présent (procédures « si… alors… ») et le futur (un petit modèle du monde qui prédit l'effet de chaque action).\n3. Le System-1 choisit l'action.\n4. Si sa confiance est faible, la trace est mise en tampon.\n5. Un LLM (*System-2*), en tâche de fond, diagnostique ces traces et crée ou corrige un module.\n\nLe LLM n'est donc jamais sur le chemin de la décision.",
+  "demarche_experimentale": "JevRSI est testé sur trois jeux textuels simulés : ALFWorld, BabyAI, TextCraft (200 épisodes d'entraînement, 134 à 150 de test dans la distribution et hors distribution). Métrique : taux de succès. Comparé à des modèles de décision seuls, deux méthodes concurrentes et des agents LLM.",
+  "resultats": [
+   {
+    "metrique": "Taux de succès (SR@1, plus haut = mieux), ALFWorld hors distribution",
+    "valeur": "76,11 % contre 44,77 % pour StartLux-9B seul",
+    "comparaison": "égale l'agent Qwen3.8-27B seul (76,11 %)",
+    "conditions": "StartLux-9B comme System-1, Qwen comme System-2 ; 134 tâches",
+    "citation": "With Qwen as System-2, StartLux-9B improves from 44.77% to 76.11% on ALFWorld OOD, matching the Qwen LLM agent."
+   },
+   {
+    "metrique": "Coût d'évaluation en dollars (plus bas = mieux)",
+    "valeur": "environ 0,36 $ contre 5,38 $",
+    "comparaison": "agent GPT-6.1 Sol, même 100 % de succès",
+    "conditions": "TextCraft dans la distribution, JevRSI avec DeepSeek ; chiffres des auteurs",
+    "citation": "JevRSI with DeepSeek achieves the same 100% success rate as the GPT agent at approximately $0.36 versus $5.38, reducing evaluation cost by about 93% on TextCraft ID."
+   },
+   {
+    "metrique": "Précision de prédiction du mode de transport choisi",
+    "valeur": "inférieure aux modèles classiques",
+    "comparaison": "modèles de choix discret classiques et meilleur LLM de chat",
+    "conditions": "Jev et GPT-6 Luna Decisions, jeu Swissmetro ; chiffres non disponibles dans l'extrait lu",
+    "citation": "typed decision models achieve lower prediction accuracy than traditional discrete choice models and the strongest chat-based baseline"
+   }
+  ],
+  "limites": [
+   "Les auteurs de JevRSI reconnaissent que la robustesse est non testée en conditions réelles ; les tests sont des jeux textuels simulés, loin de la classification de textes internes.",
+   "Résultats irréguliers : avec Jev et GPT, JevRSI baisse sur TextCraft hors distribution (20,66 % contre 22,00 %). Un LLM plus fort n'améliore pas forcément le harnais.",
+   "Étude transport : précision inférieure aux méthodes classiques, forte sensibilité à la formulation, dégradation en réseau difficile. SlideJev : seul le résumé a été lu ; résultats non vérifiés ici."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "−93 %",
+    "libelle": "coût d'évaluation de JevRSI (DeepSeek) vs agent GPT, même 100 % de succès, TextCraft ID"
+   },
+   {
+    "valeur": "0,08–0,58 s",
+    "libelle": "temps moyen de décision de JevRSI, contre 2,14–15,58 s pour les agents LLM"
+   },
+   {
+    "valeur": "44,77 → 76,11 %",
+    "libelle": "succès de StartLux-9B sur ALFWorld hors distribution, avec Qwen comme System-2"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "JevRSI fait de la décision rapide avec un modèle de type Jev, tandis qu'un LLM développe en asynchrone un harnais modulaire (procédures, mémoire d'états, modèle du monde).",
+    "citation": "A Jev-style System-1 model enables low-latency action selection, while an asynchronous System-2 LLM develops a modular harness."
+   },
+   {
+    "affirmation": "Avec Qwen comme System-2, StartLux-9B passe de 44,77 % à 76,11 % sur ALFWorld hors distribution.",
+    "citation": "With Qwen as System-2, StartLux-9B improves from 44.77% to 76.11% on ALFWorld OOD, matching the Qwen LLM agent."
+   },
+   {
+    "affirmation": "Les auteurs rapportent un coût d'évaluation réduit d'environ 93 % face à l'agent GPT sur TextCraft ID, à succès égal.",
+    "citation": "reducing evaluation cost by about 93% on TextCraft ID."
+   },
+   {
+    "affirmation": "Le temps de décision de JevRSI est de 0,08 à 0,58 s contre 2,14 à 15,58 s pour les agents LLM.",
+    "citation": "Its mean System-1 inference time ranges from 0.08 to 0.58 seconds across the three benchmarks. LLM agents require 2.14–15.58 seconds on average."
+   },
+   {
+    "affirmation": "Un LLM plus fort seul n'est pas forcément meilleur pour développer le harnais.",
+    "citation": "Notably, strong LLM-agent performance does not necessarily translate into effective harness development."
+   },
+   {
+    "affirmation": "En transport, les modèles typés sont moins précis que les modèles de choix classiques sur Swissmetro.",
+    "citation": "typed decision models achieve lower prediction accuracy than traditional discrete choice models and the strongest chat-based baseline, while their performance varies substantially with input representation and question framing."
+   },
+   {
+    "affirmation": "SlideJev rapporte une cohérence de 100 % sur quatre ordres d'options en pathologie.",
+    "citation": "SlideJev achieves the highest mean overall accuracy and 100% answer consistency across four option orders."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision typé",
+    "definition": "Modèle qui reçoit une question et des options prédéfinies et renvoie un choix avec une probabilité par option, sans générer de texte libre."
+   },
+   {
+    "terme": "System-1 / System-2",
+    "definition": "Image du fonctionnement humain : System-1 décide vite et sans effort, System-2 raisonne lentement et à fond. Ici : petit modèle rapide et LLM."
+   },
+   {
+    "terme": "Harnais (harness)",
+    "definition": "Ensemble de modules autour d'un modèle (mémoire, procédures, prédicteur) qui construisent son contexte de décision."
+   },
+   {
+    "terme": "Modèle du monde",
+    "definition": "Petit programme qui prédit l'état suivant et la récompense après chaque action possible, pour comparer avant d'agir."
+   },
+   {
+    "terme": "Hors distribution (OOD)",
+    "definition": "Test sur des tâches différentes de celles de l'entraînement, pour mesurer la généralisation."
+   },
+   {
+    "terme": "SR@1",
+    "definition": "Taux de succès à la première tentative : part des tâches réussies du premier coup. Plus haut = mieux."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Think Once, Act Fast: Cost-Effective Recursive Self-Improvement for Decision Model Harness",
+    "url": "https://arxiv.org/abs/2611.22432",
+    "type": "primaire",
+    "date": "2026-11-17"
+   },
+   {
+    "titre": "When Do Typed Decision Models Work in Transportation? Evidence from Travel Choice and Traffic Signal Control",
+    "url": "https://arxiv.org/abs/2611.22926",
+    "type": "primaire",
+    "date": "2026-11-17"
+   },
+   {
+    "titre": "SlideJev: Order-Stable and Tissue-Grounded Jev Decisions for Whole-Slide Pathology",
+    "url": "https://arxiv.org/abs/2611.22879",
+    "type": "primaire",
+    "date": "2026-11-17"
+   },
+   {
+    "titre": "Dépôt GitHub usail-hkust/JevRSI",
+    "url": "https://github.com/usail-hkust/JevRSI",
+    "type": "primaire",
+    "date": "2026-11-17"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-17",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un modèle de décision typé ouvert (choix restreint parmi des options, probabilités) rivalise-t-il avec un encodeur CamemBERT sur une classification hiérarchique en français ?",
+  "hypothese": "Un LLM de 1,7 Md de paramètres utilisé en décision typée à deux étapes (scénario puis intention) sans entraînement reste inférieur de plus de 10 points de macro_f1 à CamemBERT fine-tuné sur 20 textes par classe, avec un accord entre deux ordres d'options inférieur à 90 %, mais rattrape CamemBERT à 5 textes par classe ou sa calibration (ECE) est meilleure après mise à l'échelle de température.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné",
+   "description": "Classifieur plat à 60 intentions par fine-tuning complet d'un encodeur français, entraîné avec 5, 20 textes par classe et sur tout le train.",
+   "implementation": "almanach/camembert-base, AutoModelForSequenceClassification, 60 sorties, max_length 64, lr 3e-5, batch 32, 10 époques pour 5 par classe, 6 pour 20, 4 pour le jeu complet ; le scénario prédit se déduit du préfixe de l'intention prédite ; ECE avant et après mise à l'échelle de température sur un échantillon de validation.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Décision typée à deux étapes par LLM ouvert",
+   "description": "Le modèle ne génère pas de texte : on lui présente les options sous forme de lettres et on lit la distribution de probabilité restreinte aux lettres valides, d'abord sur les 18 scénarios, puis sur les intentions du scénario choisi ; probabilité jointe = produit des deux étapes.",
+   "implementation": "Qwen/Qwen3-1.7B en bfloat16 ou float16, gabarit de conversation sans mode réflexion, un seul passage avant par étape, softmax sur les logits des jetons A, B, C… ; deux ordres d'options (original et inversé) pour mesurer la stabilité, probabilités moyennées ; mise à l'échelle de température ajustée sur 200 énoncés de validation ; décision zéro exemple avec noms des options en texte.",
+   "modeles_hf": [
+    "Qwen/Qwen3-1.7B"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen3-0.6B"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "llmaas"
+  },
+  "jeu_public": {
+   "hub_id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "text, label, label_text (scénario_intention, le scénario est le préfixe avant le premier tiret bas)",
+   "representativite": "Seul jeu français chargeable avec une hiérarchie explicite à deux niveaux et des classes proches, permet de mesurer précision, calibration et cohérence parent/enfant avec des courbes de budget d'annotation.",
+   "ecarts_donnees_reelles": "Domaine assistant domestique, énoncés courts traduits, 60 classes au lieu d'environ 300, pas de textes longs ni de pièces jointes ; l'évaluation du LLM est limitée à 400 énoncés du split test pour le budget GPU ; le LLM est testé sans exemples.",
+   "jeux_explores": [
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "Intentions françaises avec arbre scénario → intention, 11 514 textes d'entraînement.",
+     "decision": "retenu",
+     "raison": "Seule hiérarchie explicite en français chargeable en parquet, licence apache-2.0."
+    },
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "77 intentions de services financiers proches, en français.",
+     "decision": "ecarte",
+     "raison": "Pas de hiérarchie, noms de classes à aligner depuis le jeu anglais, licence non précisée."
+    },
+    {
+     "nom": "Mouwiya/cfpb-consumer-complaints",
+     "url": "https://huggingface.co/datasets/Mouwiya/cfpb-consumer-complaints",
+     "acces": "hub_libre",
+     "adequation": "Réclamations réelles anglaises avec deux hiérarchies natives.",
+     "decision": "ecarte",
+     "raison": "Anglais, CamemBERT non applicable, très volumineux (16 M de lignes)."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "Une centaine d'intentions déséquilibrées en français.",
+     "decision": "ecarte",
+     "raison": "Licence inconnue, hiérarchie à reconstruire par jointure non vérifiée."
+    },
+    {
+     "nom": "DeepPavlov/hwu64_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/hwu64_fr",
+     "acces": "hub_libre",
+     "adequation": "64 intentions traduites en français.",
+     "decision": "ecarte",
+     "raison": "Étiquettes entières sans niveau parent."
+    },
+    {
+     "nom": "nlpaueb/multi_eurlex",
+     "url": "https://huggingface.co/datasets/nlpaueb/multi_eurlex",
+     "acces": "hub_libre",
+     "adequation": "Hiérarchie EUROVOC à trois niveaux en français.",
+     "decision": "ecarte",
+     "raison": "Script de chargement, multi-label, documents longs, non chargeable en parquet."
+    }
+   ]
+  },
+  "metriques": [
+   "macro_f1",
+   "intent_accuracy",
+   "scenario_accuracy",
+   "expected_calibration_error",
+   "hierarchical_consistency",
+   "order_consistency",
+   "latency_ms_per_example"
+  ],
+  "metrique_principale": "macro_f1",
+  "sens": "max",
+  "protocole": "Évaluation : 400 énoncés tirés du split test, avec stratification au niveau intention. Entraînement : sous-échantillons du split train (5 textes par classe, 20 par classe, puis tout), imbriqués. Calibration : 200 énoncés tirés du split validation, utilisés uniquement pour ajuster la température. LLM : sans entraînement, deux ordres d'options, probabilités moyennées ; macro_f1 calculée sur les 60 intentions. hierarchical_consistency = part des prédictions dont l'intention appartient au scénario prédit (1 par construction pour le LLM en deux étapes, mesurée pour CamemBERT plat) ; order_consistency = accord des décisions entre les deux ordres ; ECE sur 10 intervalles ; latence mesurée en lot de 1. IC à 95 % par bootstrap.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Qwen/Qwen3-0.6B à la place de Qwen/Qwen3-1.7B ; 100 énoncés de test, 50 de validation, CamemBERT avec 5 textes par classe et une époque. Coût GPU complet : 600 énoncés (400 test + 200 validation) × 2 étapes × 2 ordres × environ 300 jetons = 720 000 jetons, soit environ 17 min à 700 jetons/s (borne haute pour un modèle de 1,7 Md), plus 8 min de fine-tuning CamemBERT ; à réduire à 300 énoncés de test si dépassement.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte du message, de l'e-mail ou de l'avis, pseudonymisé"
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif de niveau 1 (étiquette de référence)"
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif de niveau 2 (étiquette de référence)"
+    },
+    {
+     "colonne": "reason_description",
+     "type": "string",
+     "description": "Libellé ou description de chaque classe, pour présenter les options au modèle"
+    },
+    {
+     "colonne": "received_at",
+     "type": "date",
+     "description": "Date de réception, pour le découpage temporel"
+    }
+   ],
+   "volume_conseille": "10 000 à 50 000 textes étiquetés, au moins 20 par sous-motif, 300 classes au plus",
+   "metriques_metier": "macro_f1 par sous-motif, exactitude du motif, ECE, taux de routage correct à seuil de confiance, latence p95",
+   "garde_fous": "Pas de texte brut vers un service externe non agréé ; LLM interne uniquement ; aucune décision automatique sans seuil de confiance ; revue des classes rares.",
+   "prescriptions": [
+    "Au moins 20 textes par sous-motif en entraînement et 10 en test ; fusionner ou signaler les classes sous ce seuil.",
+    "Taxonomie figée et documentée, avec libellé et description par classe.",
+    "Étiquettes issues d'une double annotation, avec accord inter-annotateurs (kappa) rapporté.",
+    "Découpage temporel : test sur les derniers mois.",
+    "Même ordre d'options testé en deux permutations au minimum.",
+    "Pseudonymiser noms, IBAN, numéros de carte et adresses ; exclure les textes contenant des données de santé.",
+    "Conserver la distribution naturelle des classes dans le test et la rapporter."
+   ],
+   "preparation": "Extraire d'un outil de gestion de la relation client les textes entrants avec le motif et le sous-motif saisis par les conseillers, filtrer les étiquettes jugées fiables (revue ou contrôle qualité), pseudonymiser, puis échantillonner par sous-motif en gardant la distribution naturelle pour le test."
+  },
+  "duree_estimee_minutes": 120,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "Qwen/Qwen3-1.7B": {
+    "id": "Qwen/Qwen3-1.7B",
+    "sha": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 2031739904,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "Qwen/Qwen3-0.6B": {
+    "id": "Qwen/Qwen3-0.6B",
+    "sha": "c1899de289a04d12100db370d81485cdf75e47ca",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 751632384,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "splits": [
+    "train",
+    "test",
+    "validation"
+   ],
+   "licence": "apache-2.0",
+   "colonnes": {
+    "id": "Value",
+    "label": "Value",
+    "label_text": "Value",
+    "text": "Value",
+    "lang": "Value"
+   },
+   "exemple": {
+    "id": "1",
+    "label": "alarm_set",
+    "label_text": "alarm_set",
+    "text": "réveille-moi à neuf heures du matin le vendredi",
+    "lang": "fr"
+   },
+   "lignes": {
+    "train": 11514,
+    "test": 2974,
+    "validation": 2033
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

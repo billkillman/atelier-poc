@@ -1,0 +1,352 @@
+{
+ "version": 1,
+ "jour": "2026-11-19",
+ "sujet_id": "rl-nemotron-3-5-super-lora-qwen38",
+ "depot": "20261119_grpo_vs_sft_lora_intent_classification",
+ "fiche": {
+  "sujet_id": "rl-nemotron-3-5-super-lora-qwen38",
+  "titre": "Le RL seul, sans étape supervisée, gagne 4 à 14 points sur Nemotron 3.5 Super, mais sur des tâches éloignées de l'entreprise",
+  "en_une_phrase": "Cinq adaptateurs LoRA entraînés par RL gagnent +4,5 à +13,8 points sur Nemotron 3.5 Super (code, outils, documents). Jeux et benchmarks en partie de l'auteur, sans français ni cas interne.",
+  "probleme": "Le RL avec récompenses vérifiables est devenu une étape standard, mais les recettes publiées mélangent plusieurs jeux de données. On ne sait pas ce qu'apporte un seul jeu de données à un modèle ouvert déjà fort, ni par quels changements de comportement.",
+  "comment_ca_marche": "Le modèle de base est Nemotron 3.5 Super (120 Md de paramètres, 12 Md actifs par token : architecture « mixture-of-experts », où seule une partie des sous-réseaux travaille à chaque token). Pour chacun des cinq jeux de tâches :\n\n1. On gèle le modèle et on ajoute un **adaptateur LoRA** de rang 32 (petites matrices ajoutées, seules entraînées).\n2. Le modèle tente chaque tâche plusieurs fois (un « groupe » de tentatives).\n3. Un correcteur note la tentative : tests cachés pour le code, ou un LLM juge (GPT-6.1 Sol) selon une grille.\n4. **CISPO**, algorithme de RL, renforce les tentatives mieux notées que la moyenne du groupe.\n\nIl n'y a ni étape supervisée, ni pénalité KL (qui freine l'écart au modèle d'origine). Chaque adaptateur est comparé au modèle de base, mêmes tâches, même harnais.",
+  "demarche_experimentale": "Cinq runs séparés, un par jeu de données Surge AI, sur la même base. Évaluation appariée sur douze benchmarks (huit externes, quatre de Surge AI), même harnais, avec intervalle de confiance à 95 % par bootstrap sur les tâches. Analyse qualitative des échecs par agents Claude.",
+  "resultats": [
+   {
+    "metrique": "GDP.pdf (réussite sur tous les critères, plus haut = mieux)",
+    "valeur": "10,4 % à 24,2 % (+13,8 pts, IC95 [+7,8 ; +20,2])",
+    "comparaison": "Modèle de base Nemotron 3.5 Super, même harnais",
+    "conditions": "Adaptateur RL-Docs, 100 tâches × 5 tentatives, benchmark construit par Surge AI",
+    "citation": "RL-Docs lifts the score from 10.4% to 24.2%"
+   },
+   {
+    "metrique": "AutomationBench (taux de réussite, tâches avec outils)",
+    "valeur": "14,8 % à 27,5 % (+12,7 pts, IC95 [+9,3 ; +16,2])",
+    "comparaison": "Modèle de base ; RL-Docs, sans outils API à l'entraînement, gagne aussi +8,0 pts",
+    "conditions": "Adaptateur RL-ToolUse, 600 tâches × 1 tentative",
+    "citation": "RL-ToolUse raises AutomationBench’s pass rate from 14.8% to 27.5%"
+   },
+   {
+    "metrique": "Gain sans outils (plus haut = mieux)",
+    "valeur": "RL-Charts sans outils : +0,2 pt sur Chartography (IC [−2,6 ; +2,8])",
+    "comparaison": "Modèle de base, mêmes réglages",
+    "conditions": "Évaluation complémentaire (tableau 4), intervalle incluant zéro",
+    "citation": "Chartography a | No tools | 15.9 | 16.1 | + 0.2 +0.2 [ − 2.6 , + 2.8 ]"
+   }
+  ],
+  "limites": [
+   "Quatre benchmarks sur douze sont construits par Surge AI, auteur des jeux d'entraînement ; notation largement par LLM juge (GPT-6.1 Sol, Claude Opus 5.5).",
+   "Gains parfois non robustes : DeepSWE (IC incluant zéro), Terminal-Bench avec un autre harnais (+1,6), SWE-bench Verified (−0,5), RL-Charts sans outils quasi nul.",
+   "Aucune comparaison avec un fine-tuning supervisé ni coût de calcul chiffré ; publication des adaptateurs Nemotron non précisée par la source. Tout en anglais."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "+13,8 pts",
+    "libelle": "Gain maximal, GDP.pdf (raisonnement sur PDF) : 10,4 % à 24,2 %, contre le modèle de base"
+   },
+   {
+    "valeur": "14,8 → 27,5 %",
+    "libelle": "AutomationBench (tâches d'agent avec outils), adaptateur RL-ToolUse contre modèle de base"
+   },
+   {
+    "valeur": "+0,2 pt",
+    "libelle": "Gain de RL-Charts sur Chartography sans outils : l'effet passe par les outils"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Chaque adaptateur est un LoRA de rang 32 entraîné avec CISPO sur Tinker, sans étape supervisée.",
+    "citation": "Each run trains a fresh rank-32 LoRA adapter with CISPO on Tinker, with no supervised stage"
+   },
+   {
+    "affirmation": "RL-Docs fait passer GDP.pdf de 10,4 % à 24,2 %.",
+    "citation": "RL-Docs lifts the score from 10.4% to 24.2%"
+   },
+   {
+    "affirmation": "RL-ToolUse lit plus souvent la boîte mail avant d'agir : la part de tâches sans ouverture de l'inbox ou Slack passe de 74,3 % à 41,2 %.",
+    "citation": "the share of tasks where it never opens the inbox or Slack falls from 74.3% to 41.2%"
+   },
+   {
+    "affirmation": "Sans outils, RL-Charts ne gagne presque rien sur Chartography.",
+    "citation": "Chartography a | No tools | 15.9 | 16.1 | + 0.2 +0.2 [ − 2.6 , + 2.8 ]"
+   },
+   {
+    "affirmation": "Quatre des douze benchmarks sont construits par Surge AI, auteur de l'étude.",
+    "citation": "eight built by other groups and four by Surge AI"
+   },
+   {
+    "affirmation": "L'adaptateur Qwen3.8-27B-pi-adapted est sous Apache-2.0 (gains auto-rapportés sur le harnais pi).",
+    "citation": "The adapter is released under Apache-2.0."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "LoRA",
+    "definition": "Fine-tuning léger : on gèle le modèle et on entraîne de petites matrices ajoutées. Le rang (ici 32) fixe leur taille."
+   },
+   {
+    "terme": "CISPO",
+    "definition": "Algorithme de RL proche de GRPO : il borne le poids d'importance (écart entre probabilités de l'entraîneur et de l'échantillonneur) plutôt que la mise à jour."
+   },
+   {
+    "terme": "RL (reinforcement learning)",
+    "definition": "Le modèle tente des tâches et est renforcé selon une note (récompense), ici tests cachés ou juge LLM."
+   },
+   {
+    "terme": "Mixture-of-experts",
+    "definition": "Modèle composé de nombreux sous-réseaux, dont seuls quelques-uns s'activent par token : 120 Md au total, 12 Md actifs."
+   },
+   {
+    "terme": "Bootstrap apparié",
+    "definition": "Méthode statistique : on rééchantillonne les tâches pour obtenir un intervalle de confiance sur la différence entre deux modèles."
+   },
+   {
+    "terme": "MCP",
+    "definition": "Model Context Protocol : standard qui expose des services (mail, calendrier, fichiers) comme outils appelables par un agent."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "What RL on Expert-Built Tasks Teaches Nemotron 3.5 Super",
+    "url": "https://arxiv.org/abs/2611.22161",
+    "type": "primaire",
+    "date": "2026-11-17"
+   },
+   {
+    "titre": "New LoRA Adapter Lifts Qwen3.8 Coding Success From 39% to 65%",
+    "url": "https://www.marktechpost.com/2026/11/18/hugging-face-qwen3-8-27b-pi-adapted-lora/",
+    "type": "secondaire",
+    "date": "2026-11-18"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-17",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Le GRPO par LoRA à récompense vérifiable dépasse-t-il le fine-tuning supervisé LoRA, à calcul comparable, pour classer des requêtes en 77 intentions en français ?",
+  "hypothese": "À 10 textes par classe et un calcul d'entraînement comparable, GRPO après SFT gagne au moins 2 points d'accuracy sur le SFT seul sur 500 requêtes de test, GRPO seul depuis le modèle de base reste inférieur au SFT, et la régression hors tâche (accuracy zéro exemple sur un autre jeu d'intentions) reste inférieure à 3 points.",
+  "reference": {
+   "nom": "SFT LoRA",
+   "description": "Fine-tuning supervisé par LoRA du même petit modèle d'instruction, qui apprend à produire le nom de l'intention à partir de la liste des intentions et de la requête.",
+   "implementation": "Qwen/Qwen2.5-0.5B-Instruct, peft LoRA rang 16 sur les projections d'attention et MLP, perte uniquement sur la réponse, lr 2e-4, 3 époques sur 10 textes par classe (770 exemples), batch 8, fp16 avec autocast, boucle PyTorch simple.",
+   "modeles_hf": [
+    "Qwen/Qwen2.5-0.5B-Instruct"
+   ],
+   "modeles_hf_sandbox": [
+    "HuggingFaceTB/SmolLM2-135M-Instruct"
+   ],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "GRPO LoRA à récompense vérifiable",
+   "description": "Pour chaque requête, 8 réponses sont échantillonnées ; la récompense vaut 1 si le nom d'intention généré est exactement la bonne classe et 0 sinon (y compris format invalide) ; l'avantage est la récompense centrée-réduite dans le groupe, sans modèle de valeur.",
+   "implementation": "Réimplémentation courte en PyTorch et peft (pas de trl) : 8 requêtes × 8 échantillons par pas, température 1,0, 8 jetons générés au plus, perte de gradient de politique pondérée par l'avantage avec coefficient KL de 0,01 vers le modèle de base, lr 1e-5, 100 pas depuis le modèle de base et 40 pas depuis l'adaptateur SFT ; récompense calculée par comparaison de chaînes normalisées, jamais par un LLM juge.",
+   "modeles_hf": [
+    "Qwen/Qwen2.5-0.5B-Instruct"
+   ],
+   "modeles_hf_sandbox": [
+    "HuggingFaceTB/SmolLM2-135M-Instruct"
+   ],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "utterance, label ; noms des 77 intentions lus dans mteb/banking77 (colonnes label, label_text), alignés par index et vérifiés par le nombre de classes. Contrôle hors tâche : mteb/amazon_massive_intent (fr), colonnes text et label_text, split test.",
+   "representativite": "Requêtes françaises de services financiers avec 77 intentions proches et étiquette exacte, donc récompense vérifiable ; reproduit le cadre routage à budget d'étiquettes limité.",
+   "ecarts_donnees_reelles": "Traduction automatique, requêtes courtes, 77 classes au lieu d'environ 300, pas de hiérarchie ni d'e-mails ; noms d'intention en anglais ; petit modèle de 0,5 Md au lieu d'un modèle de 120 Md ; une seule graine ; licence du jeu non précisée (original CC BY 4.0).",
+   "jeux_explores": [
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "77 intentions de services financiers en français, 10 003 textes d'entraînement et 3 080 de test.",
+     "decision": "retenu",
+     "raison": "Domaine le plus proche, étiquette exacte vérifiable, chargeable en parquet."
+    },
+    {
+     "nom": "mteb/banking77",
+     "url": "https://huggingface.co/datasets/mteb/banking77",
+     "acces": "hub_libre",
+     "adequation": "Version anglaise avec noms d'étiquettes, licence mit.",
+     "decision": "ecarte",
+     "raison": "Sert seulement aux noms de classes ; texte non français."
+    },
+    {
+     "nom": "DeepPavlov/clinc150_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/clinc150_fr",
+     "acces": "hub_libre",
+     "adequation": "150 intentions en 10 domaines, plus proche du nombre de classes visé.",
+     "decision": "ecarte",
+     "raison": "Noms de classes absents, prompt à 150 options trop long pour le budget GPU."
+    },
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "60 intentions en français avec noms et hiérarchie scénario/intention.",
+     "decision": "ecarte",
+     "raison": "Hors domaine financier ; utilisé seulement comme contrôle de régression hors tâche (200 énoncés de test)."
+    },
+    {
+     "nom": "GregoryD/explicit-function-calling-french",
+     "url": "https://huggingface.co/datasets/GregoryD/explicit-function-calling-french",
+     "acces": "hub_libre",
+     "adequation": "Appels de fonctions JSON en français, récompense vérifiable sur le format.",
+     "decision": "ecarte",
+     "raison": "Fonctions génériques dans une chaîne unique à parser, hors routage."
+    },
+    {
+     "nom": "CATIE-AQ/smoltalk2_smolagents_toolcalling_french",
+     "url": "https://huggingface.co/datasets/CATIE-AQ/smoltalk2_smolagents_toolcalling_french",
+     "acces": "hub_libre",
+     "adequation": "Traces d'agents avec appels d'outils, apache-2.0.",
+     "decision": "ecarte",
+     "raison": "Outils simulés, mélange français/anglais, trop long pour le calcul disponible."
+    },
+    {
+     "nom": "Données Surge AI de l'étude arXiv 2611.22161",
+     "url": "https://arxiv.org/abs/2611.22161",
+     "acces": "restreint",
+     "adequation": "Reproduction exacte de l'étude (code, outils, documents) mais en anglais.",
+     "decision": "ecarte",
+     "raison": "Aucune publication confirmée, licence inconnue, non chargeable."
+    }
+   ]
+  },
+  "metriques": [
+   "accuracy",
+   "macro_f1",
+   "mean_reward",
+   "valid_label_rate",
+   "mean_completion_tokens",
+   "out_of_task_accuracy",
+   "train_gpu_seconds"
+  ],
+  "metrique_principale": "accuracy",
+  "sens": "max",
+  "protocole": "Sur le split train de DeepPavlov/banking77_fr, tirage de 10 textes par classe (770 requêtes), identiques pour le SFT et le GRPO ; sur le split test, tirage stratifié de 500 requêtes d'évaluation ; 100 requêtes de validation prélevées dans le train hors des 770. Même modèle de départ pour toutes les variantes ; évaluation par décodage glouton avec le même prompt (liste numérotée des 77 intentions, réponse = nom exact). Variantes : modèle sans entraînement ; SFT LoRA ; GRPO LoRA seul ; SFT puis GRPO. Le budget est comparé par temps GPU d'entraînement mesuré et nombre de jetons traités, et rapporté. Courbes de la récompense moyenne et de l'accuracy sur la validation tous les 20 pas. Détournement de récompense : taux de sorties valides, longueur moyenne des réponses, diversité des classes prédites. Régression hors tâche : accuracy zéro exemple sur 200 énoncés du split test de mteb/amazon_massive_intent (fr) avec le même gabarit de prompt, avant et après. IC à 95 % par bootstrap.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "HuggingFaceTB/SmolLM2-135M-Instruct, 100 requêtes de test, 3 textes par classe, 2 pas de GRPO de 4 requêtes × 4 échantillons, un tour de SFT. Coût GPU complet : GRPO depuis la base 100 pas × 64 séquences × environ 460 jetons = 2,9 M jetons (environ 13 min sur T4 pour 0,5 Md), SFT 3 époques × 770 × 460 = 1,1 M jetons (3 min), SFT puis GRPO 40 pas (5 min), 4 évaluations de 500 requêtes (4 min) et contrôle hors tâche ; total environ 30 min, GRPO à réduire à 70 pas si dépassement.",
+  "dependances": [
+   "peft"
+  ],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte du message ou de l'e-mail, pseudonymisé"
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif de référence"
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif de référence, utilisé pour la récompense"
+    },
+    {
+     "colonne": "received_at",
+     "type": "date",
+     "description": "Date de réception, pour le découpage temporel"
+    }
+   ],
+   "volume_conseille": "au moins 10 textes étiquetés par sous-motif en entraînement, 2 000 textes de test",
+   "metriques_metier": "accuracy et macro_f1 sur sous-motif, accuracy sur motif, taux de sorties invalides, coût de calcul d'entraînement",
+   "garde_fous": "Entraînement local uniquement ; récompense déterministe ; surveiller la longueur et la diversité des sorties ; aucun déploiement sans contrôle de régression hors tâche.",
+   "prescriptions": [
+    "Au moins 10 textes par sous-motif en entraînement, 10 en test.",
+    "Étiquettes fiables (double annotation, accord inter-annotateurs rapporté).",
+    "Les mêmes textes pour SFT et RL, découpage temporel pour le test.",
+    "Taxonomie figée, noms de classes sans ambiguïté et distincts.",
+    "Prévoir un jeu hors tâche (autre type de texte) pour mesurer la régression.",
+    "Pseudonymiser les données personnelles et financières avant tout entraînement.",
+    "Rapporter le temps GPU et les jetons de chaque variante pour la comparaison à coût égal."
+   ],
+   "preparation": "Extraire les textes entrants avec le motif et le sous-motif validés par les conseillers, filtrer les étiquettes douteuses, pseudonymiser, tirer 10 à 20 textes par sous-motif pour l'entraînement et un lot de test postérieur en date."
+  },
+  "duree_estimee_minutes": 120,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "Qwen/Qwen2.5-0.5B-Instruct": {
+    "id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "sha": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 494032768,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   },
+   "HuggingFaceTB/SmolLM2-135M-Instruct": {
+    "id": "HuggingFaceTB/SmolLM2-135M-Instruct",
+    "sha": "12fd25f77366fa6b3b4b768ec3050bf629380bac",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 134515008,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "label": "Value",
+    "utterance": "Value"
+   },
+   "exemple": {
+    "label": 0,
+    "utterance": "S'il vous plaît, aidez-moi avec ma carte.  Il ne s'activera pas."
+   },
+   "lignes": {
+    "train": 10003,
+    "test": 3080
+   }
+  },
+  "paquets": {
+   "peft": {
+    "paquet": "peft",
+    "derniere_version": "0.21.3",
+    "licence": "Apache",
+    "auteur": "The HuggingFace team",
+    "source": "https://github.com/huggingface/peft"
+   }
+  }
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
