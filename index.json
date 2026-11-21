@@ -2,6 +2,93 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-21",
+   "sujet_id": "glide-decision-model-distille-raisonnement",
+   "depot": "20261121_typed_decision_camembert_hierarchical_intents",
+   "titre": "Un modèle de décision typé sans entraînement (GLiDE) rivalise-t-il avec un encodeur CamemBERT fine-tuné sur une taxonomie française à deux niveaux ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné (plancher TF-IDF + régression logistique))",
+    "raison": "approches ou métriques différentes de celles de l'échelle réduite"
+   },
+   "iterations": 3,
+   "metrique_principale": "intent_accuracy",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "TF-IDF + régression logistique",
+     "role": "reference",
+     "valeur": 0.6933333333333334,
+     "ic95": [
+      0.62,
+      0.7666666666666667
+     ]
+    },
+    {
+     "nom": "CamemBERT-base (5 ex./classe)",
+     "role": "reference",
+     "valeur": 0.06,
+     "ic95": [
+      0.02666666666666667,
+      0.1
+     ]
+    },
+    {
+     "nom": "GLiDE hiérarchique (sans entraînement)",
+     "role": "nouvelle",
+     "valeur": 0.7066666666666667,
+     "ic95": [
+      0.6333333333333333,
+      0.7733333333333333
+     ]
+    }
+   ],
+   "n_exemples": 150,
+   "jeu": "SetFit/amazon_massive_intent_fr-FR",
+   "synthese": "intent_accuracy : GLiDE hiérarchique (sans entraînement) 0,707 contre 0,06 pour CamemBERT-base (5 ex./classe) (150 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (substitut GLiDE-0.8B, 150 exemples de test, 5 exemples par classe pour CamemBERT), GLiDE hiérarchique atteint 70,7 % de justesse (IC 63–77 %), statistiquement indiscernable de TF-IDF + régression logistique entraîné sur 2 701 exemples (69,3 %). Il fait moins bien que TF-IDF au niveau scénario (74,7 % contre 78,7 %). CamemBERT à 5 exemples (6 %) n'a pas appris, donc l'hypothèse face à CamemBERT n'est pas testable ici. L'ECE de GLiDE (6,6 %, IC environ 5–14 %) ne permet pas de trancher les seuils, et la latence de 2 s sur CPU n'est pas transposable : ces chiffres ne permettent pas de conclure.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Les chiffres ne permettent pas de trancher : la référence CamemBERT à faible budget n'a pas appris et l'échantillon est trop petit. Seul constat solide : le substitut sans entraînement égale un TF-IDF entraîné.",
+   "libelle_metrique": "Justesse au sous-niveau (intention)",
+   "reserves": [
+    "La référence CamemBERT à 5 exemples par classe est probablement sous-entraînée : l'avantage de GLiDE sur elle est surestimé et ne dit rien du vrai rapport entre un décideur sans entraînement et un encodeur ajusté.",
+    "Face à un simple TF-IDF entraîné sur toutes les étiquettes, GLiDE-0.8B est à égalité statistique : il n'y a aucun gain mesuré à ne pas entraîner, seulement l'absence de perte.",
+    "Les chiffres de calibration et de couverture sont indicatifs : l'incertitude est de l'ordre de 10 points, donc ni la calibration annoncée ni la part automatisable ne sont établies."
+   ],
+   "duree_minutes": 88.0,
+   "consommation": {
+    "claude:poc_code:glide-decision-model-distille-raisonnement": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1759.0,
+     "cout_equivalent_usd": 4.5936,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:glide-decision-model-distille-raisonnement": {
+     "appels": 4,
+     "echecs": 0,
+     "secondes": 1497.9,
+     "cout_equivalent_usd": 6.5119,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:glide-decision-model-distille-raisonnement": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 111.4,
+     "cout_equivalent_usd": 0.6423,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261121_typed_decision_camembert_hierarchical_intents",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-19",
    "sujet_id": "rl-nemotron-3-5-super-lora-qwen38",
    "depot": "20261119_grpo_vs_sft_lora_intent_classification",
