@@ -1,0 +1,62 @@
+{
+ "version": 1,
+ "jour": "2026-11-21",
+ "sujet_id": "glide-decision-model-distille-raisonnement",
+ "depot": "20261121_typed_decision_camembert_hierarchical_intents",
+ "titre": "Un modèle de décision typé sans entraînement (GLiDE) rivalise-t-il avec un encodeur CamemBERT fine-tuné sur une taxonomie française à deux niveaux ?",
+ "debut": "2026-11-21T02:08:18Z",
+ "maj": "2026-11-21T02:08:18Z",
+ "statut": "en_cours",
+ "etape": "ecriture",
+ "detail": "le modèle écrit le notebook : protocole, deux approches, évaluation",
+ "iteration": 0,
+ "iterations_max": 3,
+ "sous_progression": null,
+ "etapes": [
+  {
+   "code": "ecriture",
+   "libelle": "Écriture du notebook",
+   "statut": "en_cours",
+   "debut": "2026-11-21T02:08:18Z",
+   "fin": null
+  },
+  {
+   "code": "essai",
+   "libelle": "Exécution à échelle réduite",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue_prealable",
+   "libelle": "Relecture avant l'échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "complete",
+   "libelle": "Échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue",
+   "libelle": "Revue de méthode",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "publication",
+   "libelle": "Publication",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  }
+ ],
+ "progression": 0.0,
+ "estimation_fin": "2026-11-21T03:43:18Z",
+ "resultat": null
+}
