@@ -5,10 +5,10 @@
  "depot": "20261121_typed_decision_camembert_hierarchical_intents",
  "titre": "Un modèle de décision typé sans entraînement (GLiDE) rivalise-t-il avec un encodeur CamemBERT fine-tuné sur une taxonomie française à deux niveaux ?",
  "debut": "2026-11-21T02:08:18Z",
- "maj": "2026-11-21T03:35:07Z",
+ "maj": "2026-11-21T03:36:13Z",
  "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "etape": "publication",
+ "detail": "dépôt public créé seulement si l'expérience est validée",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,19 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-21T03:35:07Z",
-   "fin": null
+   "fin": "2026-11-21T03:36:13Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-21T03:36:13Z",
    "fin": null
   }
  ],
- "progression": 0.98,
- "estimation_fin": "2026-11-21T03:38:07Z",
+ "progression": 0.986,
+ "estimation_fin": "2026-11-21T03:38:13Z",
  "resultat": null
 }
