@@ -5,10 +5,10 @@
  "depot": "20261121_typed_decision_camembert_hierarchical_intents",
  "titre": "Un modèle de décision typé sans entraînement (GLiDE) rivalise-t-il avec un encodeur CamemBERT fine-tuné sur une taxonomie française à deux niveaux ?",
  "debut": "2026-11-21T02:08:18Z",
- "maj": "2026-11-21T03:36:13Z",
- "statut": "en_cours",
+ "maj": "2026-11-21T03:36:21Z",
+ "statut": "valide",
  "etape": "publication",
- "detail": "dépôt public créé seulement si l'expérience est validée",
+ "detail": "",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -51,12 +51,56 @@
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-21T03:36:13Z",
-   "fin": null
+   "fin": "2026-11-21T03:36:21Z"
   }
  ],
- "progression": 0.986,
- "estimation_fin": "2026-11-21T03:38:13Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261121_typed_decision_camembert_hierarchical_intents",
+  "depot": "20261121_typed_decision_camembert_hierarchical_intents",
+  "en_bref": "Les chiffres ne permettent pas de trancher : la référence CamemBERT à faible budget n'a pas appris et l'échantillon est trop petit. Seul constat solide : le substitut sans entraînement égale un TF-IDF entraîné.",
+  "synthese": "intent_accuracy : GLiDE hiérarchique (sans entraînement) 0,707 contre 0,06 pour CamemBERT-base (5 ex./classe) (150 exemples, échelle réduite, CPU du sandbox).",
+  "metrique_principale": "intent_accuracy",
+  "libelle_metrique": "Justesse au sous-niveau (intention)",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "TF-IDF + régression logistique",
+    "role": "reference",
+    "valeur": 0.6933333333333334,
+    "ic95": [
+     0.62,
+     0.7666666666666667
+    ]
+   },
+   {
+    "nom": "CamemBERT-base (5 ex./classe)",
+    "role": "reference",
+    "valeur": 0.06,
+    "ic95": [
+     0.02666666666666667,
+     0.1
+    ]
+   },
+   {
+    "nom": "GLiDE hiérarchique (sans entraînement)",
+    "role": "nouvelle",
+    "valeur": 0.7066666666666667,
+    "ic95": [
+     0.6333333333333333,
+     0.7733333333333333
+    ]
+   }
+  ],
+  "n_exemples": 150,
+  "jeu": "SetFit/amazon_massive_intent_fr-FR",
+  "materiel": "CPU du sandbox",
+  "echelle": "reduite",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
