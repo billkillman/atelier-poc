@@ -1,0 +1,427 @@
+{
+ "version": 1,
+ "jour": "2026-11-21",
+ "sujet_id": "glide-decision-model-distille-raisonnement",
+ "depot": "20261121_typed_decision_camembert_hierarchical_intents",
+ "fiche": {
+  "sujet_id": "glide-decision-model-distille-raisonnement",
+  "titre": "GLiDE : un modèle de décision à poids ouverts et calibré mène les classements, mais sans français testé ni licence libre",
+  "en_une_phrase": "Fastino publie GLiDE (0,4 à 27 Md), qui choisit parmi au plus 255 options en un passage, avec des probabilités fiables. Il est 1er d'un classement à tests cachés, mais le français n'est pas évalué et la licence restreint la production.",
+  "probleme": "Les LLM servent de plus en plus à **décider** : router une demande, classer un texte, choisir un outil. Générer la réponse mot à mot est lent. Le texte produit doit ensuite être analysé, et il ne donne pas de probabilité fiable par option. Faire raisonner le modèle avant de répondre améliore la justesse, mais multiplie le coût. Les *modèles de décision* (Jev de TypeSafe AI, Decider de Perplexity) notent directement les options en un seul calcul. Reste une question : peut-on y garder le bénéfice du raisonnement sans payer sa génération à chaque requête ?",
+  "comment_ca_marche": "Un *modèle de décision* ne rédige rien. Il reçoit un contexte, une question et une liste d'options, et rend une probabilité par option.\n\n1. **Entrée.** Le contexte, la question et les options sont mis bout à bout. Chaque option reçoit un code d'un seul jeton (A, B, …, puis des codes de deux lettres). La séquence se termine par « Answer: ( ».\n2. **Base.** Le point de départ est Qwen3.8-27B, un LLM *hybride*. Il compte 16 couches d'attention, où chaque mot consulte les autres. Il compte aussi 48 couches *Gated DeltaNet* : elles lisent de gauche à droite en tenant un résumé courant, pour un coût linéaire.\n3. **Lecture dans les deux sens.** Les auteurs retirent des 16 couches d'attention le *masque causal*, la règle qui empêche un mot de voir les suivants (elle ne sert qu'à écrire). Le contexte est alors lu en connaissant la question, et les options se comparent entre elles. En contrepartie, le modèle ne peut plus générer de texte.\n4. **Sortie.** Le vecteur de la dernière position est converti en 255 scores, un par code. On garde les scores des options proposées et on les transforme en probabilités. Le tout tient en un seul passage.\n5. **Distillation du raisonnement.** Un « professeur », le même Qwen adapté par LoRA (une méthode d'ajustement léger), raisonne par écrit sur environ 135 000 questions. On enregistre ses probabilités *après réflexion*. L'élève apprend à les reproduire directement, ce qu'on appelle *distillation douce* : 30 % du signal vient de la bonne réponse, 70 % de la distribution du professeur. Si le professeur est déjà sûr à 80 % sans réfléchir, on garde sa réponse directe.\n6. **Finitions.** Les cibles combinent plusieurs professeurs, pondérés selon le type de tâche. Une option « je ne sais pas » est ajoutée. Les poids finaux sont la moyenne de deux entraînements.\n\n**Ce qui est nouveau** : le raisonnement est payé une seule fois, à l'entraînement. La calibration vient de l'entraînement lui-même, sans correction après coup. GLiDE 27B repasse en plus deux blocs de couches centrales deux fois, sans nouveaux poids : c'est la *profondeur récurrente*, qui fait passer la latence de 92,9 à 122 ms. Les petites tailles sont distillées du 27B.",
+  "demarche_experimentale": "L'évaluation principale se fait sur le **Hugging Face Decision Index** (édition 0.4.1 du 22 octobre 2026, 225 modèles). Son classement repose uniquement sur deux jeux de test cachés, notés par ses mainteneurs :\n- des questions inédites issues de familles de tâches connues (60 % du score « Full ») ;\n- des domaines absents des benchmarks publics (40 %).\n\nRègles imposées : aucun raisonnement intermédiaire, et moins d'une seconde par décision sur un GPU RTX PRO 6000.\n\nÉvaluations complémentaires : trois versions de l'Artificial Analysis Decision Index (connaissance, raisonnement, outils, sécurité ; données en partie privées), JevBench, SciFact, un jeu clinique et une suite interne.\n\nMétriques : score Full (plus haut = mieux), ECE (calibration, plus bas = mieux), latence médiane. Les ablations portent sur 125 000 exemples avec une seule graine aléatoire. Le dédoublonnage entre entraînement et test (MinHash) a retiré 3 222 lignes.",
+  "resultats": [
+   {
+    "metrique": "Score Full, jeux cachés (plus haut = mieux)",
+    "valeur": "71,52 (1er sur 225)",
+    "comparaison": "Jeffan-31B 69,75 ; Jev 1.14 60,24",
+    "conditions": "HF Decision Index 0.4.1, GLiDE V1.2 27B",
+    "citation": "GLiDE V1.2 achieves a Full score of 71.52, ranking first of 225 models, 1.77 points ahead of Jeffan-31B; this margin is about twice the board’s 0.9-point tie margin"
+   },
+   {
+    "metrique": "ECE, écart confiance/justesse (plus bas = mieux)",
+    "valeur": "2,0 %",
+    "comparaison": "Jeffan-31B 4,7 % ; Jev 1.14 8,0 %",
+    "conditions": "Échantillon du classement, 10 classes de confiance, sans recalibrage",
+    "citation": "GLiDE V1.2 has an expected calibration error of 2.0% (10 bins on the board’s sample; interval about [1.7, 2.4]), the lowest among the ten highest-ranked models (Table 7)."
+   },
+   {
+    "metrique": "Justesse des réponses à confiance ≥ 0,9",
+    "valeur": "97,4 % sur 56 % des réponses",
+    "comparaison": "81,5 % si toutes les réponses sont acceptées",
+    "conditions": "GLiDE V1.2, échantillon de calibration du classement",
+    "citation": "Accepting only answers with a confidence of at least 0.8 keeps 68% of them, and 95.0% of those are correct. At 0.9, 56% are kept and 97.4% are correct."
+   },
+   {
+    "metrique": "Latence médiane",
+    "valeur": "92,9 ms",
+    "comparaison": "1,3× plus rapide que Jeffan-31B, 2,4× que mammoth-1",
+    "conditions": "Un GPU RTX PRO 6000",
+    "citation": "GLiDE V1.2 has a median latency of 92.9 ms on a single RTX PRO 6000 GPU, 1.3× faster than Jeffan-31B, 2.4× faster than mammoth-1"
+   },
+   {
+    "metrique": "Effet de l'entraînement, à architecture égale",
+    "valeur": "+4,92 points",
+    "comparaison": "Drex Max : même base Qwen, mêmes modifications, 66,60",
+    "conditions": "HF Decision Index 0.4.1",
+    "citation": "Drex Max starts from the same Qwen3.8-27B base and makes the same two architectural changes: non-causal attention and a 255-way readout. It scores 66.60 on this board, 4.92 points below GLiDE V1.2."
+   },
+   {
+    "metrique": "Score Full des petites tailles",
+    "valeur": "9B : 62,48 ; 2B : 43,72 ; 0.4B : 33,84",
+    "comparaison": "En tête de leur taille, avec 3,2 à 10,9 points d'avance",
+    "conditions": "Classement du 12 novembre 2026, 300 modèles ; 18 à 122 ms",
+    "citation": "All five GLiDE models lie on the score--parameter Pareto frontier and exceed every evaluated alternative of equal or smaller size by 3.2 to 10.9 points. Median latency ranges from 18 to 122 ms."
+   }
+  ],
+  "limites": [
+   "**Licence** : la Fastino Community License impose un accord écrit séparé pour toute production commerciale d'une entité dont le chiffre d'affaires annuel dépasse 10 M USD, plus la mention « Built with Fastino GLiDE ». L'évaluation et les tests restent libres.",
+   "**Français non évalué** : ni l'article ni les fiches des modèles ne précisent les langues couvertes. Aucun test sur données internes réelles, et aucune comparaison avec un encodeur fine-tuné.",
+   "**255 options au plus** par question : 300 classes à plat sont impossibles, il faut passer par motif puis sous-motif. Chaque question coûte un passage, et les petites tailles sont bien plus faibles (0.4B : 33,84).",
+   "**Preuves à nuancer** : des classements créés il y a quelques semaines et révisés depuis. Les auteurs eux-mêmes jugent leurs ablations « indicatives », car les écarts restent dans la variabilité d'une seule graine. Article de l'éditeur."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "2,0 %",
+    "libelle": "Erreur de calibration (ECE), la plus basse du top 10 du classement"
+   },
+   {
+    "valeur": "97,4 %",
+    "libelle": "Réponses justes parmi les 56 % données avec une confiance ≥ 0,9"
+   },
+   {
+    "valeur": "255",
+    "libelle": "Nombre maximal d'options par question, donc pas 300 classes à plat"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "GLiDE V1.2 (27B) est premier sur 225 modèles du Hugging Face Decision Index 0.4.1, avec 1,77 point d'avance.",
+    "citation": "GLiDE V1.2 achieves a Full score of 71.52, ranking first of 225 models, 1.77 points ahead of Jeffan-31B; this margin is about twice the board’s 0.9-point tie margin"
+   },
+   {
+    "affirmation": "Une question peut comporter au plus 255 options.",
+    "citation": "There are 255 rows because we use 255 single-token codes: the 26 letters, then two-letter codes. A question can therefore have at most 255 options."
+   },
+   {
+    "affirmation": "La calibration résulte de l'entraînement, sans correction appliquée après coup.",
+    "citation": "We apply no correction after training, such as a fitted temperature. The probabilities are the plain softmax of the readout, so the calibration is a result of training and not of a later fix."
+   },
+   {
+    "affirmation": "Les auteurs n'ont jamais eu accès aux questions cachées des classements.",
+    "citation": "We have never had access to the hidden questions, their answers, or per-question results of either benchmark; we see only the aggregate scores published by their maintainers."
+   },
+   {
+    "affirmation": "Les poids des cinq tailles sont publiés.",
+    "citation": "The public weights for all five models are available online."
+   },
+   {
+    "affirmation": "La production commerciale par une entité dont le chiffre d'affaires dépasse 10 M USD requiert un accord séparé avec Fastino.",
+    "citation": "used in Production for any Commercial Use by an entity whose Annual Revenue exceeds 10,000,000 US dollars"
+   },
+   {
+    "affirmation": "Les auteurs jugent leurs ablations indicatives et non concluantes.",
+    "citation": "All three measures move in the same direction, but each step is within single-seed variability, so we treat these results as indicative rather than conclusive."
+   },
+   {
+    "affirmation": "À base et architecture identiques, Drex Max obtient 4,92 points de moins : l'écart vient de l'entraînement.",
+    "citation": "Drex Max starts from the same Qwen3.8-27B base and makes the same two architectural changes: non-causal attention and a 255-way readout. It scores 66.60 on this board, 4.92 points below GLiDE V1.2."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision",
+    "definition": "Modèle qui ne génère pas de texte : il reçoit une question et des options, et rend directement une probabilité pour chaque option."
+   },
+   {
+    "terme": "Masque causal",
+    "definition": "Règle qui empêche chaque mot de voir les mots suivants. Indispensable pour générer du texte, inutile quand toute la requête est connue d'avance."
+   },
+   {
+    "terme": "Gated DeltaNet",
+    "definition": "Type de couche récurrente qui lit le texte de gauche à droite en tenant un résumé courant. Son coût croît linéairement avec la longueur."
+   },
+   {
+    "terme": "Distillation douce",
+    "definition": "Entraîner un modèle élève à reproduire toute la distribution de probabilités d'un professeur, pas seulement sa réponse finale. L'élève apprend ainsi aussi son degré de certitude."
+   },
+   {
+    "terme": "ECE",
+    "definition": "Expected Calibration Error : écart moyen entre la confiance annoncée et la justesse observée. Plus bas = mieux ; 0 signifie que 90 % de confiance donne 90 % de réponses justes."
+   },
+   {
+    "terme": "LoRA",
+    "definition": "Méthode de fine-tuning léger : on entraîne de petites matrices ajoutées au modèle, sans modifier ses poids d'origine."
+   },
+   {
+    "terme": "Profondeur récurrente",
+    "definition": "Repasser certaines couches plusieurs fois à l'inférence pour calculer davantage, sans ajouter de paramètres ni générer de texte."
+   },
+   {
+    "terme": "Frontière de Pareto",
+    "definition": "Ici, l'ensemble des modèles qu'aucun modèle plus petit ne dépasse en score."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "GLiDE: A Fast, Calibrated Decision Model Distilled from Reasoning Teachers (arXiv 2611.26509)",
+    "url": "https://arxiv.org/abs/2611.26509",
+    "type": "primaire",
+    "date": "2026-11-19"
+   },
+   {
+    "titre": "Fastino sur Hugging Face : collection des modèles GLiDE",
+    "url": "https://huggingface.co/fastino",
+    "type": "primaire",
+    "date": ""
+   },
+   {
+    "titre": "Fiche du modèle GLiDE-27B",
+    "url": "https://huggingface.co/fastino/GLiDE-27B",
+    "type": "primaire",
+    "date": ""
+   },
+   {
+    "titre": "Fastino Community License (GLiDE-27B)",
+    "url": "https://huggingface.co/fastino/GLiDE-27B/blob/main/LICENSE",
+    "type": "primaire",
+    "date": ""
+   },
+   {
+    "titre": "Fiche du modèle GLiDE-0.4B",
+    "url": "https://huggingface.co/fastino/GLiDE-0.4B",
+    "type": "primaire",
+    "date": ""
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-19",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un modèle de décision typé sans entraînement (GLiDE) rivalise-t-il avec un encodeur CamemBERT fine-tuné sur une taxonomie française à deux niveaux ?",
+  "hypothese": "GLiDE (2B, classes décrites en clair, enchaînement parent puis enfant) atteint une justesse au sous-niveau à moins de 2 points de CamemBERT-base fine-tuné sur toutes les étiquettes, avec une ECE sous 5 % sans recalibrage, et surpasse CamemBERT à 5 exemples étiquetés par classe. Infirmé si l'écart dépasse 5 points ou si l'ECE dépasse 10 %.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné (plancher TF-IDF + régression logistique)",
+   "description": "Classifieur CamemBERT-base fine-tuné à plat sur les intentions, avec tête de classification et softmax ; un TF-IDF + régression logistique sert de plancher. Le parent est déduit de l'intention prédite.",
+   "implementation": "transformers AutoModelForSequenceClassification (almanach/camembert-base), AdamW, lr 3e-5, 4 époques, longueur max 64, entraîné pour chaque budget de 5, 20 et toutes les étiquettes par classe ; validation tirée du train ; température ajustée sur validation pour l'ECE après recalibrage ; TF-IDF (1-2 grammes) + LogisticRegression scikit-learn.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "GLiDE, décideur typé sans entraînement",
+   "description": "Modèle de décision à poids ouverts qui renvoie une probabilité par option en une passe, sans générer de texte ; les classes sont décrites en clair dans la requête. Deux modes : à plat (toutes les intentions) et hiérarchique (scénario puis intention parmi les enfants du scénario choisi).",
+   "implementation": "Pas de paquet PyPI : télécharger le dépôt du modèle avec huggingface_hub.snapshot_download (fastino/GLiDE-2B), installer son requirements.txt avec pip, ajouter le dossier au PYTHONPATH et utiliser glide.Glide.from_pretrained(dossier).decide / decide_batch avec des questions de type « choice » dont les critères sont les libellés de classes (nom d'intention rendu lisible). Aucun entraînement ; probabilités brutes, sans recalibrage ; la même température que pour la référence est ajustée à part pour le rapport. Latence mesurée par exemple.",
+   "modeles_hf": [
+    "fastino/GLiDE-0.4B",
+    "fastino/GLiDE-2B"
+   ],
+   "modeles_hf_sandbox": [
+    "fastino/GLiDE-0.8B"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "SetFit/amazon_massive_intent_fr-FR",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "text, label, label_text (préfixe = scénario, suffixe = intention) ; validation tirée de train pour les réglages",
+   "representativite": "Seul banc français chargeable avec un vrai arbre à deux niveaux (18 scénarios → 60 intentions), splits propres, noms de classes en clair, classes proches : permet de mesurer justesse, cohérence parent/enfant, calibration, couverture à seuil et courbe selon le nombre d'étiquettes par classe.",
+   "ecarts_donnees_reelles": "Énoncés courts d'assistant domestique et non messages ou e-mails de services financiers ; 60 classes au lieu de ~300 ; texte traduit ; pas de pièces jointes ; classes plus disjointes ; français de GLiDE non documenté ; licence du miroir non vérifiée (original CC BY 4.0).",
+   "jeux_explores": [
+    {
+     "nom": "SetFit/amazon_massive_intent_fr-FR",
+     "url": "https://huggingface.co/datasets/SetFit/amazon_massive_intent_fr-FR",
+     "acces": "hub_libre",
+     "adequation": "MASSIVE fr, 60 intentions « scénario_intention », colonnes text/label/label_text, train/validation/test.",
+     "decision": "retenu",
+     "raison": "Arbre à deux niveaux explicite et noms de classes dans le jeu, sans jointure à vérifier."
+    },
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "Même contenu, apache-2.0, config fr.",
+     "decision": "ecarte",
+     "raison": "Équivalent ; colonnes moins bien vérifiées côté Hub, la variante SetFit est lue directement."
+    },
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "77 intentions internes proches, 10 003/3 080, domaine plus proche.",
+     "decision": "ecarte",
+     "raison": "Pas d'arbre et étiquettes entières sans noms (alignement avec mteb/banking77 à vérifier) ; licence non précisée."
+    },
+    {
+     "nom": "DeepPavlov/clinc150_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/clinc150_fr",
+     "acces": "hub_libre",
+     "adequation": "150 classes en français, 15 200/3 100/5 500.",
+     "decision": "ecarte",
+     "raison": "Étiquettes entières sans noms ni domaines dans le dépôt, impossible de décrire les classes en clair."
+    },
+    {
+     "nom": "DeepPavlov/hwu64_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/hwu64_fr",
+     "acces": "hub_libre",
+     "adequation": "64 intentions en domaines, test de 1 076.",
+     "decision": "ecarte",
+     "raison": "Domaines et noms absents, test trop petit pour l'ECE."
+    },
+    {
+     "nom": "BEE-spoke-data/consumer-finance-complaints",
+     "url": "https://huggingface.co/datasets/BEE-spoke-data/consumer-finance-complaints",
+     "acces": "hub_libre",
+     "adequation": "Réclamations financières réelles, hiérarchie Issue → Sub-issue, CC0, anglais.",
+     "decision": "ecarte",
+     "raison": "Anglais : ne teste pas le français, plus de 255 sous-motifs possibles ; piste pour la suite."
+    },
+    {
+     "nom": "Benchmark d'intentions hiérarchique logistique (arXiv 2603.23172)",
+     "url": "https://arxiv.org/abs/2603.23172",
+     "acces": "sur_demande",
+     "adequation": "30 000 requêtes réelles, 13 parents / 17 feuilles.",
+     "decision": "ecarte",
+     "raison": "Emplacement du jeu introuvable, français non cité."
+    }
+   ]
+  },
+  "metriques": [
+   "intent_accuracy",
+   "intent_macro_f1",
+   "scenario_accuracy",
+   "hierarchical_consistency",
+   "expected_calibration_error",
+   "coverage_at_95_precision",
+   "latency_ms_per_example"
+  ],
+  "metrique_principale": "intent_accuracy",
+  "sens": "max",
+  "protocole": "Test = split test (2 974 exemples) ; validation tirée de train pour les réglages. Budgets d'étiquettes par classe pour la référence : 5, 20 et toutes ; GLiDE n'utilise aucune étiquette (libellés seuls). Modes GLiDE : à plat (60 options) et hiérarchique (scénario puis intention). Seuils de confiance balayés pour couverture à précision 95 %. Intervalles de confiance par bootstrap (1 000 tirages) et test apparié (McNemar) entre GLiDE et CamemBERT. Cohérence = part des prédictions dont le parent prédit est le parent de l'intention prédite (mode à plat). Classes rares rapportées à part (10 % les moins fréquentes). Réduit : 300 exemples de test, 1 budget de 5 étiquettes par classe, 1 époque.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Substitut GLiDE-0.8B à la place de GLiDE-2B (2B > 1 Md de paramètres sur CPU), CamemBERT-base inchangé (110 M), 300 exemples de test, une époque, un seul budget. Échelle complète : GLiDE-0.4B sur les 2 974 exemples (~1,2 M tokens, quelques minutes) ; GLiDE-2B sur 500 exemples de test tirés au hasard, deux passes (scénario ~250 tokens, intention ~300) soit ~0,3 M tokens ÷ 700 tokens/s ≈ 8 min, plus le mode à plat 500×~450 ≈ 0,23 M ≈ 5 min ; CamemBERT : 3 entraînements courts de ~3 min sur T4 ; total ≈ 35 min sous 45 min. Limite dite : 2B évalué sur 500 exemples, intervalles plus larges ; les modèles 9B et 27B (>4 Md) ne sont pas testés.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte du message ou e-mail anonymisé (corps, éventuellement texte de pièce jointe extrait)"
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif (niveau 1) validé par un annotateur"
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif (niveau 2) validé"
+    },
+    {
+     "colonne": "sub_reason_description",
+     "type": "string",
+     "description": "Description en clair du sous-motif (taxonomie)"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception pour le découpage temporel"
+    }
+   ],
+   "volume_conseille": "Au moins 2 000 textes étiquetés de test et 50 par sous-motif pour l'entraînement, taxonomie complète (~300 sous-motifs).",
+   "metriques_metier": "Part du flux automatisable à précision ≥ 95 % au sous-motif, taux d'erreur de routage, coût et latence par message, stabilité à l'ajout d'un sous-motif.",
+   "garde_fous": "Pas de données personnelles non anonymisées ; modèle exécuté en local ; licence de GLiDE : évaluation seulement, production commerciale à contractualiser ; aucune décision automatique sans seuil validé par le métier.",
+   "prescriptions": [
+    "Au moins 2 000 textes de test étiquetés par des annotateurs experts, couvrant tous les sous-motifs avec au moins 10 textes chacun.",
+    "Au moins 50 textes d'entraînement par sous-motif pour la référence, 5 et 20 pour la courbe.",
+    "Accord inter-annotateurs mesuré sur un échantillon d'au moins 300 textes (kappa), étiquettes litigieuses arbitrées.",
+    "Libellé et description clairs pour chaque motif et sous-motif, au plus 255 options par question (passage par le motif).",
+    "Découpage temporel : entraînement sur les périodes anciennes, test sur les plus récentes ; pas de doublons ni de fils de discussion répartis entre splits.",
+    "Période d'au moins 6 mois pour refléter la saisonnalité et les classes rares.",
+    "Anonymisation des noms, IBAN, numéros de carte avant extraction ; exclure les textes de moins de 3 mots.",
+    "Distribution naturelle conservée dans le test (pas de rééquilibrage) pour l'ECE."
+   ],
+   "preparation": "Extraire les e-mails et messages déjà routés et revus par un conseiller sur 6 à 12 mois, joindre le motif et le sous-motif validés, retirer les doublons et les textes vides, extraire le texte des pièces jointes si pertinent, puis échantillonner de façon stratifiée pour garantir un minimum par classe tout en gardant un jeu de test à distribution naturelle."
+  },
+  "duree_estimee_minutes": 40,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "fastino/GLiDE-0.4B": {
+    "id": "fastino/GLiDE-0.4B",
+    "sha": "16fb9d63cc34d1b4b5a1fb7cbf2d9d4a3dd5ad71",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 394781696,
+    "licence": "other",
+    "code_distant": false,
+    "langues": []
+   },
+   "fastino/GLiDE-2B": {
+    "id": "fastino/GLiDE-2B",
+    "sha": "742ba093a930f229c0e01622aa1c421dc9e2b70b",
+    "tache": "image-text-to-text",
+    "bibliotheque": "transformers",
+    "parametres": 1881825088,
+    "licence": "other",
+    "code_distant": false,
+    "langues": []
+   },
+   "fastino/GLiDE-0.8B": {
+    "id": "fastino/GLiDE-0.8B",
+    "sha": "34f575d63c5c8fdc608e59cd8bcc649064904835",
+    "tache": "image-text-to-text",
+    "bibliotheque": "transformers",
+    "parametres": 752393024,
+    "licence": "other",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "SetFit/amazon_massive_intent_fr-FR",
+   "config": "default",
+   "splits": [
+    "train",
+    "validation",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "id": "Value",
+    "label": "Value",
+    "text": "Value",
+    "label_text": "Value"
+   },
+   "exemple": {
+    "id": "1",
+    "label": 48,
+    "text": "réveille-moi à neuf heures du matin le vendredi",
+    "label_text": "alarm_set"
+   },
+   "lignes": {
+    "train": 11514,
+    "validation": 2033,
+    "test": 2974
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
