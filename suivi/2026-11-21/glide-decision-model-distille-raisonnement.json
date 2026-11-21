@@ -5,26 +5,26 @@
  "depot": "20261121_typed_decision_camembert_hierarchical_intents",
  "titre": "Un modèle de décision typé sans entraînement (GLiDE) rivalise-t-il avec un encodeur CamemBERT fine-tuné sur une taxonomie française à deux niveaux ?",
  "debut": "2026-11-21T02:08:18Z",
- "maj": "2026-11-21T02:08:18Z",
+ "maj": "2026-11-21T02:37:37Z",
  "statut": "en_cours",
- "etape": "ecriture",
- "detail": "le modèle écrit le notebook : protocole, deux approches, évaluation",
- "iteration": 0,
+ "etape": "essai",
+ "detail": "itération 1 sur 3",
+ "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
  "etapes": [
   {
    "code": "ecriture",
    "libelle": "Écriture du notebook",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-21T02:08:18Z",
-   "fin": null
+   "fin": "2026-11-21T02:37:37Z"
   },
   {
    "code": "essai",
    "libelle": "Exécution à échelle réduite",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-21T02:37:37Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.0,
- "estimation_fin": "2026-11-21T03:43:18Z",
+ "progression": 0.263,
+ "estimation_fin": "2026-11-21T03:47:37Z",
  "resultat": null
 }
