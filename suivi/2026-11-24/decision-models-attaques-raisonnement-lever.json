@@ -5,10 +5,10 @@
  "depot": "20261124_typed_decision_misleading_comment_robustness",
  "titre": "Un décideur typé à passe unique, un décideur avec raisonnement bref et un encodeur fine-tuné résistent-ils à un commentaire externe trompeur sur 77 intentions en français ?",
  "debut": "2026-11-24T02:15:48Z",
- "maj": "2026-11-24T03:50:37Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-24T03:52:34Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,63 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-24T03:50:37Z",
-   "fin": null
+   "fin": "2026-11-24T03:52:26Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-24T03:52:26Z",
+   "fin": "2026-11-24T03:52:34Z"
   }
  ],
- "progression": 0.99,
- "estimation_fin": "2026-11-24T03:53:37Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261124_typed_decision_misleading_comment_robustness",
+  "depot": "20261124_typed_decision_misleading_comment_robustness",
+  "en_bref": "Le décideur à passe unique suit massivement une note trompeuse, et le raisonnement bref de ce petit modèle n'y change rien. L'encodeur bascule moins mais est sous-entraîné, et une simple similarité ignorant la note fait mieux que tous.",
+  "synthese": "accuracy_under_attack : Décideur à menu – raisonnement bref 0,179 contre 0,51 pour CamemBERT-base fine-tuné (400 exemples, GPU T4 (Google Colab)).",
+  "metrique_principale": "accuracy_under_attack",
+  "libelle_metrique": "Exactitude sous attaque",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "CamemBERT-base fine-tuné",
+    "role": "reference",
+    "valeur": 0.51,
+    "ic95": [
+     0.46,
+     0.55625
+    ]
+   },
+   {
+    "nom": "Décideur à menu – passe unique",
+    "role": "nouvelle",
+    "valeur": 0.16875,
+    "ic95": [
+     0.13875,
+     0.20125
+    ]
+   },
+   {
+    "nom": "Décideur à menu – raisonnement bref",
+    "role": "nouvelle",
+    "valeur": 0.17875,
+    "ic95": [
+     0.1475,
+     0.20875
+    ]
+   }
+  ],
+  "n_exemples": 400,
+  "jeu": "DeepPavlov/banking77_fr",
+  "materiel": "GPU T4 (Google Colab)",
+  "echelle": "complete",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
