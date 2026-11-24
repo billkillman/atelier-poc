@@ -5,10 +5,10 @@
  "depot": "20261124_rlvr_lora_rank_intent_classification",
  "titre": "En RL à récompense vérifiable, le rang du LoRA (et DoRA) change-t-il le résultat par rapport à un fine-tuning supervisé de même coût, sur une classification à 77 intentions en français ?",
  "debut": "2026-11-24T04:51:56Z",
- "maj": "2026-11-24T05:41:03Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-24T05:42:00Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,81 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-24T05:41:03Z",
-   "fin": null
+   "fin": "2026-11-24T05:41:53Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-24T05:41:53Z",
+   "fin": "2026-11-24T05:42:00Z"
   }
  ],
- "progression": 0.99,
- "estimation_fin": "2026-11-24T05:44:03Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261124_rlvr_lora_rank_intent_classification",
+  "depot": "20261124_rlvr_lora_rank_intent_classification",
+  "en_bref": "Le GRPO n'a reçu aucun signal de récompense à cette échelle et n'a pas appris. La comparaison avec le SFT, le rang et DoRA n'est donc pas concluante, malgré le verdict automatique favorable au SFT.",
+  "synthese": "macro_f1 : GRPO DoRA r=16 0 contre 0,17 pour SFT LoRA r=16 (120 exemples, échelle réduite, CPU du sandbox).",
+  "metrique_principale": "macro_f1",
+  "libelle_metrique": "macro-F1 (test)",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "Modèle de départ (sans entraînement)",
+    "role": "reference",
+    "valeur": 0.0,
+    "ic95": [
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "nom": "SFT LoRA r=16",
+    "role": "reference",
+    "valeur": 0.16988497217068646,
+    "ic95": [
+     0.10733058135534916,
+     0.22464818565735997
+    ]
+   },
+   {
+    "nom": "GRPO LoRA r=4",
+    "role": "nouvelle",
+    "valeur": 0.0,
+    "ic95": [
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "nom": "GRPO LoRA r=16",
+    "role": "nouvelle",
+    "valeur": 0.0,
+    "ic95": [
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "nom": "GRPO DoRA r=16",
+    "role": "nouvelle",
+    "valeur": 0.0,
+    "ic95": [
+     0.0,
+     0.0
+    ]
+   }
+  ],
+  "n_exemples": 120,
+  "jeu": "DeepPavlov/banking77_fr",
+  "materiel": "CPU du sandbox",
+  "echelle": "reduite",
+  "confiance": "faible",
+  "tentatives": 1
+ }
 }
