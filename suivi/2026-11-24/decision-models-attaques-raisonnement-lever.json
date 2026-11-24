@@ -5,10 +5,10 @@
  "depot": "20261124_typed_decision_misleading_comment_robustness",
  "titre": "Un décideur typé à passe unique, un décideur avec raisonnement bref et un encodeur fine-tuné résistent-ils à un commentaire externe trompeur sur 77 intentions en français ?",
  "debut": "2026-11-24T02:15:48Z",
- "maj": "2026-11-24T03:34:41Z",
+ "maj": "2026-11-24T03:35:49Z",
  "statut": "en_cours",
- "etape": "revue_prealable",
- "detail": "relecture de la méthode sur l'échelle réduite",
+ "etape": "complete",
+ "detail": "sur GPU GPU T4 (Google Colab)",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -30,15 +30,15 @@
   {
    "code": "revue_prealable",
    "libelle": "Relecture avant l'échelle complète",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-24T03:34:41Z",
-   "fin": null
+   "fin": "2026-11-24T03:35:49Z"
   },
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-24T03:35:49Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.253,
- "estimation_fin": "2026-11-24T08:38:41Z",
+ "progression": 0.256,
+ "estimation_fin": "2026-11-24T08:38:49Z",
  "resultat": null
 }
