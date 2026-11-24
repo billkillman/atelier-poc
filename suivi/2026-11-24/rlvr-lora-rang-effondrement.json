@@ -1,0 +1,62 @@
+{
+ "version": 1,
+ "jour": "2026-11-24",
+ "sujet_id": "rlvr-lora-rang-effondrement",
+ "depot": "20261124_rlvr_lora_rank_intent_classification",
+ "titre": "En RL à récompense vérifiable, le rang du LoRA (et DoRA) change-t-il le résultat par rapport à un fine-tuning supervisé de même coût, sur une classification à 77 intentions en français ?",
+ "debut": "2026-11-24T04:51:56Z",
+ "maj": "2026-11-24T04:51:56Z",
+ "statut": "en_cours",
+ "etape": "ecriture",
+ "detail": "le modèle écrit le notebook : protocole, deux approches, évaluation",
+ "iteration": 0,
+ "iterations_max": 3,
+ "sous_progression": null,
+ "etapes": [
+  {
+   "code": "ecriture",
+   "libelle": "Écriture du notebook",
+   "statut": "en_cours",
+   "debut": "2026-11-24T04:51:56Z",
+   "fin": null
+  },
+  {
+   "code": "essai",
+   "libelle": "Exécution à échelle réduite",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue_prealable",
+   "libelle": "Relecture avant l'échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "complete",
+   "libelle": "Échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue",
+   "libelle": "Revue de méthode",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "publication",
+   "libelle": "Publication",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  }
+ ],
+ "progression": 0.0,
+ "estimation_fin": "2026-11-24T15:46:56Z",
+ "resultat": null
+}
