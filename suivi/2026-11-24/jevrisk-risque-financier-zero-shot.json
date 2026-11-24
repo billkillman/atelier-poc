@@ -5,10 +5,10 @@
  "depot": "20261124_zero_shot_llm_credit_risk_scoring",
  "titre": "Un petit LLM ouvert, interrogé en zéro-shot sur un dossier de risque calculé par code, égale-t-il un GBDT appris sur ~1 000 clients étiquetés (défaut de crédit) ?",
  "debut": "2026-11-24T03:56:28Z",
- "maj": "2026-11-24T04:47:07Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-24T04:48:10Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,90 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-24T04:47:07Z",
-   "fin": null
+   "fin": "2026-11-24T04:48:03Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-24T04:48:03Z",
+   "fin": "2026-11-24T04:48:10Z"
   }
  ],
- "progression": 0.99,
- "estimation_fin": "2026-11-24T04:50:07Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261124_zero_shot_llm_credit_risk_scoring",
+  "depot": "20261124_zero_shot_llm_credit_risk_scoring",
+  "en_bref": "Non concluant : le petit modèle de substitution ne lit pas le dossier et reste au niveau du hasard. L'expérience ne dit rien sur l'approche de la source, seulement que ce modèle est trop petit.",
+  "synthese": "auc : LLM zéro-shot (Qwen2.5-0.5B-Instruct) 0,522 contre 0,667 pour XGBoost, 20000 étiquettes (192 exemples, échelle réduite, CPU du sandbox).",
+  "metrique_principale": "auc",
+  "libelle_metrique": "AUC",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "Comptage d'indicateurs",
+    "role": "reference",
+    "valeur": 0.5273980034722222,
+    "ic95": [
+     0.4519262072707542,
+     0.6064372557533652
+    ]
+   },
+   {
+    "nom": "XGBoost, 100 étiquettes",
+    "role": "reference",
+    "valeur": 0.5428602430555556,
+    "ic95": [
+     0.4578260869565217,
+     0.6230059685295714
+    ]
+   },
+   {
+    "nom": "XGBoost, 300 étiquettes",
+    "role": "reference",
+    "valeur": 0.5843098958333334,
+    "ic95": [
+     0.5028757460661964,
+     0.6689655172413793
+    ]
+   },
+   {
+    "nom": "XGBoost, 1000 étiquettes",
+    "role": "reference",
+    "valeur": 0.5851779513888888,
+    "ic95": [
+     0.5065132435953105,
+     0.6691531373409391
+    ]
+   },
+   {
+    "nom": "XGBoost, 20000 étiquettes",
+    "role": "reference",
+    "valeur": 0.6667751736111112,
+    "ic95": [
+     0.5885052447552448,
+     0.7455236028214867
+    ]
+   },
+   {
+    "nom": "LLM zéro-shot (Qwen2.5-0.5B-Instruct)",
+    "role": "nouvelle",
+    "valeur": 0.5220269097222222,
+    "ic95": [
+     0.44123711340206184,
+     0.6012872259190575
+    ]
+   }
+  ],
+  "n_exemples": 192,
+  "jeu": "mohameddhameem/home-credit-default-risk",
+  "materiel": "CPU du sandbox",
+  "echelle": "reduite",
+  "confiance": "elevee",
+  "tentatives": 1
+ }
 }
