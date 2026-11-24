@@ -3,6 +3,119 @@
  "pocs": [
   {
    "jour": "2026-11-24",
+   "sujet_id": "jevrisk-risque-financier-zero-shot",
+   "depot": "20261124_zero_shot_llm_credit_risk_scoring",
+   "titre": "Un petit LLM ouvert, interrogé en zéro-shot sur un dossier de risque calculé par code, égale-t-il un GBDT appris sur ~1 000 clients étiquetés (défaut de crédit) ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "Qwen/Qwen2.5-3B-Instruct (3.1 Md de paramètres) trop gros pour le CPU du sandbox",
+    "raison": "approches ou métriques différentes de celles de l'échelle réduite"
+   },
+   "iterations": 1,
+   "metrique_principale": "auc",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "Comptage d'indicateurs",
+     "role": "reference",
+     "valeur": 0.5273980034722222,
+     "ic95": [
+      0.4519262072707542,
+      0.6064372557533652
+     ]
+    },
+    {
+     "nom": "XGBoost, 100 étiquettes",
+     "role": "reference",
+     "valeur": 0.5428602430555556,
+     "ic95": [
+      0.4578260869565217,
+      0.6230059685295714
+     ]
+    },
+    {
+     "nom": "XGBoost, 300 étiquettes",
+     "role": "reference",
+     "valeur": 0.5843098958333334,
+     "ic95": [
+      0.5028757460661964,
+      0.6689655172413793
+     ]
+    },
+    {
+     "nom": "XGBoost, 1000 étiquettes",
+     "role": "reference",
+     "valeur": 0.5851779513888888,
+     "ic95": [
+      0.5065132435953105,
+      0.6691531373409391
+     ]
+    },
+    {
+     "nom": "XGBoost, 20000 étiquettes",
+     "role": "reference",
+     "valeur": 0.6667751736111112,
+     "ic95": [
+      0.5885052447552448,
+      0.7455236028214867
+     ]
+    },
+    {
+     "nom": "LLM zéro-shot (Qwen2.5-0.5B-Instruct)",
+     "role": "nouvelle",
+     "valeur": 0.5220269097222222,
+     "ic95": [
+      0.44123711340206184,
+      0.6012872259190575
+     ]
+    }
+   ],
+   "n_exemples": 192,
+   "jeu": "mohameddhameem/home-credit-default-risk",
+   "synthese": "auc : LLM zéro-shot (Qwen2.5-0.5B-Instruct) 0,522 contre 0,667 pour XGBoost, 20000 étiquettes (192 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (modèle de 0,5 milliard de paramètres sur CPU, 192 clients de test, un seul tirage d'étiquettes par budget), le LLM zéro-shot obtient une AUC de 0,522 [0,441 ; 0,601], au niveau du hasard et du comptage d'indicateurs (0,527). Le contrôle positif échoue : le modèle ne distingue pas un dossier très risqué d'un dossier sain. XGBoost entraîné sur 20 000 étiquettes est le seul à se distinguer (0,667, écart apparié de +0,145). Ces chiffres ne permettent pas de trancher sur l'approche, ni de la comparer aux résultats de la source obtenus avec un modèle bien plus capable. La comparaison est construite équitablement (mêmes clients, mêmes variables, seuils tirés du développement). Elle n'a simplement pas la puissance pour conclure.",
+   "confiance": "elevee",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Non concluant : le petit modèle de substitution ne lit pas le dossier et reste au niveau du hasard. L'expérience ne dit rien sur l'approche de la source, seulement que ce modèle est trop petit.",
+   "libelle_metrique": "AUC",
+   "reserves": [
+    "Ce petit modèle répond presque toujours « oui », que le dossier soit sain ou très risqué. Son AUC proche du hasard ne dit rien sur ce que donnerait un modèle de décision plus gros.",
+    "Avec 192 clients et un seul tirage par budget, on ne peut pas dire combien d'étiquettes « vaut » le LLM. Les écarts entre approches sont dans la marge d'erreur, sauf pour le modèle supervisé entraîné sur toutes les étiquettes."
+   ],
+   "duree_minutes": 51.6,
+   "consommation": {
+    "claude:poc_code:jevrisk-risque-financier-zero-shot": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1542.4,
+     "cout_equivalent_usd": 4.2394,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:jevrisk-risque-financier-zero-shot": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 242.1,
+     "cout_equivalent_usd": 1.1696,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:jevrisk-risque-financier-zero-shot": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 88.7,
+     "cout_equivalent_usd": 0.5518,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261124_zero_shot_llm_credit_risk_scoring",
+   "tentatives": 1
+  },
+  {
+   "jour": "2026-11-24",
    "sujet_id": "decision-models-attaques-raisonnement-lever",
    "depot": "20261124_typed_decision_misleading_comment_robustness",
    "titre": "Un décideur typé à passe unique, un décideur avec raisonnement bref et un encodeur fine-tuné résistent-ils à un commentaire externe trompeur sur 77 intentions en français ?",
