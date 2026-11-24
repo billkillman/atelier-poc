@@ -5,10 +5,10 @@
  "depot": "20261124_zero_shot_llm_credit_risk_scoring",
  "titre": "Un petit LLM ouvert, interrogé en zéro-shot sur un dossier de risque calculé par code, égale-t-il un GBDT appris sur ~1 000 clients étiquetés (défaut de crédit) ?",
  "debut": "2026-11-24T03:56:28Z",
- "maj": "2026-11-24T04:34:09Z",
+ "maj": "2026-11-24T04:47:07Z",
  "statut": "en_cours",
- "etape": "complete",
- "detail": "sur GPU GPU T4 (Google Colab)",
+ "etape": "revue",
+ "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -37,15 +37,15 @@
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-24T04:34:09Z",
-   "fin": null
+   "fin": "2026-11-24T04:47:07Z"
   },
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-24T04:47:07Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.176,
- "estimation_fin": "2026-11-24T08:37:09Z",
+ "progression": 0.99,
+ "estimation_fin": "2026-11-24T04:50:07Z",
  "resultat": null
 }
