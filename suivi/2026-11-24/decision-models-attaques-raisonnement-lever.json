@@ -5,11 +5,11 @@
  "depot": "20261124_typed_decision_misleading_comment_robustness",
  "titre": "Un décideur typé à passe unique, un décideur avec raisonnement bref et un encodeur fine-tuné résistent-ils à un commentaire externe trompeur sur 77 intentions en français ?",
  "debut": "2026-11-24T02:15:48Z",
- "maj": "2026-11-24T03:04:59Z",
+ "maj": "2026-11-24T03:11:20Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 2 : correction du notebook (son exécution dans le sandbox a échoué ou ne remplit pas les conditions de validation)",
- "iteration": 2,
+ "detail": "itération 3 : phase publique sur le jeu public (échelle réduite, CPU)",
+ "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
  "etapes": [
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.148,
- "estimation_fin": "2026-11-24T08:29:32Z",
+ "progression": 0.154,
+ "estimation_fin": "2026-11-24T08:55:32Z",
  "resultat": null
 }
