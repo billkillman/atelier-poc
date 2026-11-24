@@ -3,6 +3,111 @@
  "pocs": [
   {
    "jour": "2026-11-24",
+   "sujet_id": "rlvr-lora-rang-effondrement",
+   "depot": "20261124_rlvr_lora_rank_intent_classification",
+   "titre": "En RL à récompense vérifiable, le rang du LoRA (et DoRA) change-t-il le résultat par rapport à un fine-tuning supervisé de même coût, sur une classification à 77 intentions en français ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : SFT LoRA rang 16 sur les mêmes énoncés)",
+    "raison": "exception (cellule 37, section reference)"
+   },
+   "iterations": 1,
+   "metrique_principale": "macro_f1",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "Modèle de départ (sans entraînement)",
+     "role": "reference",
+     "valeur": 0.0,
+     "ic95": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "nom": "SFT LoRA r=16",
+     "role": "reference",
+     "valeur": 0.16988497217068646,
+     "ic95": [
+      0.10733058135534916,
+      0.22464818565735997
+     ]
+    },
+    {
+     "nom": "GRPO LoRA r=4",
+     "role": "nouvelle",
+     "valeur": 0.0,
+     "ic95": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "nom": "GRPO LoRA r=16",
+     "role": "nouvelle",
+     "valeur": 0.0,
+     "ic95": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "nom": "GRPO DoRA r=16",
+     "role": "nouvelle",
+     "valeur": 0.0,
+     "ic95": [
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "n_exemples": 120,
+   "jeu": "DeepPavlov/banking77_fr",
+   "synthese": "macro_f1 : GRPO DoRA r=16 0 contre 0,17 pour SFT LoRA r=16 (120 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (modèle de 135 M, 120 énoncés de test, 10 classes, 5 pas GRPO, une graine), les chiffres ne permettent pas de trancher. Les trois GRPO restent à un macro-F1 de 0,00, identique au modèle de départ, car la récompense est toujours nulle et aucune mise à jour n'a lieu. Seul le SFT progresse (macro-F1 0,17 [0,11 ; 0,22]), ce qui valide le chemin d'évaluation mais ne dit rien sur le rang, DoRA ou l'intérêt du RL. Le « confirmée » de H4 est un artefact. Aucune conclusion sur l'effondrement à rang élevé n'est possible avant d'avoir un GRPO qui démarre.",
+   "confiance": "faible",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Le GRPO n'a reçu aucun signal de récompense à cette échelle et n'a pas appris. La comparaison avec le SFT, le rang et DoRA n'est donc pas concluante, malgré le verdict automatique favorable au SFT.",
+   "libelle_metrique": "macro-F1 (test)",
+   "reserves": [
+    "Les lignes GRPO (rangs 4 et 16, DoRA) sont le modèle de départ inchangé, pas des modèles entraînés. Leur comparaison avec le SFT, ou entre rangs, ne dit rien sur l'effet du rang ni sur DoRA.",
+    "Le « confirmée » sur la supériorité du SFT ne vient pas d'une comparaison réelle. Le GRPO n'a pas appris, donc l'hypothèse n'est pas testée.",
+    "Les colonnes de tokens et de durée ne permettent pas de dire que le GRPO coûte moins cher que le SFT. Les budgets de calcul ne sont pas mis sur la même base."
+   ],
+   "duree_minutes": 50.0,
+   "consommation": {
+    "claude:poc_code:rlvr-lora-rang-effondrement": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1622.8,
+     "cout_equivalent_usd": 4.2398,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:rlvr-lora-rang-effondrement": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 208.8,
+     "cout_equivalent_usd": 0.969,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:rlvr-lora-rang-effondrement": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 104.4,
+     "cout_equivalent_usd": 0.508,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261124_rlvr_lora_rank_intent_classification",
+   "tentatives": 1
+  },
+  {
+   "jour": "2026-11-24",
    "sujet_id": "jevrisk-risque-financier-zero-shot",
    "depot": "20261124_zero_shot_llm_credit_risk_scoring",
    "titre": "Un petit LLM ouvert, interrogé en zéro-shot sur un dossier de risque calculé par code, égale-t-il un GBDT appris sur ~1 000 clients étiquetés (défaut de crédit) ?",
