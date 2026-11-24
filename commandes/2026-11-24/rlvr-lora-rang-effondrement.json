@@ -1,0 +1,357 @@
+{
+ "version": 1,
+ "jour": "2026-11-24",
+ "sujet_id": "rlvr-lora-rang-effondrement",
+ "depot": "20261124_rlvr_lora_rank_intent_classification",
+ "fiche": {
+  "sujet_id": "rlvr-lora-rang-effondrement",
+  "titre": "RL à récompense vérifiable : le LoRA de rang élevé s'effondre (73 % → 5 %), DoRA et QuanTA tiennent, sur maths en 8B",
+  "en_une_phrase": "Sur un modèle 8B entraîné en RL sur des maths, augmenter le rang du LoRA fait brutalement échouer l'entraînement ; des adaptateurs structurés tiennent. Résultat limité à un modèle, aux maths, sans test en français.",
+  "probleme": "Pour le RL à récompense vérifiable (RLVR), le choix se résume souvent à : fine-tuning complet, coûteux, ou LoRA, léger. Les auteurs soutiennent qu'il manque une variable, la géométrie de la mise à jour, et testent comment le rang du LoRA change le résultat.",
+  "comment_ca_marche": "Le **RLVR** entraîne un modèle avec une récompense vérifiable automatiquement (ici : la réponse mathématique est-elle correcte ?). **GRPO** est l'algorithme : pour chaque question, le modèle génère un groupe de réponses, et chacune est notée relativement à la moyenne du groupe.\n\nLe **LoRA** gèle le modèle et n'entraîne qu'une petite correction, produit de deux matrices dont la dimension interne est le *rang* r. **DoRA** sépare la correction en magnitude et direction. **QuanTA** écrit la correction comme un réseau de petits tenseurs (structure empruntée à la physique quantique), ce qui permet une correction de rang plein avec peu de paramètres.\n\nLes auteurs :\n1. entraînent Qwen 3 8B « à froid » (sans SFT préalable) avec chaque adaptateur ;\n2. font varier le rang, la taille de lot et du groupe ;\n3. mesurent la précision ;\n4. analysent la structure de la mise à jour par décomposition en valeurs singulières.",
+  "demarche_experimentale": "Qwen 3 8B, Llama 3.1 8B et Apertus 8B, entraînés en GRPO à froid sur DeepMath-Hard (5 399 problèmes difficiles), Skywork-Hard, MATH et Enigmata. Balayage du rang LoRA de 1 à 256, tailles de lot 64/128/256, graines 42 à 44 pour les configurations clés.",
+  "resultats": [
+   {
+    "metrique": "Précision DeepMath-Hard, LoRA (plus haut = mieux)",
+    "valeur": "73,1 % à r=64 ; 4,7 % à r=128 ; 2,3 % à r=256",
+    "comparaison": "LoRA r=1 à 32 : 76,2 à 79,29 %",
+    "conditions": "Qwen 3 8B, graine 42, lot 64, une graine seulement pour ce balayage complet",
+    "citation": "Performance is broadly stable across low ranks, declines at r=64, and then collapses abruptly at r≥128 under the common protocol."
+   },
+   {
+    "metrique": "Précision DeepMath-Hard, adaptateurs structurés",
+    "valeur": "84,0 % (DoRA r=16 et QuanTA d=3) contre 77,3 % pour le fine-tuning complet",
+    "comparaison": "Sur trois graines : fine-tuning complet 73,16 % ± 7,55, DoRA 74,4 % ± 10,9, QuanTA 75,1 % ± 9,6",
+    "conditions": "Qwen 3 8B, graine 42 puis moyenne des graines 42 à 44",
+    "citation": "We therefore interpret the primary result as structured parameter-efficient competitiveness with FFT."
+   },
+   {
+    "metrique": "Précision DeepMath-Hard selon la taille de lot",
+    "valeur": "LoRA r=64 : 73,1 % (lot 64) puis 8,7 % (128) et 6,0 % (256)",
+    "comparaison": "QuanTA d=3 : 65,8 % au lot 256",
+    "conditions": "Qwen 3 8B, une époque, graine 42 (reproduit sur la graine 43)",
+    "citation": "Thus, larger batches do not eliminate rank collapse under the fixed-pass protocol; instead, the observed LoRA stability boundary moves downward."
+   }
+  ],
+  "limites": [
+   "Seuls les modèles 8B denses ont été testés, et le balayage complet repose sur Qwen 3 8B. Llama 3.1 8B et Apertus 8B restent proches de zéro (auteurs).",
+   "L'effondrement dépend du protocole : un autre travail (Schulman et Lab) ne l'observe pas à r=128. Rang, taux d'apprentissage ou budget non réglés par configuration pourraient déplacer la frontière (auteurs).",
+   "Écarts entre graines très grands (± 7 à 11 points) : l'avantage de DoRA et QuanTA sur le fine-tuning complet n'est pas établi. Le lien avec l'échelle de pré-entraînement est une hypothèse, non causale (auteurs)."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "73,1 % → 4,7 %",
+    "libelle": "Précision du LoRA rang 64 puis rang 128, Qwen 3 8B, DeepMath-Hard (plus haut = mieux)"
+   },
+   {
+    "valeur": "< 0,6 %",
+    "libelle": "Part des paramètres mise à jour par DoRA et QuanTA, compétitifs avec le fine-tuning complet"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Le LoRA passe de 73,1 % (r=64) à 4,7 % (r=128) de précision sur DeepMath-Hard avec Qwen 3 8B.",
+    "citation": "Performance is broadly stable across r=1–32, declines to 73.1% at r=64, and then collapses abruptly to 4.7% at r=128 and 2.3% at r=256."
+   },
+   {
+    "affirmation": "Augmenter la taille de lot ne sauve pas le LoRA de rang élevé ; la frontière descend.",
+    "citation": "r=64, which reaches 73.1% at batch size 64, falls to 8.7% and 6.0% at batch sizes 128 and 256."
+   },
+   {
+    "affirmation": "DoRA et QuanTA sont compétitifs avec le fine-tuning complet en mettant à jour moins de 0,6 % des paramètres, mais avec une forte variance entre graines.",
+    "citation": "Across seeds 42–44, all three methods exhibit run-to-run variation: FFT reaches 73.16% ± 7.55%, DoRA r=16 reaches 74.4% ± 10.9%, and QuanTA d=3 reaches 75.1% ± 9.6%."
+   },
+   {
+    "affirmation": "Le rang effectif seul n'explique pas l'effondrement.",
+    "citation": "the collapsed r=256 checkpoint still has higher effective rank than the functional r=64 checkpoint."
+   },
+   {
+    "affirmation": "Llama 3.1 8B et Apertus 8B restent près de zéro sur DeepMath-Hard quel que soit l'adaptateur ; l'hypothèse de maturité n'est pas causale.",
+    "citation": "Both ∼15T models score near floor on DeepMath-Hard under any adapter configuration; Qwen 3 8B reaches 78–84%."
+   },
+   {
+    "affirmation": "Le protocole est un démarrage à froid sur des modèles 8B denses ; la transférabilité aux modèles plus grands, MoE ou aux pipelines SFT puis RL est ouverte.",
+    "citation": "whether the same stability boundaries arise in substantially larger models or MoE architectures remains open."
+   },
+   {
+    "affirmation": "Un autre preprint (OLMo-2-1B, GSM8K) rapporte que le GRPO ramène la précision à environ 60 % même après un SFT sur données corrompues.",
+    "citation": "GRPO post-training consistently restores model accuracy back to gold-baseline levels (≈60%)."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "RLVR",
+    "definition": "Apprentissage par renforcement où la récompense est vérifiable automatiquement (réponse exacte d'un problème de maths, par exemple), sans modèle de récompense appris."
+   },
+   {
+    "terme": "GRPO",
+    "definition": "Algorithme de RL qui note chaque réponse d'un groupe relativement à la moyenne du groupe, sans réseau critique séparé."
+   },
+   {
+    "terme": "LoRA",
+    "definition": "Fine-tuning léger : le modèle est gelé, on entraîne une correction produit de deux petites matrices, dont la dimension interne est le rang."
+   },
+   {
+    "terme": "DoRA",
+    "definition": "Variante de LoRA qui sépare la correction en magnitude et direction de chaque matrice de poids."
+   },
+   {
+    "terme": "QuanTA",
+    "definition": "Adaptateur qui écrit la correction comme un réseau de petits tenseurs, permettant un rang élevé avec peu de paramètres."
+   },
+   {
+    "terme": "Rang effectif",
+    "definition": "Mesure du nombre de directions réellement utilisées par une mise à jour, calculée sur ses valeurs singulières (plus élevé = plus distribuée)."
+   },
+   {
+    "terme": "Démarrage à froid (cold-start)",
+    "definition": "RL appliqué directement au modèle de base, sans fine-tuning supervisé (SFT) préalable."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Structure Over Scale: Rethinking Adaptation for Reinforcement Learning with Verifiable Rewards",
+    "url": "https://arxiv.org/abs/2611.27148",
+    "type": "primaire",
+    "date": "2026-11-20"
+   },
+   {
+    "titre": "Reinforcement Learning Unlearns Corrupted SFT Reasoning",
+    "url": "https://arxiv.org/abs/2611.26756",
+    "type": "secondaire",
+    "date": "2026-11-19"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-20",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "En RL à récompense vérifiable, le rang du LoRA (et DoRA) change-t-il le résultat par rapport à un fine-tuning supervisé de même coût, sur une classification à 77 intentions en français ?",
+  "hypothese": "Avec un petit modèle de 0,5 B, GRPO à récompense exacte gagne au moins 10 points de macro-F1 sur le modèle de départ ; une dégradation d'au moins 10 points apparaît à un rang élevé (256) par rapport à un rang bas (8) ; DoRA r=16 reste à moins de 3 points du meilleur LoRA ; le SFT de même durée de calcul reste devant ou à égalité à ce volume de données.",
+  "reference": {
+   "nom": "SFT LoRA rang 16 sur les mêmes énoncés",
+   "description": "Fine-tuning supervisé du même petit modèle, mêmes prompts et mêmes énoncés d'entraînement, à nombre de tokens traités comparable à celui du GRPO.",
+   "implementation": "peft LoraConfig(r=16, alpha=32, modules d'attention et MLP), perte de langage sur la seule étiquette, lr 2e-4, ~3 époques sur un sous-ensemble de 3 000 énoncés tiré au hasard dans le split train (le même pour les deux méthodes) ; ordre de grandeur de calcul calé sur le coût du GRPO (≈ 12 minutes T4).",
+   "modeles_hf": [
+    "Qwen/Qwen2.5-0.5B-Instruct"
+   ],
+   "modeles_hf_sandbox": [
+    "HuggingFaceTB/SmolLM2-135M-Instruct"
+   ],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "GRPO LoRA : balayage de rang et DoRA",
+   "description": "Pour chaque énoncé, le modèle échantillonne 8 réponses ; récompense 1 si le nom de classe produit est exact, 0 sinon ; avantage normalisé dans le groupe. Entraînements LoRA aux rangs 8, 64, 256 et DoRA rang 16, à budget de pas identique.",
+   "implementation": "Boucle GRPO minimale écrite en PyTorch avec peft (LoraConfig, use_dora=True pour DoRA) : 8 énoncés × 8 générations par pas, 60 pas, température 1,0, max 12 tokens générés, perte de gradient de politique sans terme KL (β=0, pas de critique), lr 1e-5, clip du ratio non nécessaire (une mise à jour par lot). Récompense déterministe : correspondance exacte normalisée du nom de classe (jamais de LLM juge). Le prompt liste les 77 noms de classe (mteb/banking77 label_text). Journal de la récompense moyenne par pas ; évaluation décodage glouton.",
+   "modeles_hf": [
+    "Qwen/Qwen2.5-0.5B-Instruct"
+   ],
+   "modeles_hf_sandbox": [
+    "HuggingFaceTB/SmolLM2-135M-Instruct"
+   ],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "utterance, label ; noms des classes via mteb/banking77 (label_text) ; contrôle hors tâche : mteb/amazon_massive_intent (fr, test, label_text)",
+   "representativite": "Classification en français à 77 classes proches avec récompense exacte, assez d'énoncés pour mesurer des écarts de quelques points avec intervalle de confiance.",
+   "ecarts_donnees_reelles": "Traduction automatique, 77 classes plates sans hiérarchie, énoncés courts et propres ; modèle de 0,5 B au lieu des 8 B de la source ; la source étudie des maths en anglais à froid ; une seule exécution par configuration, donc variance entre graines non mesurée.",
+   "jeux_explores": [
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "10 003 / 3 080 énoncés français, 77 intentions proches, étiquette exacte.",
+     "decision": "retenu",
+     "raison": "Seul jeu français chargeable à classes proches et récompense exacte ; licence à valider (original CC BY 4.0)."
+    },
+    {
+     "nom": "mteb/banking77",
+     "url": "https://huggingface.co/datasets/mteb/banking77",
+     "acces": "hub_libre",
+     "adequation": "Version anglaise avec label_text.",
+     "decision": "ecarte",
+     "raison": "Anglais ; utilisé seulement comme table des noms de classes."
+    },
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "60 intentions françaises hors domaine, avec label_text.",
+     "decision": "ecarte",
+     "raison": "Jeu secondaire : contrôle de régression hors tâche (200 énoncés), pas entraînement."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "113 intentions déséquilibrées, deux niveaux.",
+     "decision": "ecarte",
+     "raison": "Étiquettes entières sans noms de classe, licence inconnue ; piste pour une récompense hiérarchique."
+    },
+    {
+     "nom": "zwhe99/DeepMath-103K",
+     "url": "https://huggingface.co/datasets/zwhe99/DeepMath-103K",
+     "acces": "hub_libre",
+     "adequation": "Maths difficiles de la source.",
+     "decision": "ecarte",
+     "raison": "Anglais, trop dur pour un modèle <1 B, sous-ensemble « Hard » non fourni."
+    },
+    {
+     "nom": "ahmedselhady/mAceReason-Math",
+     "url": "https://huggingface.co/datasets/ahmedselhady/mAceReason-Math",
+     "acces": "hub_libre",
+     "adequation": "Maths RLVR en français.",
+     "decision": "ecarte",
+     "raison": "Licence cc-by-nc-nd-4.0 incompatible avec l'usage commercial."
+    },
+    {
+     "nom": "juletxara/mgsm",
+     "url": "https://huggingface.co/datasets/juletxara/mgsm",
+     "acces": "hub_libre",
+     "adequation": "250 problèmes de maths en français.",
+     "decision": "ecarte",
+     "raison": "Réponses nulles dans l'aperçu, trop petit et sans rapport avec la tâche de classification."
+    }
+   ]
+  },
+  "metriques": [
+   "macro_f1",
+   "accuracy",
+   "mean_reward",
+   "invalid_format_rate",
+   "mean_output_tokens",
+   "off_task_accuracy_delta",
+   "train_gpu_minutes"
+  ],
+  "metrique_principale": "macro_f1",
+  "sens": "max",
+  "protocole": "Entraînement : 3 000 énoncés tirés au hasard dans le split train (identiques pour toutes les conditions). Évaluation : 1 000 énoncés tirés au hasard dans le split test (identiques pour toutes les conditions). Conditions : modèle sans entraînement ; SFT LoRA r=16 ; GRPO LoRA r=8, r=64, r=256 ; GRPO DoRA r=16 ; GRPO r=8 initialisé après le SFT (si le budget le permet). Courbes de la récompense moyenne et du macro-F1 de validation (200 énoncés tirés du train, hors entraînement) toutes les 10 étapes. Détournement de la récompense : taux de sorties hors liste, longueur moyenne, répartition des classes prédites (collapse sur une classe). Régression hors tâche : exactitude zéro-shot sur 200 énoncés de mteb/amazon_massive_intent avant/après. Intervalles bootstrap à 95 % et test de McNemar apparié contre le SFT ; une seule exécution par configuration, donc conclusion prudente sur les écarts < 3 points.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "SmolLM2-135M-Instruct à la place du 0,5B, 300 énoncés d'entraînement, 5 pas GRPO (4 générations), rangs 4 et 16 et DoRA seulement, 200 énoncés de test. Calcul GPU complet : par pas 64 générations × (~420 tokens de prompt + 12) ≈ 28 k tokens en génération et rétropropagation ≈ 3,5 s ; 60 pas × 4 entraînements ≈ 14 min ; SFT 3 000 énoncés × 3 époques ≈ 3 min ; évaluations (7 × 1 000 énoncés × 420 tokens ≈ 3 M tokens de remplissage, rapide pour 0,5 B) ≈ 10 min ; total ≈ 30 min sous 45 min. Si le temps est dépassé, réduire les énoncés de test à 500.",
+  "dependances": [
+   "peft"
+  ],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Texte à classer (message, e-mail, avis)."
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif (niveau 1 de l'arbre)."
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif (niveau 2), étiquette de référence de la récompense."
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception, pour le découpage temporel."
+    }
+   ],
+   "volume_conseille": "Au moins 20 000 textes étiquetés, 30 textes minimum par sous-motif retenu pour l'entraînement, test de 3 000 textes.",
+   "metriques_metier": "Macro-F1 au sous-motif, exactitude au motif, cohérence motif/sous-motif, part de sorties invalides, coût GPU par point de macro-F1.",
+   "garde_fous": "Récompense uniquement déterministe depuis les étiquettes ; surveiller le détournement (format, longueur, collapse de classe) et la régression hors tâche avant toute adoption ; pas de mise en production d'un modèle entraîné par RL sans comparaison au supervisé sur le même test.",
+   "prescriptions": [
+    "Étiquettes issues d'une annotation revue (accord entre annotateurs mesuré sur 10 % des textes).",
+    "Au moins 30 textes par sous-motif en entraînement ; classes rares reportées à part.",
+    "Test sur la période la plus récente, strictement postérieure à l'entraînement.",
+    "Plusieurs graines (au moins 3) par configuration, vu la variance rapportée par la source.",
+    "Noms de sous-motifs courts et distincts pour une récompense par correspondance exacte.",
+    "Anonymiser noms, numéros de compte et coordonnées dans les textes.",
+    "Exclure les textes sans étiquette consolidée ou à étiquette contestée.",
+    "Mesurer le coût GPU total de chaque configuration."
+   ],
+   "preparation": "Extraire les textes routés avec leur étiquette finale depuis les outils de traitement, dédupliquer, anonymiser, vérifier la cohérence motif/sous-motif avec la taxonomie en vigueur, échantillonner par classe puis découper chronologiquement en entraînement, validation et test."
+  },
+  "duree_estimee_minutes": 600,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "Qwen/Qwen2.5-0.5B-Instruct": {
+    "id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "sha": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 494032768,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   },
+   "HuggingFaceTB/SmolLM2-135M-Instruct": {
+    "id": "HuggingFaceTB/SmolLM2-135M-Instruct",
+    "sha": "12fd25f77366fa6b3b4b768ec3050bf629380bac",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 134515008,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "label": "Value",
+    "utterance": "Value"
+   },
+   "exemple": {
+    "label": 0,
+    "utterance": "S'il vous plaît, aidez-moi avec ma carte.  Il ne s'activera pas."
+   },
+   "lignes": {
+    "train": 10003,
+    "test": 3080
+   }
+  },
+  "paquets": {
+   "peft": {
+    "paquet": "peft",
+    "derniere_version": "0.22.0",
+    "licence": "Apache",
+    "auteur": "The HuggingFace team",
+    "source": "https://github.com/huggingface/peft"
+   }
+  }
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

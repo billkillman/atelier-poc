@@ -1,0 +1,662 @@
+{
+ "version": 1,
+ "jour": "2026-11-24",
+ "sujet_id": "jevrisk-risque-financier-zero-shot",
+ "depot": "20261124_zero_shot_llm_credit_risk_scoring",
+ "fiche": {
+  "sujet_id": "jevrisk-risque-financier-zero-shot",
+  "titre": "Risque AML et crédit sans étiquettes : un modèle de décision égale un scoring supervisé appris sur 1 000 clients, sur données publiques",
+  "en_une_phrase": "Jev, un modèle qui répond par une probabilité, note le risque AML et crédit sans étiquettes, au niveau de modèles supervisés entraînés sur ~1 000 clients ; mais AML synthétique, jugement non expliqué, rien en français.",
+  "probleme": "un acteur des services financiers doit noter le risque de chaque client : le blanchiment (qui placer sous surveillance renforcée) et le crédit (à qui prêter). Un même comportement est normal pour un restaurateur et suspect pour un étudiant. Les systèmes en place comptent des alertes avec des seuils fixes, identiques pour tous, et ignorent donc le profil. Les modèles supervisés apprennent ce contexte, mais chaque étiquette coûte une revue d'analyste ou des mois d'historique de remboursement, et il faut tout refaire pour chaque nouveau type de risque. Les auteurs cherchent un score *zero-shot*, c'est-à-dire obtenu sans aucun exemple étiqueté de la tâche.",
+  "comment_ca_marche": "JevRisk sépare le calcul exact du jugement en contexte.\n\n1. **Le code agrège l'activité.** Les transactions de chaque client sont résumées par canal (espèces, virements entre particuliers, virements internationaux) : nombres, sommes, contreparties distinctes, pays.\n2. **Le code calcule les indicateurs réglementaires.** Pour le blanchiment, ce sont 8 signaux d'alerte (*red flags*) publiés par FINTRAC, la cellule de renseignement financier canadienne. Pour le crédit, ce sont 7 ou 8 signaux d'alerte précoce tirés des lignes directrices de l'EBA, l'Autorité interne européenne. Le seuil vient du texte (par exemple un dépôt d'espèces d'au moins 10 000 $). À défaut, c'est le 95e percentile des clients historiques, calculé une seule fois et sans étiquette.\n3. **Le code monte un dossier.** Un texte structuré (JSON) réunit trois parties : le profil KYC, c'est-à-dire les données d'identification du client (métier, âge, ancienneté, sans nom ni genre) ; une ligne d'activité par canal ; chaque indicateur, avec sa définition, son statut (présent ou absent) et le chiffre qui le justifie.\n4. **Jev juge le dossier en un seul appel.** Jev, de TypeSafe AI, est un *modèle de décision de langage* : il lit un texte et une question fermée, puis renvoie directement la probabilité de « oui », sans générer de texte. On lui pose deux questions : « le métier, en soi, est-il à haut risque ? » et « ce client est-il à haut risque ? ».\n5. **Le score combine les deux réponses.** Il est égal au produit des deux probabilités et sert à classer les clients. La décision reste à l'analyste.\n\n**Ce qui est nouveau** : deux clients qui déclenchent la même alerte reçoivent des scores différents selon leur profil, et aucune étiquette n'est nécessaire. Si Jev lit les historiques bruts au lieu des indicateurs, il consomme environ 3 fois plus de tokens et son AUC baisse de 0,024 (Home Credit).",
+  "demarche_experimentale": "Trois jeux de données publics.\n\n- **AML** : 195 789 clients synthétiques fournis par Scotiabank. L'étiquette est la notation de risque de l'entreprise (2,82 % à haut risque).\n- **Crédit** : 307 511 demandes réelles de Home Credit (8,07 % d'incidents de paiement) et 546 018 prêts Lending Club, découpés dans le temps (2013-2014 pour le développement, 2015 pour le test). Les scores externes et le score FICO sont exclus.\n\nChaque jeu est testé sur 4 000 clients (2 000 risqués, 2 000 autres). La métrique est l'AUC : la probabilité de classer un client risqué au-dessus d'un client sain (0,5 = hasard, 1 = parfait). Elle est donnée avec un intervalle à 95 % calculé par rééchantillonnage (*bootstrap*). Les baselines sont le comptage d'indicateurs, l'isolation forest (détection d'anomalies sans étiquettes), ainsi que GBDT, régression logistique et TabPFN entraînés sur 100 clients étiquetés jusqu'à la totalité, en moyenne sur 20 tirages.",
+  "resultats": [
+   {
+    "metrique": "AUC AML (plus haut = mieux)",
+    "valeur": "0,923",
+    "comparaison": "Comptage d'alertes 0,830 ; isolation forest 0,898",
+    "conditions": "Données synthétiques Scotiabank, 4 000 clients de test, aucune étiquette",
+    "citation": "On AML, JevRisk achieves an AUC of 0.923, compared with 0.830 for the red-flag count and 0.898 for isolation forest (Table 1)."
+   },
+   {
+    "metrique": "AUC AML face au supervisé",
+    "valeur": "0,923",
+    "comparaison": "TabPFN avec 1 000 étiquettes : 0,923 (à égalité) ; GBDT avec toutes les étiquettes (38 712) : 0,957",
+    "conditions": "Même échantillon de test ; supervisé moyenné sur 20 tirages",
+    "citation": "TabPFN is on par at 1,000 labelled customers, at 0.923. [...] With all 38,712 development customers, the GBDT and logistic regression reach 0.957 and 0.949."
+   },
+   {
+    "metrique": "AUC crédit Home Credit",
+    "valeur": "0,628",
+    "comparaison": "Comptage 0,587 ; isolation forest 0,556 ; GBDT avec toutes les étiquettes 0,720",
+    "conditions": "Données réelles, découpage aléatoire, scores externes exclus",
+    "citation": "On Home Credit, JevRisk achieves an AUC of 0.628, compared with 0.587 for the early-warning indicator count and 0.556 for isolation forest (Table 3)."
+   },
+   {
+    "metrique": "AUC crédit Lending Club",
+    "valeur": "0,651",
+    "comparaison": "Comptage 0,574 ; TabPFN le dépasse à partir de 10 000 étiquettes",
+    "conditions": "Test sur les prêts de 2015, postérieurs aux données de développement",
+    "citation": "On loans issued in 2015, JevRisk achieves an AUC of 0.651, compared with 0.574 for the early-warning indicator count and 0.544 for isolation forest (Table 3)."
+   },
+   {
+    "metrique": "Rappel dans le top 5 % AML (part des clients risqués trouvés)",
+    "valeur": "49,3 %",
+    "comparaison": "Comptage d'alertes 37,7 %",
+    "conditions": "Revue des 5 % de clients les mieux classés, estimation pondérée",
+    "citation": "reviewing the top 5% of each ranking captures an estimated 49.3% of all customers rated high risk with JevRisk and 37.7% with the red-flag count (Table 14)."
+   },
+   {
+    "metrique": "AUC avec un modèle ouvert (Qwen3.5-9B)",
+    "valeur": "0,908 / 0,617 / 0,605",
+    "comparaison": "Jev : 0,923 / 0,628 / 0,651",
+    "conditions": "AML / Home Credit / Lending Club ; probabilité du premier token « Yes »",
+    "citation": "Using Qwen3.5-9B in place of Jev gives an AUC of 0.908, compared with 0.923 for Jev and 0.830 for the red-flag count (Table 1)."
+   }
+  ],
+  "limites": [
+   "Selon les auteurs, l'AML est synthétique et l'étiquette est une notation de l'entreprise, pas des cas de blanchiment avérés. Pour le crédit, les AUC restent modestes et les scores externes ont été exclus.",
+   "Jev n'est utilisable que par API externe (liste d'attente selon un comparatif tiers) : les données clients sortent de l'entreprise. Ses sorties peuvent changer d'une version à l'autre (auteurs). Les modèles ouverts testés sont plus faibles sur Lending Club.",
+   "De l'aveu des auteurs, le jugement de Jev n'est pas expliqué et aucun test de biais n'a été fait. La question sur le métier peut servir d'indicateur indirect de groupes protégés : c'est bloquant pour le crédit, classé à haut risque.",
+   "Les prompts sont en anglais et il n'y a aucune donnée française. Le code est annoncé mais pas publié. « À égalité » signifie seulement une différence non significative sur 4 000 clients, pas une équivalence."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "0,923",
+    "libelle": "AUC AML sans étiquette (1 = parfait), contre 0,830 pour le comptage d'alertes"
+   },
+   {
+    "valeur": "≈ 1 000",
+    "libelle": "clients étiquetés à partir desquels les modèles supervisés égalent JevRisk"
+   },
+   {
+    "valeur": "9 $",
+    "libelle": "coût API Jev pour noter une fois les 195 789 clients AML"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Sans étiquette, JevRisk atteint une AUC de 0,923 sur l'AML, contre 0,830 pour le comptage d'alertes.",
+    "citation": "On AML, JevRisk achieves an AUC of 0.923, compared with 0.830 for the red-flag count and 0.898 for isolation forest (Table 1)."
+   },
+   {
+    "affirmation": "JevRisk est à égalité ou meilleur que des modèles supervisés entraînés sur environ un millier de clients étiquetés.",
+    "citation": "JevRisk is thus on par with or better than supervised models trained on about a thousand labelled customers."
+   },
+   {
+    "affirmation": "Les modèles supervisés dépassent JevRisk dès 3 000 étiquettes en AML et sur Home Credit, et dès 10 000 sur Lending Club.",
+    "citation": "In AUC, the best supervised model is better than JevRisk from 3,000 labels for AML and Home Credit, and from 10,000 for Lending Club."
+   },
+   {
+    "affirmation": "Les données AML sont synthétiques et l'étiquette est une notation de risque de l'entreprise, pas des cas de blanchiment confirmés.",
+    "citation": "For AML, the data and labels are synthetic. Moreover, the labels are a customer risk rating by the bank, not confirmed laundering cases or filed suspicious transaction reports."
+   },
+   {
+    "affirmation": "Le jugement de Jev n'est pas expliqué, seules les entrées sont traçables.",
+    "citation": "Then the inputs of each rating can be traced and checked by a regulator, an auditor or a model-validation team. The judgment of Jev itself, however, is not explained."
+   },
+   {
+    "affirmation": "Aucun test de biais n'a été fait, et la question sur le métier peut servir d'indicateur indirect de groupes protégés.",
+    "citation": "We do not test JevRisk for bias across protected groups, such as groups by gender, age or ethnicity. The occupation question in particular may act as a proxy for such groups, so a bank would need fairness tests before use."
+   },
+   {
+    "affirmation": "Noter les 195 789 clients AML coûte environ 9 $ via l'API Jev, facturée 0,042 $ par million de tokens d'entrée.",
+    "citation": "The API charges only for input tokens, at $0.042 per million as TypeSafe listed in September 2026 (TypeSafe AI, 2026). At about 1,120, 1,180 and 1,370 tokens per call, rating all 195,789 AML customers once costs about $9"
+   },
+   {
+    "affirmation": "Le code et les sorties brutes sont annoncés mais pas encore publiés.",
+    "citation": "We will release the code, the raw runs, the stored scores and these scripts. Jev is accessed through a public API, so its outputs can change across versions."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "AUC",
+    "definition": "Probabilité qu'un modèle classe un client risqué au-dessus d'un client sain tiré au hasard. 0,5 = hasard, 1 = classement parfait."
+   },
+   {
+    "terme": "Modèle de décision de langage",
+    "definition": "Modèle qui lit un texte et une question fermée, puis renvoie une probabilité ou un choix typé au lieu de générer du texte. Jev de TypeSafe AI en est un exemple."
+   },
+   {
+    "terme": "Zero-shot",
+    "definition": "Utilisation d'un modèle sur une tâche sans aucun exemple étiqueté de cette tâche pour l'entraîner."
+   },
+   {
+    "terme": "KYC",
+    "definition": "Know Your Customer : données d'identification et de profil recueillies à l'ouverture du compte (métier, âge, ancienneté…)."
+   },
+   {
+    "terme": "Red flag",
+    "definition": "Indicateur d'alerte de blanchiment publié par un régulateur, par exemple un dépôt d'espèces d'au moins 10 000 $ ou des dépôts fractionnés juste sous ce seuil."
+   },
+   {
+    "terme": "GBDT",
+    "definition": "Gradient-boosted decision trees : ensemble d'arbres de décision construits successivement, chacun corrigeant les erreurs du précédent (famille de XGBoost et LightGBM)."
+   },
+   {
+    "terme": "TabPFN",
+    "definition": "Modèle de fondation tabulaire, pré-entraîné sur des tâches synthétiques, qui prédit à partir de quelques lignes étiquetées sans entraînement classique (au plus 10 000 lignes)."
+   },
+   {
+    "terme": "Isolation forest",
+    "definition": "Méthode de détection d'anomalies sans étiquettes : elle mesure à quel point l'activité d'un client est inhabituelle par rapport aux autres."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "JevRisk: Zero-Shot Financial Risk Assessment with a Language Decision Model (arXiv 2611.26999)",
+    "url": "https://arxiv.org/abs/2611.26999",
+    "type": "primaire",
+    "date": "2026-11-20"
+   },
+   {
+    "titre": "TypeSafe Jev pricing (2026): $0.042 per million tokens, output free (eesel.ai)",
+    "url": "https://www.eesel.ai/blog/typesafe-jev-pricing",
+    "type": "secondaire",
+    "date": ""
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-20",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un petit LLM ouvert, interrogé en zéro-shot sur un dossier de risque calculé par code, égale-t-il un GBDT appris sur ~1 000 clients étiquetés (défaut de crédit) ?",
+  "hypothese": "L'AUC du score zéro-shot (P(« Yes ») d'un LLM ≤3B sur un dossier à indicateurs d'alerte précoce) dépasse celle du simple comptage d'indicateurs d'au moins 0,03 et atteint celle d'un XGBoost entraîné sur 300 à 1 000 clients ; XGBoost entraîné sur toutes les étiquettes reste devant d'au moins 0,05 d'AUC.",
+  "reference": {
+   "nom": "XGBoost supervisé à budget d'étiquettes variable",
+   "description": "Classifieur à arbres boostés entraîné sur N demandes étiquetées (N = 100, 300, 1 000, 3 000, toutes) avec les variables brutes de la demande, plus une baseline sans apprentissage : le nombre d'indicateurs d'alerte précoce déclenchés.",
+   "implementation": "xgboost.XGBClassifier (n_estimators 300, max_depth 4, learning_rate 0.05) ; variables catégorielles encodées ordinalement ; 10 tirages par N pour N<all ; indicateurs : mensualité/revenu > 0,35, crédit/revenu > 5, ancienneté d'emploi < 1 an, âge < 25 ans, crédit > 95e percentile de la période de développement, revenu < 25e percentile.",
+   "modeles_hf": [],
+   "modeles_hf_sandbox": [],
+   "entrainement": "autre",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Score zéro-shot LLM sur dossier structuré (équivalent ouvert de JevRisk)",
+   "description": "Le code calcule les indicateurs et monte un dossier JSON (profil, montants, indicateurs avec statut et chiffre). Un LLM ouvert répond à deux questions fermées (métier à haut risque ? client à haut risque ?) ; le score est le produit des probabilités de « Yes », lues sur les logits du premier token, sans génération.",
+   "implementation": "transformers AutoModelForCausalLM en float16, un seul passage avant par client, lots triés par longueur ; probabilité = softmax restreint aux tokens « Yes »/« No » ; question métier posée une fois par valeur distincte d'OCCUPATION_TYPE (mise en cache). Genre, scores externes EXT_SOURCE_* et identifiants exclus du dossier. Deux tailles comparées pour juger l'effet d'échelle.",
+   "modeles_hf": [
+    "Qwen/Qwen2.5-3B-Instruct",
+    "Qwen/Qwen2.5-1.5B-Instruct"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen2.5-0.5B-Instruct"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "llmaas"
+  },
+  "jeu_public": {
+   "hub_id": "mohameddhameem/home-credit-default-risk",
+   "config": "application_train_dated",
+   "split_evaluation": "train",
+   "split_entrainement": "train",
+   "colonnes_utiles": "TARGET, application_date, NAME_CONTRACT_TYPE, AMT_INCOME_TOTAL, AMT_CREDIT, AMT_ANNUITY, NAME_INCOME_TYPE, NAME_EDUCATION_TYPE, OCCUPATION_TYPE, DAYS_BIRTH, DAYS_EMPLOYED, CODE_GENDER (seulement pour le contrôle d'équité, jamais dans le dossier) ; EXT_SOURCE_* exclus",
+   "representativite": "Demandes réelles de crédit à la consommation avec défaut observé et date : permet l'AUC, un découpage temporel (fait dans le notebook à partir du split unique « train », selon application_date) et la courbe AUC selon le nombre d'étiquettes.",
+   "ecarts_donnees_reelles": "Prêteur d'Europe de l'Est, pas de marché français ; date probablement reconstituée (à vérifier) ; indicateurs tirés de la seule table de demande ; prompts en anglais ; volet AML non couvert (pas de KYC ni de transactions par canal en libre) ; LLM ouvert ≤3B au lieu de Jev, donc plancher de ce que l'approche peut donner.",
+   "jeux_explores": [
+    {
+     "nom": "mohameddhameem/home-credit-default-risk",
+     "url": "https://huggingface.co/datasets/mohameddhameem/home-credit-default-risk",
+     "acces": "hub_libre",
+     "adequation": "307 511 demandes avec TARGET, date et métier.",
+     "decision": "retenu",
+     "raison": "Chargeable, libre, cible de défaut et date permettant un découpage temporel."
+    },
+    {
+     "nom": "codesignal/lending-club-loan-accepted",
+     "url": "https://huggingface.co/datasets/codesignal/lending-club-loan-accepted",
+     "acces": "hub_libre",
+     "adequation": "Prêts 2007-2018 avec issue_d, mais 151 colonnes dont beaucoup postérieures à l'octroi.",
+     "decision": "ecarte",
+     "raison": "Risque de fuite de cible et effectif non confirmé ; Home Credit suffit pour un premier verdict."
+    },
+    {
+     "nom": "scotiabank-big-data-team/2026-scotiabank-imi-big-data-ai",
+     "url": "https://huggingface.co/datasets/scotiabank-big-data-team/2026-scotiabank-imi-big-data-ai",
+     "acces": "compte_requis",
+     "adequation": "KYC, métiers, transactions par canal et labels : le jeu AML idéal.",
+     "decision": "ecarte",
+     "raison": "Accès conditionnel (gated), licence inconnue, identité avec l'article non prouvée ; à demander pour la suite AML."
+    },
+    {
+     "nom": "AMLGentex/sweden_100K_easy",
+     "url": "https://huggingface.co/datasets/AMLGentex/sweden_100K_easy",
+     "acces": "hub_libre",
+     "adequation": "Transactions AML avec isSAR (7,8 M lignes).",
+     "decision": "ecarte",
+     "raison": "Aucun profil KYC : l'apport du jugement selon le profil ne peut pas être mesuré."
+    },
+    {
+     "nom": "VynFi/vynfi-aml-100k",
+     "url": "https://huggingface.co/datasets/VynFi/vynfi-aml-100k",
+     "acces": "hub_libre",
+     "adequation": "Transactions synthétiques par canal avec étiquette de suspicion.",
+     "decision": "ecarte",
+     "raison": "Niveau transaction, profil KYC non confirmé, signaux probablement trop propres."
+    },
+    {
+     "nom": "scikit-learn/credit-card-clients",
+     "url": "https://huggingface.co/datasets/scikit-learn/credit-card-clients",
+     "acces": "hub_libre",
+     "adequation": "30 000 clients, défaut de paiement, petit.",
+     "decision": "ecarte",
+     "raison": "Données taïwanaises de 2005, sans date ni métier ; trop petit pour un test de 2 000 clients et un GBDT à 3 000 étiquettes."
+    },
+    {
+     "nom": "algoan/fake-open-banking-data",
+     "url": "https://github.com/algoan/fake-open-banking-data",
+     "acces": "telechargement_libre",
+     "adequation": "Profils fictifs en français, sans étiquette de risque.",
+     "decision": "ecarte",
+     "raison": "Hors Hub, quelques profils, aucune AUC mesurable ; utile seulement pour tester le format français en phase interne."
+    },
+    {
+     "nom": "sovereign-forger/kyc-aml-sample-data",
+     "url": "https://huggingface.co/datasets/sovereign-forger/kyc-aml-sample-data",
+     "acces": "hub_libre",
+     "adequation": "5 profils KYC/AML synthétiques.",
+     "decision": "ecarte",
+     "raison": "5 lignes et licence cc-by-nc-4.0."
+    }
+   ]
+  },
+  "metriques": [
+   "auc",
+   "auc_ci_low",
+   "auc_ci_high",
+   "recall_at_top5pct",
+   "auc_vs_n_labels",
+   "tokens_per_client",
+   "latency_ms_per_client"
+  ],
+  "metrique_principale": "auc",
+  "sens": "max",
+  "protocole": "Le jeu n'a qu'un split « train » : le découpage temporel est fait dans le notebook sur application_date. Développement = demandes antérieures (jusqu'à 100 000, pour XGBoost, les percentiles de référence et le tirage des N étiquettes) ; test = période la plus récente, 2 000 demandes dont 1 000 en défaut (échantillon équilibré, l'AUC n'en dépend pas). Dossier identique pour tous les LLM. Scores : comptage d'indicateurs, LLM 1,5B, LLM 3B (zéro-shot, aucun exemple), XGBoost à N = 100, 300, 1 000, 3 000 et toutes les étiquettes (10 tirages par N hors 'toutes'). AUC avec intervalle bootstrap à 95 % (1 000 rééchantillonnages) ; test apparié (bootstrap de la différence d'AUC) entre LLM 3B et XGBoost à 1 000 étiquettes ; rappel dans le top 5 % ; point d'équivalence : plus petit N où XGBoost dépasse significativement le LLM. Contrôle d'équité sommaire : AUC par sexe sur le test, sexe non fourni au modèle.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Qwen2.5-0.5B-Instruct au lieu des 1,5B/3B, 200 clients de test (100 défauts), N jusqu'à 1 000, un seul tirage par N. Coût GPU à l'échelle complète : 2 000 clients × ~300 tokens par dossier = 0,6 M tokens par modèle ; 3B à ~700 tokens/s en lots remplis ≈ 14 min, 1,5B (~1 400 tokens/s) ≈ 7 min ; questions métier mises en cache (≈18 valeurs) ; XGBoost sur CPU ≈ 3 min ; total ≈ 27 min avec chargements, sous le budget de 45 min. Dossier limité à ~300 tokens pour tenir ce budget.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "customer_id",
+     "type": "string",
+     "description": "Identifiant pseudonymisé du client ou du dossier."
+    },
+    {
+     "colonne": "application_date",
+     "type": "datetime",
+     "description": "Date de la demande ou de la revue, pour le découpage temporel."
+    },
+    {
+     "colonne": "occupation",
+     "type": "string",
+     "description": "Profession ou code métier (sans identité)."
+    },
+    {
+     "colonne": "age",
+     "type": "integer",
+     "description": "Âge à la date de la demande."
+    },
+    {
+     "colonne": "income",
+     "type": "float",
+     "description": "Revenu déclaré annuel."
+    },
+    {
+     "colonne": "credit_amount",
+     "type": "float",
+     "description": "Montant demandé ou encours."
+    },
+    {
+     "colonne": "annuity",
+     "type": "float",
+     "description": "Mensualité ou échéance."
+    },
+    {
+     "colonne": "employment_years",
+     "type": "float",
+     "description": "Ancienneté d'emploi ou de relation."
+    },
+    {
+     "colonne": "target",
+     "type": "integer",
+     "description": "1 si défaut ou risque confirmé dans la fenêtre d'observation, sinon 0."
+    }
+   ],
+   "volume_conseille": "Au moins 4 000 clients de test (dont 2 000 à risque) et 30 000 clients de développement étiquetés, sur au moins 18 mois.",
+   "metriques_metier": "AUC, rappel dans les 5 % de dossiers les mieux classés (charge de revue), AUC selon le nombre d'étiquettes, coût par client.",
+   "garde_fous": "Outil de tri des dossiers à revoir, pas de décision automatique (scoring crédit des particuliers à haut risque au sens de l'AI Act) ; aucune donnée client vers une API externe ; test d'équité obligatoire avant tout usage ; variables protégées et leurs proxys (métier) exclus ou audités.",
+   "prescriptions": [
+    "Étiquette observée à posteriori (défaut ou issue de revue), pas une note interne dérivée des mêmes variables.",
+    "Au moins 2 000 positifs au test, et 500 positifs au développement.",
+    "Découpage temporel : développement strictement antérieur au test, fenêtre d'observation du défaut complète.",
+    "Exclure scores internes et variables postérieures à la décision (fuite).",
+    "Pseudonymiser, retirer nom, adresse, genre et identifiants directs ; LLM servi uniquement dans l'environnement cible.",
+    "Seuils d'indicateurs fixés depuis les textes réglementaires ou les percentiles de la période de développement, jamais du test.",
+    "Fournir la période et la politique d'octroi, pour juger le biais de sélection."
+   ],
+   "preparation": "Extraire les demandes de crédit ou dossiers clients avec issue observée depuis les entrepôts de décision, joindre profil et historique agrégé, filtrer les dossiers incomplets, échantillonner les positifs et les négatifs au test, et conserver l'ordre chronologique pour le découpage."
+  },
+  "duree_estimee_minutes": 240,
+  "analyse_materiel": "Les LLM de 1,5 à 3 Md paramètres dépassent le seuil de 1 Md et 0,6 M tokens par modèle seraient trop lents sur 2 cœurs ; le GPU est nécessaire à l'échelle complète.",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "Qwen/Qwen2.5-3B-Instruct": {
+    "id": "Qwen/Qwen2.5-3B-Instruct",
+    "sha": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 3085938688,
+    "licence": "other",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   },
+   "Qwen/Qwen2.5-1.5B-Instruct": {
+    "id": "Qwen/Qwen2.5-1.5B-Instruct",
+    "sha": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 1543714304,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   },
+   "Qwen/Qwen2.5-0.5B-Instruct": {
+    "id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "sha": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 494032768,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "mohameddhameem/home-credit-default-risk",
+   "config": "application_train_dated",
+   "splits": [
+    "train"
+   ],
+   "licence": "apache-2.0",
+   "colonnes": {
+    "SK_ID_CURR": "Value",
+    "application_date": "Value",
+    "TARGET": "Value",
+    "NAME_CONTRACT_TYPE": "Value",
+    "CODE_GENDER": "Value",
+    "FLAG_OWN_CAR": "Value",
+    "FLAG_OWN_REALTY": "Value",
+    "CNT_CHILDREN": "Value",
+    "AMT_INCOME_TOTAL": "Value",
+    "AMT_CREDIT": "Value",
+    "AMT_ANNUITY": "Value",
+    "AMT_GOODS_PRICE": "Value",
+    "NAME_TYPE_SUITE": "Value",
+    "NAME_INCOME_TYPE": "Value",
+    "NAME_EDUCATION_TYPE": "Value",
+    "NAME_FAMILY_STATUS": "Value",
+    "NAME_HOUSING_TYPE": "Value",
+    "REGION_POPULATION_RELATIVE": "Value",
+    "DAYS_BIRTH": "Value",
+    "DAYS_EMPLOYED": "Value",
+    "DAYS_REGISTRATION": "Value",
+    "DAYS_ID_PUBLISH": "Value",
+    "OWN_CAR_AGE": "Value",
+    "FLAG_MOBIL": "Value",
+    "FLAG_EMP_PHONE": "Value",
+    "FLAG_WORK_PHONE": "Value",
+    "FLAG_CONT_MOBILE": "Value",
+    "FLAG_PHONE": "Value",
+    "FLAG_EMAIL": "Value",
+    "OCCUPATION_TYPE": "Value",
+    "CNT_FAM_MEMBERS": "Value",
+    "REGION_RATING_CLIENT": "Value",
+    "REGION_RATING_CLIENT_W_CITY": "Value",
+    "WEEKDAY_APPR_PROCESS_START": "Value",
+    "HOUR_APPR_PROCESS_START": "Value",
+    "REG_REGION_NOT_LIVE_REGION": "Value",
+    "REG_REGION_NOT_WORK_REGION": "Value",
+    "LIVE_REGION_NOT_WORK_REGION": "Value",
+    "REG_CITY_NOT_LIVE_CITY": "Value",
+    "REG_CITY_NOT_WORK_CITY": "Value",
+    "LIVE_CITY_NOT_WORK_CITY": "Value",
+    "ORGANIZATION_TYPE": "Value",
+    "EXT_SOURCE_1": "Value",
+    "EXT_SOURCE_2": "Value",
+    "EXT_SOURCE_3": "Value",
+    "APARTMENTS_AVG": "Value",
+    "BASEMENTAREA_AVG": "Value",
+    "YEARS_BEGINEXPLUATATION_AVG": "Value",
+    "YEARS_BUILD_AVG": "Value",
+    "COMMONAREA_AVG": "Value",
+    "ELEVATORS_AVG": "Value",
+    "ENTRANCES_AVG": "Value",
+    "FLOORSMAX_AVG": "Value",
+    "FLOORSMIN_AVG": "Value",
+    "LANDAREA_AVG": "Value",
+    "LIVINGAPARTMENTS_AVG": "Value",
+    "LIVINGAREA_AVG": "Value",
+    "NONLIVINGAPARTMENTS_AVG": "Value",
+    "NONLIVINGAREA_AVG": "Value",
+    "APARTMENTS_MODE": "Value",
+    "BASEMENTAREA_MODE": "Value",
+    "YEARS_BEGINEXPLUATATION_MODE": "Value",
+    "YEARS_BUILD_MODE": "Value",
+    "COMMONAREA_MODE": "Value",
+    "ELEVATORS_MODE": "Value",
+    "ENTRANCES_MODE": "Value",
+    "FLOORSMAX_MODE": "Value",
+    "FLOORSMIN_MODE": "Value",
+    "LANDAREA_MODE": "Value",
+    "LIVINGAPARTMENTS_MODE": "Value",
+    "LIVINGAREA_MODE": "Value",
+    "NONLIVINGAPARTMENTS_MODE": "Value",
+    "NONLIVINGAREA_MODE": "Value",
+    "APARTMENTS_MEDI": "Value",
+    "BASEMENTAREA_MEDI": "Value",
+    "YEARS_BEGINEXPLUATATION_MEDI": "Value",
+    "YEARS_BUILD_MEDI": "Value",
+    "COMMONAREA_MEDI": "Value",
+    "ELEVATORS_MEDI": "Value",
+    "ENTRANCES_MEDI": "Value",
+    "FLOORSMAX_MEDI": "Value",
+    "FLOORSMIN_MEDI": "Value",
+    "LANDAREA_MEDI": "Value",
+    "LIVINGAPARTMENTS_MEDI": "Value",
+    "LIVINGAREA_MEDI": "Value",
+    "NONLIVINGAPARTMENTS_MEDI": "Value",
+    "NONLIVINGAREA_MEDI": "Value",
+    "FONDKAPREMONT_MODE": "Value",
+    "HOUSETYPE_MODE": "Value",
+    "TOTALAREA_MODE": "Value",
+    "WALLSMATERIAL_MODE": "Value",
+    "EMERGENCYSTATE_MODE": "Value",
+    "OBS_30_CNT_SOCIAL_CIRCLE": "Value",
+    "DEF_30_CNT_SOCIAL_CIRCLE": "Value",
+    "OBS_60_CNT_SOCIAL_CIRCLE": "Value",
+    "DEF_60_CNT_SOCIAL_CIRCLE": "Value",
+    "DAYS_LAST_PHONE_CHANGE": "Value",
+    "FLAG_DOCUMENT_2": "Value",
+    "FLAG_DOCUMENT_3": "Value",
+    "FLAG_DOCUMENT_4": "Value",
+    "FLAG_DOCUMENT_5": "Value",
+    "FLAG_DOCUMENT_6": "Value",
+    "FLAG_DOCUMENT_7": "Value",
+    "FLAG_DOCUMENT_8": "Value",
+    "FLAG_DOCUMENT_9": "Value",
+    "FLAG_DOCUMENT_10": "Value",
+    "FLAG_DOCUMENT_11": "Value",
+    "FLAG_DOCUMENT_12": "Value",
+    "FLAG_DOCUMENT_13": "Value",
+    "FLAG_DOCUMENT_14": "Value",
+    "FLAG_DOCUMENT_15": "Value",
+    "FLAG_DOCUMENT_16": "Value",
+    "FLAG_DOCUMENT_17": "Value",
+    "FLAG_DOCUMENT_18": "Value",
+    "FLAG_DOCUMENT_19": "Value",
+    "FLAG_DOCUMENT_20": "Value",
+    "FLAG_DOCUMENT_21": "Value",
+    "AMT_REQ_CREDIT_BUREAU_HOUR": "Value",
+    "AMT_REQ_CREDIT_BUREAU_DAY": "Value",
+    "AMT_REQ_CREDIT_BUREAU_WEEK": "Value",
+    "AMT_REQ_CREDIT_BUREAU_MON": "Value",
+    "AMT_REQ_CREDIT_BUREAU_QRT": "Value",
+    "AMT_REQ_CREDIT_BUREAU_YEAR": "Value"
+   },
+   "exemple": {
+    "SK_ID_CURR": 100002,
+    "application_date": "2018-01-01",
+    "TARGET": 1,
+    "NAME_CONTRACT_TYPE": "Cash loans",
+    "CODE_GENDER": "M",
+    "FLAG_OWN_CAR": "N",
+    "FLAG_OWN_REALTY": "Y",
+    "CNT_CHILDREN": 0,
+    "AMT_INCOME_TOTAL": 202500.0,
+    "AMT_CREDIT": 406597.5,
+    "AMT_ANNUITY": 24700.5,
+    "AMT_GOODS_PRICE": 351000.0,
+    "NAME_TYPE_SUITE": "Unaccompanied",
+    "NAME_INCOME_TYPE": "Working",
+    "NAME_EDUCATION_TYPE": "Secondary / secondary special",
+    "NAME_FAMILY_STATUS": "Single / not married",
+    "NAME_HOUSING_TYPE": "House / apartment",
+    "REGION_POPULATION_RELATIVE": 0.018801,
+    "DAYS_BIRTH": -9461,
+    "DAYS_EMPLOYED": -637,
+    "DAYS_REGISTRATION": -3648.0,
+    "DAYS_ID_PUBLISH": -2120,
+    "OWN_CAR_AGE": null,
+    "FLAG_MOBIL": 1,
+    "FLAG_EMP_PHONE": 1,
+    "FLAG_WORK_PHONE": 0,
+    "FLAG_CONT_MOBILE": 1,
+    "FLAG_PHONE": 1,
+    "FLAG_EMAIL": 0,
+    "OCCUPATION_TYPE": "Laborers",
+    "CNT_FAM_MEMBERS": 1.0,
+    "REGION_RATING_CLIENT": 2,
+    "REGION_RATING_CLIENT_W_CITY": 2,
+    "WEEKDAY_APPR_PROCESS_START": "WEDNESDAY",
+    "HOUR_APPR_PROCESS_START": 10,
+    "REG_REGION_NOT_LIVE_REGION": 0,
+    "REG_REGION_NOT_WORK_REGION": 0,
+    "LIVE_REGION_NOT_WORK_REGION": 0,
+    "REG_CITY_NOT_LIVE_CITY": 0,
+    "REG_CITY_NOT_WORK_CITY": 0,
+    "LIVE_CITY_NOT_WORK_CITY": 0,
+    "ORGANIZATION_TYPE": "Business Entity Type 3",
+    "EXT_SOURCE_1": 0.0830369673913225,
+    "EXT_SOURCE_2": 0.2629485927471776,
+    "EXT_SOURCE_3": 0.1393757800997895,
+    "APARTMENTS_AVG": 0.0247,
+    "BASEMENTAREA_AVG": 0.0369,
+    "YEARS_BEGINEXPLUATATION_AVG": 0.9722,
+    "YEARS_BUILD_AVG": 0.6192,
+    "COMMONAREA_AVG": 0.0143,
+    "ELEVATORS_AVG": 0.0,
+    "ENTRANCES_AVG": 0.069,
+    "FLOORSMAX_AVG": 0.0833,
+    "FLOORSMIN_AVG": 0.125,
+    "LANDAREA_AVG": 0.0369,
+    "LIVINGAPARTMENTS_AVG": 0.0202,
+    "LIVINGAREA_AVG": 0.019,
+    "NONLIVINGAPARTMENTS_AVG": 0.0,
+    "NONLIVINGAREA_AVG": 0.0,
+    "APARTMENTS_MODE": 0.0252,
+    "BASEMENTAREA_MODE": 0.0383,
+    "YEARS_BEGINEXPLUATATION_MODE": 0.9722,
+    "YEARS_BUILD_MODE": 0.6341,
+    "COMMONAREA_MODE": 0.0144,
+    "ELEVATORS_MODE": 0.0,
+    "ENTRANCES_MODE": 0.069,
+    "FLOORSMAX_MODE": 0.0833,
+    "FLOORSMIN_MODE": 0.125,
+    "LANDAREA_MODE": 0.0377,
+    "LIVINGAPARTMENTS_MODE": 0.022,
+    "LIVINGAREA_MODE": 0.0198,
+    "NONLIVINGAPARTMENTS_MODE": 0.0,
+    "NONLIVINGAREA_MODE": 0.0,
+    "APARTMENTS_MEDI": 0.025,
+    "BASEMENTAREA_MEDI": 0.0369,
+    "YEARS_BEGINEXPLUATATION_MEDI": 0.9722,
+    "YEARS_BUILD_MEDI": 0.6243,
+    "COMMONAREA_MEDI": 0.0144,
+    "ELEVATORS_MEDI": 0.0,
+    "ENTRANCES_MEDI": 0.069,
+    "FLOORSMAX_MEDI": 0.0833,
+    "FLOORSMIN_MEDI": 0.125,
+    "LANDAREA_MEDI": 0.0375,
+    "LIVINGAPARTMENTS_MEDI": 0.0205,
+    "LIVINGAREA_MEDI": 0.0193,
+    "NONLIVINGAPARTMENTS_MEDI": 0.0,
+    "NONLIVINGAREA_MEDI": 0.0,
+    "FONDKAPREMONT_MODE": "reg oper account",
+    "HOUSETYPE_MODE": "block of flats",
+    "TOTALAREA_MODE": 0.0149,
+    "WALLSMATERIAL_MODE": "Stone, brick",
+    "EMERGENCYSTATE_MODE": "No",
+    "OBS_30_CNT_SOCIAL_CIRCLE": 2.0,
+    "DEF_30_CNT_SOCIAL_CIRCLE": 2.0,
+    "OBS_60_CNT_SOCIAL_CIRCLE": 2.0,
+    "DEF_60_CNT_SOCIAL_CIRCLE": 2.0,
+    "DAYS_LAST_PHONE_CHANGE": -1134.0,
+    "FLAG_DOCUMENT_2": 0,
+    "FLAG_DOCUMENT_3": 1,
+    "FLAG_DOCUMENT_4": 0,
+    "FLAG_DOCUMENT_5": 0,
+    "FLAG_DOCUMENT_6": 0,
+    "FLAG_DOCUMENT_7": 0,
+    "FLAG_DOCUMENT_8": 0,
+    "FLAG_DOCUMENT_9": 0,
+    "FLAG_DOCUMENT_10": 0,
+    "FLAG_DOCUMENT_11": 0,
+    "FLAG_DOCUMENT_12": 0,
+    "FLAG_DOCUMENT_13": 0,
+    "FLAG_DOCUMENT_14": 0,
+    "FLAG_DOCUMENT_15": 0,
+    "FLAG_DOCUMENT_16": 0,
+    "FLAG_DOCUMENT_17": 0,
+    "FLAG_DOCUMENT_18": 0,
+    "FLAG_DOCUMENT_19": 0,
+    "FLAG_DOCUMENT_20": 0,
+    "FLAG_DOCUMENT_21": 0,
+    "AMT_REQ_CREDIT_BUREAU_HOUR": 0.0,
+    "AMT_REQ_CREDIT_BUREAU_DAY": 0.0,
+    "AMT_REQ_CREDIT_BUREAU_WEEK": 0.0,
+    "AMT_REQ_CREDIT_BUREAU_MON": 0.0,
+    "AMT_REQ_CREDIT_BUREAU_QRT": 0.0,
+    "AMT_REQ_CREDIT_BUREAU_YEAR": 1.0
+   },
+   "lignes": {
+    "train": 307511
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
