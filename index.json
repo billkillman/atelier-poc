@@ -2,6 +2,94 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-24",
+   "sujet_id": "decision-models-attaques-raisonnement-lever",
+   "depot": "20261124_typed_decision_misleading_comment_robustness",
+   "titre": "Un décideur typé à passe unique, un décideur avec raisonnement bref et un encodeur fine-tuné résistent-ils à un commentaire externe trompeur sur 77 intentions en français ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "complete",
+   "materiel": "GPU T4 (Google Colab)",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : Classifieur CamemBERT-base fine-tuné)",
+    "raison": ""
+   },
+   "iterations": 3,
+   "metrique_principale": "accuracy_under_attack",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "CamemBERT-base fine-tuné",
+     "role": "reference",
+     "valeur": 0.51,
+     "ic95": [
+      0.46,
+      0.55625
+     ]
+    },
+    {
+     "nom": "Décideur à menu – passe unique",
+     "role": "nouvelle",
+     "valeur": 0.16875,
+     "ic95": [
+      0.13875,
+      0.20125
+     ]
+    },
+    {
+     "nom": "Décideur à menu – raisonnement bref",
+     "role": "nouvelle",
+     "valeur": 0.17875,
+     "ic95": [
+      0.1475,
+      0.20875
+     ]
+    }
+   ],
+   "n_exemples": 400,
+   "jeu": "DeepPavlov/banking77_fr",
+   "synthese": "accuracy_under_attack : Décideur à menu – raisonnement bref 0,179 contre 0,51 pour CamemBERT-base fine-tuné (400 exemples, GPU T4 (Google Colab)).",
+   "conclusion": "À l'échelle complète (400 énoncés communs, 77 intentions françaises, GPU T4), la vulnérabilité annoncée par la source se reproduit pour le décideur à passe unique : exactitude de 65,2 % en entrée propre contre 16,9 % sous attaque, ASR de 72,8 % (IC 67,7–78,3 %) et ECE de 0,78. Le raisonnement bref d'un petit modèle ne protège pas ici : ASR de 71,9 %, écart non significatif (McNemar p = 0,56), latence environ quatre fois plus élevée (248 contre 66 ms par décision, amortie par lot). La protection de la source (38,5 → 95,8 %) n'est pas reproduite. Les protocoles ne sont pas comparables (modèle, tâche, attaque par gabarit), et l'apparente protection de l'échelle réduite était un artefact du modèle substitut. L'encodeur perd 23,5 points mais seulement 13,8 % d'ASR, avec 11,8 points perdus dès la note neutre. Il est de plus sous-entraîné (ECE propre de 0,66). Aucun des trois systèmes ne bat la première option du menu (82 %), qui ignore la note.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "partiellement",
+   "en_bref": "Le décideur à passe unique suit massivement une note trompeuse, et le raisonnement bref de ce petit modèle n'y change rien. L'encodeur bascule moins mais est sous-entraîné, et une simple similarité ignorant la note fait mieux que tous.",
+   "libelle_metrique": "Exactitude sous attaque",
+   "reserves": [
+    "Un simple classement par similarité, qui ne lit pas la note, fait mieux que les trois systèmes, même sans attaque. Ici, la fragilité du décideur à menu est donc mesurée sur un système qu'on n'aurait pas de raison de déployer tel quel.",
+    "La référence est probablement sous-entraînée : sa chute sous attaque et son ECE ne représentent pas un encodeur bien entraîné. L'écart réel avec les décideurs est sans doute différent, et sa « bonne » ECE sous attaque ne signifie pas qu'il est mieux calibré.",
+    "La perte de l'encodeur vient en grande partie de la seule présence d'un texte inhabituel, pas de la tromperie : peu de ses bonnes décisions basculent vers la classe visée. Son comportement est donc très différent de celui du décideur, qui suit la note.",
+    "L'absence de protection ne vaut que pour ce petit modèle et cette consigne courte. Elle ne réfute pas le constat de la source sur un modèle de raisonnement, et elle ne le confirme pas non plus."
+   ],
+   "duree_minutes": 96.7,
+   "consommation": {
+    "claude:poc_code:decision-models-attaques-raisonnement-lever": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 1064.2,
+     "cout_equivalent_usd": 2.7263,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:decision-models-attaques-raisonnement-lever": {
+     "appels": 3,
+     "echecs": 0,
+     "secondes": 966.0,
+     "cout_equivalent_usd": 4.2094,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:decision-models-attaques-raisonnement-lever": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 177.0,
+     "cout_equivalent_usd": 0.6942,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261124_typed_decision_misleading_comment_robustness",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-21",
    "sujet_id": "glide-decision-model-distille-raisonnement",
    "depot": "20261121_typed_decision_camembert_hierarchical_intents",
