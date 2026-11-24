@@ -5,10 +5,10 @@
  "depot": "20261124_rlvr_lora_rank_intent_classification",
  "titre": "En RL à récompense vérifiable, le rang du LoRA (et DoRA) change-t-il le résultat par rapport à un fine-tuning supervisé de même coût, sur une classification à 77 intentions en français ?",
  "debut": "2026-11-24T04:51:56Z",
- "maj": "2026-11-24T05:18:58Z",
+ "maj": "2026-11-24T05:22:27Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 1 sur 3",
+ "detail": "itération 1 : phase publique sur le jeu public (échelle réduite, CPU)",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.038,
+ "progression": 0.044,
  "estimation_fin": "2026-11-24T15:48:58Z",
  "resultat": null
 }
