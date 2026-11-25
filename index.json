@@ -2,6 +2,26 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-25",
+   "sujet_id": "vlm-confiance-par-champ-extraction",
+   "depot": "20261125_vlm_field_confidence_min_prob",
+   "titre": "La probabilité minimale des tokens d'un champ permet-elle de repérer les erreurs d'extraction JSON d'un VLM ouvert de 2 Md de paramètres, mieux qu'une confiance verbalisée ?",
+   "statut": "echec",
+   "cause": "technique",
+   "raison": "modèle en échec : poc_code:vlm-confiance-par-champ-extraction : délai dépassé (1800s)",
+   "duree_minutes": 91.6,
+   "consommation": {
+    "claude:poc_code:vlm-confiance-par-champ-extraction": {
+     "appels": 3,
+     "echecs": 3,
+     "secondes": 5400.0,
+     "cout_equivalent_usd": 0.0,
+     "recherches_web": 0
+    }
+   },
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-24",
    "sujet_id": "rlvr-lora-rang-effondrement",
    "depot": "20261124_rlvr_lora_rank_intent_classification",
