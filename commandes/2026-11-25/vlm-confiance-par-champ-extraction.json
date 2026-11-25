@@ -1,0 +1,355 @@
+{
+ "version": 1,
+ "jour": "2026-11-25",
+ "sujet_id": "vlm-confiance-par-champ-extraction",
+ "depot": "20261125_vlm_field_confidence_min_prob",
+ "fiche": {
+  "sujet_id": "vlm-confiance-par-champ-extraction",
+  "titre": "",
+  "en_une_phrase": "Barclays montre qu'on peut trier les champs extraits par un VLM sans coût d'inférence, grâce aux log-probabilités (AUROC 0,74–0,91), mais sur deux petits jeux anglophones, avec seuils non validés en français.",
+  "probleme": "Un VLM (modèle qui lit une image et du texte) extrait des champs en JSON mais ne dit pas lesquels sont faux. Envoyer tout le document en revue humaine dès qu'un champ est douteux annule le gain d'automatisation.",
+  "comment_ca_marche": "À chaque token (morceau de mot) généré, le modèle calcule déjà une probabilité : c'est la *log-probabilité*. Le procédé :\n\n1. Le VLM extrait les champs en JSON, en décodage *greedy* (toujours le token le plus probable).\n2. Un hook enregistre les probabilités des 50 meilleurs tokens à chaque pas.\n3. Un analyseur JSON retrouve les caractères de chaque valeur, et les relie aux tokens correspondants.\n4. Pour chaque champ, on retient `min_prob` : la probabilité du token le moins sûr. Un seul token douteux suffit à alerter, alors qu'une moyenne le diluerait.\n5. Des seuils fixes classent le champ : GREEN (accepté), AMBER ou RED (revue humaine). GREEN exige `geo_prob` ≥ 0,99 (moyenne géométrique des probabilités) et `min_prob` ≥ 0,80.\n\nAucun calcul supplémentaire côté modèle.",
+  "demarche_experimentale": "Trois VLM (Qwen3-VL-8B, Granite-2.9B, Gemma 4-5.1B) sur CORD v2 (100 reçus de test) et Kleister NDA (83 contrats multipages), contre une confiance verbalisée et le hasard. Puis fine-tuning GRPO sur les champs incertains.",
+  "resultats": [
+   {
+    "metrique": "AUROC de détection d'erreur (min_prob), plus haut = mieux",
+    "valeur": "0,914 CORD ; 0,819 NDA (Qwen3-VL-8B)",
+    "comparaison": "Confiance verbalisée : 0,563 et 0,527 ; hasard : 0,500",
+    "conditions": "Greedy ; 285 champs notés sur CORD, 249 sur NDA",
+    "citation": "min_prob, the probability of the least-confident token in a field’s span, is the single best zero-shot signal (0.914)."
+   },
+   {
+    "metrique": "Justesse par bin, Qwen3-VL-8B, CORD",
+    "valeur": "GREEN 90,8 % ; RED 37,8 %",
+    "comparaison": "Justesse globale 80,0 % ; sur NDA GREEN 90,5 %",
+    "conditions": "AMBER sur seulement 12 champs ; ECE (erreur de calibration, plus bas = mieux) 0,165 : modèle surconfiant",
+    "citation": "GREEN fields are correct 90.8% of the time, more than double the accuracy of RED fields (37.8%)."
+   },
+   {
+    "metrique": "Justesse après GRPO (apprentissage par renforcement)",
+    "valeur": "CORD 78,5 → 87,5 % ; NDA 70,7 → 75,1 %",
+    "comparaison": "SFT (fine-tuning supervisé) sur CORD : 78,5 → 82,4 %",
+    "conditions": "QLoRA rang 16, 67 exemples (CORD), 259 (NDA, ≤ 8 pages) ; un seul run, sans répétition",
+    "citation": "fine-tuning via Group Relative Policy Optimisation (GRPO) improves accuracy from 78.5% to 87.5% on CORD (67 examples) and from 70.7% to 75.1% on multi-page NDA contracts (259 examples)"
+   }
+  ],
+  "limites": [
+   "Jeux petits et anglophones (100 reçus, 83 contrats) ; aucun document français ni téléphonique. Seuils calibrés sur un corpus financier non décrit. Évaluation par les auteurs, chez Barclays, sans reproduction tierce.",
+   "Sur CORD, seuls 285 champs sur 900 ont une confiance alignée ; les autres sont RED par défaut. 18 des 21 GREEN faux viennent d'annotations manquantes (analyse des auteurs).",
+   "Gain GRPO inégal : `effective_date` régresse de 8,4 points sur NDA. Récompense calculée sur la vérité terrain ; le juge LLM sans annotation n'est pas testé en entraînement (auteurs). Modèles < 10 Md de paramètres."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "0,74–0,91",
+    "libelle": "AUROC (1 = parfait, 0,5 = hasard) de détection d'erreur par champ, 3 VLM, 2 jeux"
+   },
+   {
+    "valeur": "0,53–0,56",
+    "libelle": "AUROC de la confiance « verbalisée » demandée au modèle : proche du hasard"
+   },
+   {
+    "valeur": "78,5 → 87,5 %",
+    "libelle": "Justesse sur CORD après GRPO, 67 exemples d'entraînement"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "La probabilité minimale d'un token par champ atteint un AUROC de 0,74–0,91, contre 0,53–0,56 pour la confiance verbalisée.",
+    "citation": "the minimum token probability per field achieves Area Under the ROC Curve (AUROC) 0.74–0.91 for error detection—far exceeding verbalized confidence (0.53–0.56)."
+   },
+   {
+    "affirmation": "Sur CORD avec Qwen3-VL-8B, les champs GREEN sont justes à 90,8 % contre 37,8 % pour les RED.",
+    "citation": "GREEN fields are correct 90.8% of the time, more than double the accuracy of RED fields (37.8%)."
+   },
+   {
+    "affirmation": "Le décodage greedy est essentiel : l'échantillonnage dégrade toutes les métriques de calibration.",
+    "citation": "Every metric degrades under sampling, despite producing 2.2× more aligned fields"
+   },
+   {
+    "affirmation": "Un recalibrage Platt sur 50 exemples étiquetés fait passer la justesse GREEN de 88,1 % à 96,3 % sur CORD.",
+    "citation": "With just 50 labelled examples, Platt scaling reduces ECE by 47% and raises GREEN accuracy from 88.1% to 96.3%"
+   },
+   {
+    "affirmation": "Le GRPO fait passer la justesse de 70,7 % à 75,1 % sur NDA, mais dégrade effective_date.",
+    "citation": "effective_date regresses slightly (−8.4pp, net −7 fields), likely because the curriculum is dominated by jurisdiction examples."
+   },
+   {
+    "affirmation": "Les auteurs reconnaissent que la récompense GRPO utilise la vérité terrain et que le juge LLM n'est pas validé en entraînement.",
+    "citation": "the GRPO reward signal currently uses ground-truth labels; Section 6.4 shows that frontier-model pseudo-labels achieve ∼92% reward agreement, but the effect on downstream GRPO training remains to be validated."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "VLM",
+    "definition": "Vision-Language Model : modèle qui lit une image et du texte et produit du texte, ici le JSON des champs d'un document."
+   },
+   {
+    "terme": "Log-probabilité (logprob)",
+    "definition": "Logarithme de la probabilité que le modèle attribue à chaque token généré ; reflète son degré de certitude."
+   },
+   {
+    "terme": "AUROC",
+    "definition": "Qualité avec laquelle un score sépare erreurs et réussites : 1 = parfait, 0,5 = hasard."
+   },
+   {
+    "terme": "AUARC",
+    "definition": "Aire sous la courbe justesse/couverture : on accepte les champs du plus au moins confiant ; plus haut = mieux."
+   },
+   {
+    "terme": "ECE",
+    "definition": "Erreur de calibration : écart moyen entre confiance annoncée et justesse observée ; plus bas = mieux."
+   },
+   {
+    "terme": "GRPO",
+    "definition": "Group Relative Policy Optimisation : apprentissage par renforcement qui génère plusieurs réponses par prompt et favorise celles qui ont la meilleure récompense."
+   },
+   {
+    "terme": "QLoRA",
+    "definition": "Fine-tuning léger qui n'entraîne que de petites matrices additionnelles sur un modèle quantifié (compressé en 4 bits)."
+   },
+   {
+    "terme": "Platt scaling",
+    "definition": "Recalibrage par régression logistique qui transforme un score en vraie probabilité, sans changer le classement des champs."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Could This BE Any More Wrong? Teaching VLMs to Know What They Don't Know in Document Extraction",
+    "url": "https://arxiv.org/abs/2611.30119",
+    "type": "primaire",
+    "date": "2026-11-23"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-23",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "La probabilité minimale des tokens d'un champ permet-elle de repérer les erreurs d'extraction JSON d'un VLM ouvert de 2 Md de paramètres, mieux qu'une confiance verbalisée ?",
+  "hypothese": "Sur les 100 reçus de test de CORD v2, avec un VLM ouvert de 2 Md de paramètres en décodage greedy, l'AUROC de détection d'erreur par champ de min_prob atteint au moins 0,85 contre au plus 0,60 pour la confiance verbalisée ; les champs GREEN sont justes à au moins 90 % ; un recalibrage logistique (Platt) sur 50 champs étiquetés réduit l'ECE d'au moins 30 %.",
+  "reference": {
+   "nom": "Confiance verbalisée du VLM",
+   "description": "Le même VLM extrait les champs en JSON puis déclare lui-même un score de confiance par champ dans une seconde passe ; c'est la référence de la source, à côté du hasard (AUROC 0,5).",
+   "implementation": "transformers AutoModelForImageTextToText, décodage greedy ; seconde passe demandant pour chaque champ extrait une confiance entre 0 et 100 en JSON ; score = confiance déclarée normalisée ; seuils GREEN à 90 et RED sous 60.",
+   "modeles_hf": [
+    "Qwen/Qwen3-VL-2B-Instruct"
+   ],
+   "modeles_hf_sandbox": [
+    "HuggingFaceTB/SmolVLM-500M-Instruct"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "llmaas"
+  },
+  "nouvelle": {
+   "nom": "Confiance par champ via min_prob des logprobs",
+   "description": "Pendant la génération greedy du JSON, on enregistre la probabilité du token choisi à chaque pas ; chaque valeur de champ est reliée à ses tokens par les offsets de caractères, et min_prob (probabilité du token le moins sûr) sert de score. Des seuils fixes (geo_prob ≥ 0,99 et min_prob ≥ 0,80 pour GREEN) classent GREEN/AMBER/RED ; un recalibrage Platt est testé sur 50 champs de validation.",
+   "implementation": "model.generate avec output_scores=True et return_dict_in_generate=True, compute_transition_scores pour les logprobs des tokens générés ; alignement des spans de valeurs du JSON (analyse par regex sur le texte décodé et offsets des tokens) ; min_prob et geo_prob par champ ; LogisticRegression scikit-learn (Platt) ajustée sur les champs de validation ; comparaison appariée des AUROC par bootstrap sur les documents. Les champs non alignés sont comptés à part et RED par défaut, comme dans la source.",
+   "modeles_hf": [
+    "Qwen/Qwen3-VL-2B-Instruct"
+   ],
+   "modeles_hf_sandbox": [
+    "HuggingFaceTB/SmolVLM-500M-Instruct"
+   ],
+   "entrainement": "autre",
+   "service_phase2": "llmaas"
+  },
+  "jeu_public": {
+   "hub_id": "naver-clova-ix/cord-v2",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "validation",
+   "colonnes_utiles": "image, ground_truth (JSON : gt_parse.menu[nm, cnt, price], sub_total, total)",
+   "representativite": "Reproduit le protocole de la source (100 reçus de test, extraction JSON, vérité terrain champ par champ) ; permet de juger si min_prob trie les erreurs d'un VLM ouvert et si un recalibrage léger suffit.",
+   "ecarts_donnees_reelles": "Tickets de caisse indonésiens photographiés, en anglais/indonésien : ni français, ni documents de services financiers ; peu de champs par document ; annotations parfois incomplètes (faux GREEN) ; aucune conclusion sur les seuils en français.",
+   "jeux_explores": [
+    {
+     "nom": "naver-clova-ix/cord-v2",
+     "url": "https://huggingface.co/datasets/naver-clova-ix/cord-v2",
+     "acces": "hub_libre",
+     "adequation": "Images et JSON de vérité terrain, 800/100/100, cc-by-4.0 ; même jeu que la source.",
+     "decision": "retenu",
+     "raison": "Seul jeu libre, chargeable et annoté par champ à taille suffisante pour un AUROC."
+    },
+    {
+     "nom": "nnul/xfund-multilingual",
+     "url": "https://huggingface.co/datasets/nnul/xfund-multilingual",
+     "acces": "hub_libre",
+     "adequation": "Environ 150 formulaires français scannés avec images, annotations BIO question/réponse.",
+     "decision": "ecarte",
+     "raison": "Étiquettes en BIO et non en JSON de champs (appariement à construire), licence non précisée ; piste pour mesurer l'écart de langue ensuite."
+    },
+    {
+     "nom": "orgrctera/kleister_nda_information_extraction",
+     "url": "https://huggingface.co/datasets/orgrctera/kleister_nda_information_extraction",
+     "acces": "hub_libre",
+     "adequation": "Réponses attendues sur 4 champs de contrats multipages.",
+     "decision": "ecarte",
+     "raison": "Les PDF ne sont pas fournis, licence non précisée, anglais."
+    },
+    {
+     "nom": "djo33350/french-synthetic-document-test-samples",
+     "url": "https://huggingface.co/datasets/djo33350/french-synthetic-document-test-samples",
+     "acces": "hub_libre",
+     "adequation": "6 PDF français synthétiques avec JSON de vérité terrain, cc-by-4.0.",
+     "decision": "ecarte",
+     "raison": "6 documents : aucun AUROC possible."
+    },
+    {
+     "nom": "GHOFRANEE/ALCORA",
+     "url": "https://huggingface.co/datasets/GHOFRANEE/ALCORA",
+     "acces": "hub_libre",
+     "adequation": "6 factures françaises en texte OCR avec JSON.",
+     "decision": "ecarte",
+     "raison": "Texte seul sans images, 6 exemples, licence absente."
+    },
+    {
+     "nom": "Scribe Finance (dseddah/Scribe_finance)",
+     "url": "https://github.com/dseddah/Scribe_finance/",
+     "acces": "telechargement_libre",
+     "adequation": "1 204 questions sur prospectus et DICI français pour VLM.",
+     "decision": "ecarte",
+     "raison": "Hors Hub (non chargeable), questions-réponses et non extraction de champs."
+    },
+    {
+     "nom": "sofiahuppertz/payslips-fr",
+     "url": "https://huggingface.co/datasets/sofiahuppertz/payslips-fr",
+     "acces": "restreint",
+     "adequation": "Bulletins de paie français, contenu inconnu.",
+     "decision": "ecarte",
+     "raison": "Accès restreint (gated), provenance et risque RGPD non clarifiés."
+    }
+   ]
+  },
+  "metriques": [
+   "auroc_min_prob",
+   "auroc_verbalized_confidence",
+   "auroc_geo_prob",
+   "green_accuracy",
+   "red_accuracy",
+   "green_coverage",
+   "expected_calibration_error",
+   "expected_calibration_error_platt",
+   "field_accuracy",
+   "aligned_field_rate"
+  ],
+  "metrique_principale": "auroc_min_prob",
+  "sens": "max",
+  "protocole": "Les champs évalués sont les valeurs des lignes de menu (nm, cnt, price) et sub_total/total, comparés à la vérité terrain après normalisation (minuscules, espaces et séparateurs de milliers retirés). Évaluation sur le split test ; les seuils de la source sont appliqués tels quels ; Platt ajusté sur 50 champs alignés du split validation puis appliqué au test. Même prompt d'extraction et même décodage greedy pour les deux approches ; IC à 95 % par bootstrap sur les documents ; comparaison des AUROC min_prob et verbalisé par bootstrap apparié ; les champs sans alignement sont rapportés à part. GRPO de la source non reproduit.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Substitut SmolVLM-500M-Instruct (500 M de paramètres) sur CPU, 30 documents de test et 30 de validation, images réduites (max_pixels bas), 256 tokens générés au plus. À l'échelle complète : Qwen3-VL-2B-Instruct en fp16 sur T4, 100 test + 100 validation = 200 documents × 2 passes (extraction ≈ 300 tokens générés, vérification ≈ 150) ≈ 90 000 tokens générés ÷ 700 tok/s ≈ 2 min, plus préremplissage des images (~600 tokens × 400 passes), chargement et calibration : largement sous 45 min. Limite : modèle de 2 Md au lieu des 8 Md de la source, résultats non transposables telles quels.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "document_id",
+     "type": "string",
+     "description": "Identifiant pseudonymisé du document"
+    },
+    {
+     "colonne": "image_path",
+     "type": "string",
+     "description": "Chemin de l'image ou de la page du document (scan ou photo)"
+    },
+    {
+     "colonne": "document_type",
+     "type": "string",
+     "description": "Type de document (facture, bulletin de paie, justificatif de domicile, formulaire…)"
+    },
+    {
+     "colonne": "field_name",
+     "type": "string",
+     "description": "Nom du champ à extraire"
+    },
+    {
+     "colonne": "ground_truth_value",
+     "type": "string",
+     "description": "Valeur de référence saisie ou validée par un humain"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception du document, pour le découpage temporel"
+    }
+   ],
+   "volume_conseille": "Au moins 200 documents (≥ 600 champs) par type de document, dont 50 réservés au recalibrage.",
+   "metriques_metier": "Part de champs acceptés sans revue (green_coverage) à justesse GREEN ≥ 95 % ; taux d'erreurs résiduelles non détectées ; économie de revue humaine par document ; ECE par type de document.",
+   "garde_fous": "Données personnelles pseudonymisées avant tout traitement, inférence dans l'environnement cible uniquement ; aucune décision automatique sans revue des champs RED ; seuils recalibrés par type de document avant usage.",
+   "prescriptions": [
+    "Au moins 200 documents annotés champ par champ, avec 10 % de double annotation et accord inter-annotateurs mesuré.",
+    "Vérité terrain complète : un champ présent sur le document ne doit pas être manquant (source de faux GREEN).",
+    "Mêmes conditions de capture que la production (scans, photos mobiles, résolution), période d'au moins 6 mois.",
+    "Découpage temporel et par client : le lot de recalibrage (≥ 50 documents) précède le lot de test.",
+    "Serveur ou modèle local exposant les logprobs, décodage greedy, même version de modèle partout.",
+    "Exclure les pièces d'identité en clair et les documents hors périmètre de consentement ; masquer les données personnelles non utiles à la comparaison."
+   ],
+   "preparation": "Extraire d'un entrepôt de documents un échantillon stratifié par type de document et par canal de capture, joindre les valeurs saisies ou validées par les opérateurs comme vérité terrain, faire relire un sous-échantillon, pseudonymiser, puis découper chronologiquement en lot de recalibrage et lot de test."
+  },
+  "duree_estimee_minutes": 90,
+  "analyse_materiel": "",
+  "type_exemples": "enregistrements_longs"
+ },
+ "faits": {
+  "modeles": {
+   "Qwen/Qwen3-VL-2B-Instruct": {
+    "id": "Qwen/Qwen3-VL-2B-Instruct",
+    "sha": "89644892e4d85e24eaac8bacfd4f463576704203",
+    "tache": "image-text-to-text",
+    "bibliotheque": "transformers",
+    "parametres": 2127532032,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "HuggingFaceTB/SmolVLM-500M-Instruct": {
+    "id": "HuggingFaceTB/SmolVLM-500M-Instruct",
+    "sha": "753c1752602b5e739af7a7fa6947a635051897a3",
+    "tache": "image-text-to-text",
+    "bibliotheque": "transformers",
+    "parametres": 507482304,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": [
+     "en"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "naver-clova-ix/cord-v2",
+   "config": "default",
+   "splits": [
+    "train",
+    "validation",
+    "test"
+   ],
+   "licence": "cc-by-4.0",
+   "colonnes": {
+    "image": "Image",
+    "ground_truth": "Value"
+   },
+   "exemple": {
+    "ground_truth": "{\"gt_parse\": {\"menu\": [{\"nm\": \"Nasi Campur Bali\", \"cnt\": \"1 x\", \"price\": \"75,000\"}, {\"nm\": \"Bbk Bengil Nasi\", \"cnt\": \"1 x\", \"price\": \"125,000\"}, {\"nm\": \"MilkSha"
+   },
+   "lignes": {
+    "train": 800,
+    "validation": 100,
+    "test": 100
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
