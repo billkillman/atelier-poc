@@ -5,10 +5,10 @@
  "depot": "20261125_vlm_field_confidence_min_prob",
  "titre": "La probabilité minimale des tokens d'un champ permet-elle de repérer les erreurs d'extraction JSON d'un VLM ouvert de 2 Md de paramètres, mieux qu'une confiance verbalisée ?",
  "debut": "2026-11-25T02:03:16Z",
- "maj": "2026-11-25T02:03:16Z",
- "statut": "en_cours",
- "etape": "ecriture",
- "detail": "le modèle écrit le notebook : protocole, deux approches, évaluation",
+ "maj": "2026-11-25T03:34:46Z",
+ "statut": "echec",
+ "etape": "publication",
+ "detail": "",
  "iteration": 0,
  "iterations_max": 3,
  "sous_progression": null,
@@ -16,47 +16,53 @@
   {
    "code": "ecriture",
    "libelle": "Écriture du notebook",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-25T02:03:16Z",
-   "fin": null
+   "fin": "2026-11-25T03:34:46Z"
   },
   {
    "code": "essai",
    "libelle": "Exécution à échelle réduite",
-   "statut": "a_venir",
+   "statut": "saute",
    "debut": null,
    "fin": null
   },
   {
    "code": "revue_prealable",
    "libelle": "Relecture avant l'échelle complète",
-   "statut": "a_venir",
+   "statut": "saute",
    "debut": null,
    "fin": null
   },
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "a_venir",
+   "statut": "saute",
    "debut": null,
    "fin": null
   },
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "a_venir",
+   "statut": "saute",
    "debut": null,
    "fin": null
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "echec",
+   "debut": "2026-11-25T03:34:46Z",
+   "fin": "2026-11-25T03:34:46Z"
   }
  ],
- "progression": 0.0,
- "estimation_fin": "2026-11-25T04:28:16Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "echec",
+  "depot": "20261125_vlm_field_confidence_min_prob",
+  "raison": "modèle en échec : poc_code:vlm-confiance-par-champ-extraction : délai dépassé (1800s)",
+  "cause": "technique",
+  "tentatives": 1
+ }
 }
