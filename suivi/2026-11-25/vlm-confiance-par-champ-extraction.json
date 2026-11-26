@@ -4,11 +4,11 @@
  "sujet_id": "vlm-confiance-par-champ-extraction",
  "depot": "20261125_vlm_field_confidence_min_prob",
  "titre": "La probabilité minimale des tokens d'un champ permet-elle de repérer les erreurs d'extraction JSON d'un VLM ouvert de 2 Md de paramètres, mieux qu'une confiance verbalisée ?",
- "debut": "2026-11-25T02:03:16Z",
- "maj": "2026-11-25T03:34:46Z",
- "statut": "echec",
- "etape": "publication",
- "detail": "",
+ "debut": "2026-11-26T02:08:36Z",
+ "maj": "2026-11-26T02:08:36Z",
+ "statut": "en_cours",
+ "etape": "ecriture",
+ "detail": "le modèle écrit le notebook : protocole, deux approches, évaluation",
  "iteration": 0,
  "iterations_max": 3,
  "sous_progression": null,
@@ -16,53 +16,47 @@
   {
    "code": "ecriture",
    "libelle": "Écriture du notebook",
-   "statut": "fait",
-   "debut": "2026-11-25T02:03:16Z",
-   "fin": "2026-11-25T03:34:46Z"
+   "statut": "en_cours",
+   "debut": "2026-11-26T02:08:36Z",
+   "fin": null
   },
   {
    "code": "essai",
    "libelle": "Exécution à échelle réduite",
-   "statut": "saute",
+   "statut": "a_venir",
    "debut": null,
    "fin": null
   },
   {
    "code": "revue_prealable",
    "libelle": "Relecture avant l'échelle complète",
-   "statut": "saute",
+   "statut": "a_venir",
    "debut": null,
    "fin": null
   },
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "saute",
+   "statut": "a_venir",
    "debut": null,
    "fin": null
   },
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "saute",
+   "statut": "a_venir",
    "debut": null,
    "fin": null
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "echec",
-   "debut": "2026-11-25T03:34:46Z",
-   "fin": "2026-11-25T03:34:46Z"
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
   }
  ],
- "progression": 1.0,
- "estimation_fin": null,
- "resultat": {
-  "statut": "echec",
-  "depot": "20261125_vlm_field_confidence_min_prob",
-  "raison": "modèle en échec : poc_code:vlm-confiance-par-champ-extraction : délai dépassé (1800s)",
-  "cause": "technique",
-  "tentatives": 1
- }
+ "progression": 0.0,
+ "estimation_fin": "2026-11-26T04:33:36Z",
+ "resultat": null
 }
