@@ -5,10 +5,10 @@
  "depot": "20261125_vlm_field_confidence_min_prob",
  "titre": "La probabilité minimale des tokens d'un champ permet-elle de repérer les erreurs d'extraction JSON d'un VLM ouvert de 2 Md de paramètres, mieux qu'une confiance verbalisée ?",
  "debut": "2026-11-26T02:08:36Z",
- "maj": "2026-11-26T03:17:22Z",
- "statut": "en_cours",
- "etape": "essai",
- "detail": "itération 3 : phase publique sur le jeu public (échelle réduite, CPU)",
+ "maj": "2026-11-26T03:17:38Z",
+ "statut": "echec",
+ "etape": "publication",
+ "detail": "",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -23,40 +23,46 @@
   {
    "code": "essai",
    "libelle": "Exécution à échelle réduite",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-26T03:08:20Z",
-   "fin": null
+   "fin": "2026-11-26T03:17:38Z"
   },
   {
    "code": "revue_prealable",
    "libelle": "Relecture avant l'échelle complète",
-   "statut": "a_venir",
+   "statut": "saute",
    "debut": null,
    "fin": null
   },
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "a_venir",
+   "statut": "saute",
    "debut": null,
    "fin": null
   },
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "a_venir",
+   "statut": "saute",
    "debut": null,
    "fin": null
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "echec",
+   "debut": "2026-11-26T03:17:38Z",
+   "fin": "2026-11-26T03:17:38Z"
   }
  ],
- "progression": 0.173,
- "estimation_fin": "2026-11-26T06:00:20Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "echec",
+  "depot": "20261125_vlm_field_confidence_min_prob",
+  "raison": "la phase publique a échoué",
+  "cause": "methode",
+  "tentatives": 2
+ }
 }
