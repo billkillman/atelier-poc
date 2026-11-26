@@ -1,0 +1,62 @@
+{
+ "version": 1,
+ "jour": "2026-11-26",
+ "sujet_id": "control-flow-tax-jev-routage",
+ "depot": "20261126_typed_decision_closed_options_french",
+ "titre": "Un décideur typé à options fermées (SLM, probabilités calibrées, abstention) rivalise-t-il avec un encodeur fine-tuné sur 77 intentions françaises ?",
+ "debut": "2026-11-26T03:21:47Z",
+ "maj": "2026-11-26T03:21:47Z",
+ "statut": "en_cours",
+ "etape": "ecriture",
+ "detail": "le modèle écrit le notebook : protocole, deux approches, évaluation",
+ "iteration": 0,
+ "iterations_max": 3,
+ "sous_progression": null,
+ "etapes": [
+  {
+   "code": "ecriture",
+   "libelle": "Écriture du notebook",
+   "statut": "en_cours",
+   "debut": "2026-11-26T03:21:47Z",
+   "fin": null
+  },
+  {
+   "code": "essai",
+   "libelle": "Exécution à échelle réduite",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue_prealable",
+   "libelle": "Relecture avant l'échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "complete",
+   "libelle": "Échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue",
+   "libelle": "Revue de méthode",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "publication",
+   "libelle": "Publication",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  }
+ ],
+ "progression": 0.0,
+ "estimation_fin": "2026-11-26T05:16:47Z",
+ "resultat": null
+}
