@@ -3,6 +3,85 @@
  "pocs": [
   {
    "jour": "2026-11-26",
+   "sujet_id": "seldon-tfm-tabulaire-ouvert",
+   "depot": "20261126_tabular_foundation_temporal_xgboost",
+   "titre": "Un modèle tabulaire pré-entraîné sans réglage (TabICL v2) rivalise-t-il avec un XGBoost réglé sous validation chronologique ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "reduite",
+   "materiel": "CPU du sandbox",
+   "echelle_complete": {
+    "statut": "echec",
+    "materiel_requis": "gpu",
+    "raison_materiel": "échelle complète estimée à 35 min sur CPU, au-delà du budget de 20 min",
+    "raison": "noyau arrêté (mémoire saturée ou plantage natif) (cellule 49, section new_approach)"
+   },
+   "iterations": 3,
+   "metrique_principale": "temporal_roc_auc",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "XGBoost réglé",
+     "role": "reference",
+     "valeur": 0.7794444444444444,
+     "ic95": [
+      0.6813876245540657,
+      0.8573696145124716
+     ]
+    },
+    {
+     "nom": "TabICL v2 (sans réglage)",
+     "role": "nouvelle",
+     "valeur": 0.8139342403628118,
+     "ic95": [
+      0.7326479490658595,
+      0.8890699963095091
+     ]
+    }
+   ],
+   "n_exemples": 1500,
+   "jeu": "deburky/home-credit-credit-risk-model-stability",
+   "synthese": "temporal_roc_auc : TabICL v2 (sans réglage) 0,814 contre 0,779 pour XGBoost réglé (1500 exemples, échelle réduite, CPU du sandbox).",
+   "conclusion": "À l'échelle réduite (CPU, 3 000 lignes de contexte, 1 500 de test dont 30 positifs, TabICL v2 avec 2 passes comme substitut de Seldon-Mini), TabICL v2 sans réglage obtient une AUC chronologique de 0,814 contre 0,779 pour XGBoost réglé sur 4 tirages. L'IC de la différence appariée [−0,035 ; 0,125] est très large : le verdict de non-infériorité est « non concluant ». La comparaison est équitable (mêmes lignes, même contexte, XGBoost réellement réglé), mais le volume ne permet pas de trancher. Le critère de calibration (ECE 0,005) est vérifié presque par construction avec 2 % de positifs. Le coût mesuré est bien plus élevé pour TabICL sur CPU. L'écart entre découpages aléatoire et chronologique, comme l'équité entre sexes, n'est pas interprétable.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Les données ne permettent pas de trancher : le modèle sans réglage paraît au moins égal à XGBoost, mais l'échantillon de test est trop petit et l'incertitude trop grande pour conclure.",
+   "libelle_metrique": "AUC ROC, test chronologique",
+   "reserves": [
+    "Avec 30 positifs en test, la légère avance de TabICL v2 sur XGBoost est indiscernable du bruit. Les chiffres ne permettent de conclure ni à l'égalité, ni à la supériorité, ni à l'infériorité.",
+    "L'écart entre découpage aléatoire et chronologique n'est pas interprétable à cette échelle. Il ne dit rien sur la robustesse de TabICL v2 à la dérive temporelle.",
+    "Une ECE faible ne montre pas ici que TabICL v2 produit des probabilités fiables. Le déséquilibre extrême des classes la rend presque triviale.",
+    "Les durées mesurées ne permettent pas de dire quelle approche coûte le moins en pratique. Sur CPU et à petite échelle, TabICL v2 est nettement plus lent. Aucune mesure ne montre un gain."
+   ],
+   "duree_minutes": 33.8,
+   "consommation": {
+    "claude:poc_code:seldon-tfm-tabulaire-ouvert": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 533.4,
+     "cout_equivalent_usd": 1.4795,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:seldon-tfm-tabulaire-ouvert": {
+     "appels": 3,
+     "echecs": 0,
+     "secondes": 685.2,
+     "cout_equivalent_usd": 3.1811,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:seldon-tfm-tabulaire-ouvert": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 89.1,
+     "cout_equivalent_usd": 0.513,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261126_tabular_foundation_temporal_xgboost",
+   "tentatives": 1
+  },
+  {
+   "jour": "2026-11-26",
    "sujet_id": "control-flow-tax-jev-routage",
    "depot": "20261126_typed_decision_closed_options_french",
    "titre": "Un décideur typé à options fermées (SLM, probabilités calibrées, abstention) rivalise-t-il avec un encodeur fine-tuné sur 77 intentions françaises ?",
