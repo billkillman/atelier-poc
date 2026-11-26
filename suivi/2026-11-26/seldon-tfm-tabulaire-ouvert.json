@@ -5,11 +5,11 @@
  "depot": "20261126_tabular_foundation_temporal_xgboost",
  "titre": "Un modèle tabulaire pré-entraîné sans réglage (TabICL v2) rivalise-t-il avec un XGBoost réglé sous validation chronologique ?",
  "debut": "2026-11-26T04:12:19Z",
- "maj": "2026-11-26T04:30:55Z",
+ "maj": "2026-11-26T04:34:52Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 2 : correction du notebook (son exécution dans le sandbox a échoué ou ne remplit pas les conditions de validation)",
- "iteration": 2,
+ "detail": "itération 3 : phase publique sur le jeu public (échelle réduite, CPU)",
+ "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
  "etapes": [
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.299,
- "estimation_fin": "2026-11-26T05:52:13Z",
+ "progression": 0.272,
+ "estimation_fin": "2026-11-26T06:18:13Z",
  "resultat": null
 }
