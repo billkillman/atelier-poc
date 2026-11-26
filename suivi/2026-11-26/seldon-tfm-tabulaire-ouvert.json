@@ -5,10 +5,10 @@
  "depot": "20261126_tabular_foundation_temporal_xgboost",
  "titre": "Un modèle tabulaire pré-entraîné sans réglage (TabICL v2) rivalise-t-il avec un XGBoost réglé sous validation chronologique ?",
  "debut": "2026-11-26T04:12:19Z",
- "maj": "2026-11-26T04:45:17Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-26T04:46:10Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 3,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,54 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-26T04:45:17Z",
-   "fin": null
+   "fin": "2026-11-26T04:46:03Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-26T04:46:03Z",
+   "fin": "2026-11-26T04:46:10Z"
   }
  ],
- "progression": 0.979,
- "estimation_fin": "2026-11-26T04:48:17Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261126_tabular_foundation_temporal_xgboost",
+  "depot": "20261126_tabular_foundation_temporal_xgboost",
+  "en_bref": "Les données ne permettent pas de trancher : le modèle sans réglage paraît au moins égal à XGBoost, mais l'échantillon de test est trop petit et l'incertitude trop grande pour conclure.",
+  "synthese": "temporal_roc_auc : TabICL v2 (sans réglage) 0,814 contre 0,779 pour XGBoost réglé (1500 exemples, échelle réduite, CPU du sandbox).",
+  "metrique_principale": "temporal_roc_auc",
+  "libelle_metrique": "AUC ROC, test chronologique",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "XGBoost réglé",
+    "role": "reference",
+    "valeur": 0.7794444444444444,
+    "ic95": [
+     0.6813876245540657,
+     0.8573696145124716
+    ]
+   },
+   {
+    "nom": "TabICL v2 (sans réglage)",
+    "role": "nouvelle",
+    "valeur": 0.8139342403628118,
+    "ic95": [
+     0.7326479490658595,
+     0.8890699963095091
+    ]
+   }
+  ],
+  "n_exemples": 1500,
+  "jeu": "deburky/home-credit-credit-risk-model-stability",
+  "materiel": "CPU du sandbox",
+  "echelle": "reduite",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
