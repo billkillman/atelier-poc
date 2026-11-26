@@ -1,0 +1,488 @@
+{
+ "version": 1,
+ "jour": "2026-11-26",
+ "sujet_id": "seldon-tfm-tabulaire-ouvert",
+ "depot": "20261126_tabular_foundation_temporal_xgboost",
+ "fiche": {
+  "sujet_id": "seldon-tfm-tabulaire-ouvert",
+  "titre": "Seldon-Mini (27M) : prédiction tabulaire sans entraînement au meilleur compromis précision-vitesse, testée seulement sur découpages aléatoires",
+  "en_une_phrase": "Neuralk-AI publie Seldon-Mini (27M) et Seldon (213M), des modèles tabulaires qui prédisent sans entraînement et talonnent Kumo et LimiX. Seul Mini autorise l'usage interne, et rien n'est montré sur données temporelles ou internes.",
+  "probleme": "Sur les données tabulaires, les arbres de décision boostés (XGBoost, CatBoost) restent la référence, mais chaque nouvelle table exige son propre entraînement et son réglage. Les **modèles de fondation tabulaires** (TFM) suppriment ce cycle : pré-entraînés une seule fois, ils prédisent sur une table inconnue en lisant ses lignes étiquetées. Ils dominent désormais le classement public TabArena. Mais leur coût d'inférence varie énormément : parmi les dix meilleurs, prédire 1 000 lignes prend de moins de 0,1 s à plus de 8 s. Et les meilleurs modèles ne sont pas tous ouverts.",
+  "comment_ca_marche": "Seldon suit le principe des réseaux « pré-ajustés » inauguré par TabPFN. Les auteurs reconnaissent une architecture proche de celles de Kumo Tabular, TabFM et TabPFN-3.5.\n\n1. **Pré-entraînement unique, sur données fictives.** Le modèle apprend sur des tables générées par des *modèles causaux aléatoires* : un graphe tiré au hasard, où chaque variable est une fonction bruitée de ses parents. La moitié des tables ont des valeurs manquantes. Aucune table réelle n'est utilisée.\n2. **Usage : aucun entraînement.** `fit` se contente de fournir les lignes étiquetées comme *contexte*. Aucun poids n'est modifié et aucun hyperparamètre n'est cherché.\n3. **Encodage des cellules.** Chaque cellule est encodée avec deux voisines de sa ligne. Une valeur manquante est remplacée par la moyenne de sa colonne, et un signal indique au modèle qu'elle a été imputée.\n4. **Encodeur alterné colonne / ligne.** Dans chaque colonne, quelques vecteurs appris (des « points d'induction ») résument la colonne, puis chaque cellule relit ce résumé. Le coût croît donc linéairement avec le nombre de lignes. Dans chaque ligne, 4 jetons condensent la ligne en un vecteur.\n5. **Apprentissage en contexte.** Chaque ligne à prédire consulte uniquement les lignes étiquetées. Sa prédiction ne dépend donc pas des autres lignes à prédire.\n6. **Sortie.** Le modèle produit des probabilités pour 10 classes au plus. Au-delà, un code correcteur d'erreurs découpe le problème en plusieurs tâches à 10 classes. En régression, il produit 999 quantiles.\n7. **Moyenne de 4 à 8 passes**, chacune sur une version transformée de la table (colonnes permutées, changement d'échelle).\n\nCe qui est nouveau, c'est surtout le **compromis taille/précision** obtenu avec des poids ouverts. Le papier compagnon *InducedTFM* (Neuralk et INRIA) va plus loin : il applique les points d'induction aux deux axes, lignes et colonnes. Sur les tables étroites, il est 30 fois plus rapide que TabICLv2 à 640 000 lignes.",
+  "demarche_experimentale": "Les modèles sont évalués tels que publiés, sans aucun réglage. Trois classements publics tenus par des équipes indépendantes :\n- **TabArena** : 51 jeux, entrées vérifiées au 16/11/2026 ;\n- **BeyondArena** : seule la piste à découpages aléatoires est rapportée (103 jeux) ;\n- **TabBench-Bio** : 46 jeux biomédicaux.\n\nLe classement utilise un **Elo** à la Bradley-Terry : un score issu de duels jeu par jeu, plus haut = mieux. La forêt aléatoire par défaut vaut 1000 sur TabArena, XGBoost par défaut 1000 sur BeyondArena.\n\nS'y ajoutent deux bancs **maison, non publics** :\n- **TabBench** : 124 jeux OpenML, de 500 à 150 000 lignes, AUC ROC, validation croisée à 5 plis ;\n- **Breaking TFMs** : 10 tests synthétiques.\n\nSeldon+, accessible seulement par API, n'est jamais sur les classements officiels : ses scores viennent des propres exécutions des auteurs.",
+  "resultats": [
+   {
+    "metrique": "Elo TabArena global (plus haut = mieux)",
+    "valeur": "4e / 109 ; Elo 1904",
+    "comparaison": "94 points sous LimiX-2-1016, 67 sous Kumo Tabular ; intervalles de confiance chevauchants",
+    "conditions": "Seldon 213M, 51 jeux, classement officiel du 16/11/2026, sans réglage",
+    "citation": "Seldon reaches an Elo of 1904 overall, 94 points below LimiX-2-1016 and 67 points below Kumo-Tabular. Its 95% interval overlaps those of the three entries above it."
+   },
+   {
+    "metrique": "Rang TabArena et compromis précision-vitesse",
+    "valeur": "7e / 109",
+    "comparaison": "Sur le front de Pareto, avec 8 fois moins de paramètres que Seldon",
+    "conditions": "Seldon-Mini 27M, classement officiel",
+    "citation": "Seldon-Mini ranks seventh with eight times fewer parameters. Both lie on the Pareto front of Elo against inference time: no entry is both more accurate and faster."
+   },
+   {
+    "metrique": "Elo BeyondArena, découpages aléatoires",
+    "valeur": "2e / 42 ; Elo 1518",
+    "comparaison": "58 points sous Kumo Tabular ; 4e si l'on inclut les découpages temporels et groupés",
+    "conditions": "Seldon, 103 jeux ; XGBoost par défaut = 1000",
+    "citation": "Seldon reaches an Elo of 1518, 58 points below Kumo-Tabular. On all 142 datasets, including the temporal and grouped tracks, Seldon ranks fourth."
+   },
+   {
+    "metrique": "Elo TabBench (banc maison)",
+    "valeur": "Seldon+ 1207, Seldon 1178 (1er et 2e / 15)",
+    "comparaison": "Intervalles des 4 premiers chevauchants ; Seldon-Mini 9e ou 10e",
+    "conditions": "124 jeux OpenML, AUC ROC, validation croisée 5 plis, exécuté par Neuralk",
+    "citation": "On TabBench, Seldon+ reaches an Elo of 1207 and Seldon 1178. The 95% intervals of the top four models overlap."
+   },
+   {
+    "metrique": "Rang sur les jeux finance de TabArena",
+    "valeur": "Top 3 sur 6 des 8 jeux",
+    "comparaison": "1er sur Bank Customer Churn et credit-g",
+    "conditions": "Seldon, 8 jeux publics de finance",
+    "citation": "On the 8 finance datasets, Seldon ranks in the top three on 6 and first on 2: Bank Customer Churn and credit-g."
+   },
+   {
+    "metrique": "Elo TabArena d'un mélange Kumo + LimiX (Tabra Blends)",
+    "valeur": "2063,8 (+45,4)",
+    "comparaison": "Face à LimiX-2-1016 complet ; en duel direct, 27 jeux gagnés contre 24, erreur −0,10 %",
+    "conditions": "Mélange 50/50 de Kumo à 4 passes et d'un pipeline LimiX, 51 jeux, étude Rutgers",
+    "citation": "Against full 32-pipeline LimiX-2-1016, the four-estimator blend is nearly even in direct dataset-level error (Table 2), winning 27–24 across datasets"
+   }
+  ],
+  "limites": [
+   "**Conflit d'intérêts** : Seldon+ n'est 1er que sur un banc maison non public (TabBench) ou sur des exécutions des auteurs. Les intervalles des 4 premiers se chevauchent.",
+   "**Découpages aléatoires seulement** : les auteurs écartent les pistes temporelles et groupées, car leurs modèles ne les modélisent pas. Seldon y recule à la 4e place. Or l'entreprise valide sur une période ultérieure.",
+   "**Taille et preuve métier** : TabBench plafonne à 150 000 lignes et Seldon+ y manque de mémoire sur les plus grands jeux. Rien sur l'explicabilité, l'équité ou des données internes réelles.",
+   "**Licences** : Seldon (213M) est limité à la recherche non commerciale. L'usage interne de Seldon-Mini est affirmé par les auteurs, mais le texte de la licence n'est lisible qu'après inscription. Seldon+ n'existe qu'en API, hébergement non précisé."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "4e / 109",
+    "libelle": "Rang de Seldon (213M) sur TabArena, derrière LimiX-2 et Kumo Tabular"
+   },
+   {
+    "valeur": "27 M",
+    "libelle": "Paramètres de Seldon-Mini, 7e sur TabArena et sur le front précision-vitesse"
+   },
+   {
+    "valeur": "2e / 42",
+    "libelle": "Rang de Seldon sur BeyondArena, découpages aléatoires seulement (4e avec les temporels)"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Sur TabArena, Seldon est 4e et Seldon-Mini 7e sur 109 entrées, tous deux sur le front de Pareto Elo / temps d'inférence.",
+    "citation": "On TabArena, Seldon ranks fourth and Seldon-Mini seventh among 109 leaderboard entries"
+   },
+   {
+    "affirmation": "Seldon-Mini autorise l'usage interne en entreprise selon les auteurs ; Seldon (213M) est limité à la recherche et à l'évaluation non commerciales.",
+    "citation": "Seldon-Mini uses the Seldon Model License Agreement, which allows internal business use, whereas Seldon uses the Seldon Research and Evaluation License, which is limited to non-commercial research and evaluation."
+   },
+   {
+    "affirmation": "Les modèles sont entraînés uniquement sur des tables synthétiques.",
+    "citation": "Seldon-Mini and Seldon are trained on synthetic tables only."
+   },
+   {
+    "affirmation": "Seuls les découpages aléatoires de BeyondArena sont rapportés, car les modèles ne modélisent pas les structures temporelles ou groupées.",
+    "citation": "We report its IID track, 103 datasets with random splits, since the Seldon models do not model temporal or grouped structure."
+   },
+   {
+    "affirmation": "TabBench, où Seldon+ est premier, est construit et exécuté par Neuralk et n'est pas public.",
+    "citation": "The datasets of TabBench are public OpenML datasets, but the selection, the protocol and the leaderboard are ours and are not public"
+   },
+   {
+    "affirmation": "Les modèles s'utilisent via le paquet neuralk-oss avec l'interface scikit-learn.",
+    "citation": "Seldon-Mini and Seldon are available as SeldonClassifier and SeldonRegressor in the neuralk-oss Python package, which can be installed from PyPI (pypi.org/project/neuralk-oss). Both follow the scikit-learn interface"
+   },
+   {
+    "affirmation": "InducedTFM devient 30 fois plus rapide que TabICLv2 à 640 000 lignes sur tables étroites, mais la compression des lignes reste préférable sur tables larges.",
+    "citation": "It overtakes TabICLv2 in inference time on narrow tables, reaching a 30× speed-up at 640K rows, although row compression remains preferable on wide tables."
+   },
+   {
+    "affirmation": "Le mélange Kumo-4 + un pipeline LimiX est quasiment à égalité en duel direct avec LimiX-2-1016 complet malgré 45,4 points d'Elo d'avance.",
+    "citation": "Against full 32-pipeline LimiX-2-1016, the four-estimator blend is nearly even in direct dataset-level error (Table 2), winning 27–24 across datasets"
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de fondation tabulaire (TFM)",
+    "definition": "Réseau pré-entraîné une fois sur de nombreuses tables, qui prédit sur une table nouvelle sans entraînement, en lisant ses lignes étiquetées."
+   },
+   {
+    "terme": "Apprentissage en contexte",
+    "definition": "Le modèle reçoit les exemples étiquetés en entrée et en déduit la réponse, sans modifier ses poids."
+   },
+   {
+    "terme": "Modèle causal aléatoire (SCM)",
+    "definition": "Graphe tiré au hasard où chaque variable est une fonction bruitée de ses parents ; sert à fabriquer des tables d'entraînement fictives mais réalistes."
+   },
+   {
+    "terme": "Points d'induction",
+    "definition": "Petit ensemble de vecteurs appris qui résument une colonne ; chaque cellule lit ce résumé au lieu de toutes les autres, d'où un coût linéaire."
+   },
+   {
+    "terme": "Elo (Bradley-Terry)",
+    "definition": "Score de classement calculé à partir de duels entre modèles, jeu par jeu, comme aux échecs. Plus haut = mieux ; une référence est fixée à 1000."
+   },
+   {
+    "terme": "Front de Pareto",
+    "definition": "Ensemble des modèles qu'aucun autre ne bat à la fois en précision et en vitesse."
+   },
+   {
+    "terme": "Découpage aléatoire (IID)",
+    "definition": "Séparation au hasard des lignes en entraînement et test, sans tenir compte du temps ni des groupes ; plus facile qu'une validation sur une période ultérieure."
+   },
+   {
+    "terme": "AUC ROC",
+    "definition": "Capacité d'un modèle à classer les positifs avant les négatifs : 0,5 = hasard, 1 = parfait."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Seldon TFM family: Seldon-Mini, Seldon and Seldon+ (Neuralk-AI)",
+    "url": "https://arxiv.org/abs/2611.32257",
+    "type": "primaire",
+    "date": "2026-11-24"
+   },
+   {
+    "titre": "InducedTFMs: A Family of Sub-Quadratic Tabular Foundation Models Using Induced Attention",
+    "url": "https://arxiv.org/abs/2611.32504",
+    "type": "primaire",
+    "date": "2026-11-24"
+   },
+   {
+    "titre": "Tabra Blends: Improving the Accuracy–Latency Trade-off with Complementary Tabular Models",
+    "url": "https://arxiv.org/abs/2611.32859",
+    "type": "primaire",
+    "date": "2026-11-24"
+   },
+   {
+    "titre": "Neuralk-AI/seldon-mini, fiche du modèle sur Hugging Face",
+    "url": "https://huggingface.co/Neuralk-AI/seldon-mini",
+    "type": "primaire",
+    "date": ""
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-24",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un modèle tabulaire pré-entraîné sans réglage (TabICL v2) rivalise-t-il avec un XGBoost réglé sous validation chronologique ?",
+  "hypothese": "Sur un test chronologique de scoring de crédit (contexte ≤ 50 000 lignes), TabICL v2 atteint une AUC ROC ≥ celle d'un XGBoost réglé − 0,005, et son avantage éventuel sur découpage aléatoire diminue d'au moins 0,003 AUC sous découpage chronologique ; l'ECE reste ≤ 0,03.",
+  "reference": {
+   "nom": "XGBoost réglé",
+   "description": "Classifieur à arbres boostés avec recherche aléatoire d'hyperparamètres et arrêt précoce, validé chronologiquement.",
+   "implementation": "xgboost.XGBClassifier (API scikit-learn), tree_method hist, RandomizedSearchCV de 20 tirages (max_depth, learning_rate, subsample, colsample_bytree, min_child_weight, reg_lambda, n_estimators) sur un jeu de validation chronologique distinct du test ; catégorielles encodées en ordinal ; manquants natifs ; scale_pos_weight non utilisé (AUC).",
+   "modeles_hf": [],
+   "modeles_hf_sandbox": [],
+   "entrainement": "autre",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "TabICL v2 (modèle de fondation tabulaire sans entraînement)",
+   "description": "Transformeur pré-entraîné sur tables synthétiques ; fit mémorise les lignes étiquetées comme contexte, predict fait de l'apprentissage en contexte, sans réglage. Équivalent ouvert de Seldon-Mini (poids gated).",
+   "implementation": "Paquet PyPI tabicl (soda-inria) ; TabICLClassifier avec le point de contrôle tabicl-classifier-v2-20260212.ckpt du dépôt jingang/TabICL, téléchargé automatiquement depuis le Hub ; n_estimators=8 (4 en réduit), device cuda si disponible ; interface fit/predict_proba. Lire la section d'usage du paquet pour le nom exact du paramètre de checkpoint.",
+   "modeles_hf": [
+    "jingang/TabICL"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "autre",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "deburky/home-credit-credit-risk-model-stability",
+   "config": "default",
+   "split_evaluation": "train",
+   "split_entrainement": "train",
+   "colonnes_utiles": "target (cible), date_decision/WEEK_NUM (tri et découpage seulement, exclus des variables), 32 prédicteurs numériques et catégoriels ; sex_738L et age pour l'équité ; case_id exclu",
+   "representativite": "Crédit à la consommation avec cible binaire de défaut, déséquilibre, mélange numérique/catégoriel et vraie dérive temporelle : reproduit la contrainte d'une validation sur période ultérieure pour du scoring ou de l'appétence.",
+   "ecarts_donnees_reelles": "Anglais, crédit à la consommation d'un autre pays, 32 prédicteurs agrégés (tables d'historique absentes), défaut et non appétence multi-produits ; licence 'other' (conditions du concours d'origine) à valider avant usage commercial ; un seul produit.",
+   "jeux_explores": [
+    {
+     "nom": "deburky/home-credit-credit-risk-model-stability",
+     "url": "https://huggingface.co/datasets/deburky/home-credit-credit-risk-model-stability",
+     "acces": "hub_libre",
+     "adequation": "522 596 demandes, date_decision/WEEK_NUM, cible binaire, âge et sexe.",
+     "decision": "retenu",
+     "raison": "Seul jeu chargeable avec dimension temporelle explicite et volume réaliste."
+    },
+    {
+     "nom": "codesignal/lending-club-loan-accepted",
+     "url": "https://huggingface.co/datasets/codesignal/lending-club-loan-accepted",
+     "acces": "hub_libre",
+     "adequation": "Prêts 2007–2018 avec issue_d, licence CC0, 151 colonnes.",
+     "decision": "ecarte",
+     "raison": "Variables fuyantes à purger, 151 colonnes, cible à construire, aperçu seul : repli si la licence Home Credit bloque."
+    },
+    {
+     "nom": "TabArena/BeyondArena",
+     "url": "https://huggingface.co/datasets/TabArena/BeyondArena",
+     "acces": "hub_libre",
+     "adequation": "Jeux du classement de la source, mais découpages définis dans le code tabarena.",
+     "decision": "ecarte",
+     "raison": "Configurations financières non confirmées par le serveur de jeux, pas de colonne temporelle sur churn/credit-g."
+    },
+    {
+     "nom": "cestwc/bank-marketing-additional",
+     "url": "https://huggingface.co/datasets/cestwc/bank-marketing-additional",
+     "acces": "hub_libre",
+     "adequation": "41 188 lignes d'appétence, ordre chronologique UCI supposé.",
+     "decision": "ecarte",
+     "raison": "Pas de colonne de date, variable fuyante duration, licence non précisée ; usable en contrôle."
+    },
+    {
+     "nom": "scikit-learn/credit-card-clients",
+     "url": "https://huggingface.co/datasets/scikit-learn/credit-card-clients",
+     "acces": "hub_libre",
+     "adequation": "30 000 clients, CC0.",
+     "decision": "ecarte",
+     "raison": "Aucune dimension temporelle exploitable."
+    },
+    {
+     "nom": "Santander Product Recommendation (Kaggle)",
+     "url": "https://www.kaggle.com/c/santander-product-recommendation",
+     "acces": "compte_requis",
+     "adequation": "Historique mensuel multi-produits réel, idéal pour l'appétence.",
+     "decision": "ecarte",
+     "raison": "Compte Kaggle et règles à accepter, licence commerciale incertaine : à obtenir pour la suite."
+    },
+    {
+     "nom": "SBabu/BankingDataForCross-Sell",
+     "url": "https://huggingface.co/datasets/SBabu/BankingDataForCross-Sell",
+     "acces": "hub_libre",
+     "adequation": "Cross-sell, contenu non documenté.",
+     "decision": "ecarte",
+     "raison": "xlsx non chargeable en parquet."
+    }
+   ]
+  },
+  "metriques": [
+   "temporal_roc_auc",
+   "random_roc_auc",
+   "auc_gap_random_minus_temporal",
+   "temporal_pr_auc",
+   "expected_calibration_error",
+   "brier_score",
+   "auc_gap_by_sex",
+   "fit_predict_seconds"
+  ],
+  "metrique_principale": "temporal_roc_auc",
+  "sens": "max",
+  "protocole": "Le jeu n'a qu'un split « train » : le découpage est fait dans le code. Tri chronologique par date_decision ; test = 20 % les plus récents des lignes (plafonné à 30 000, échantillonnage stratifié) ; validation = 10 % précédant le test (réglage XGBoost uniquement) ; contexte/entraînement = 70 % les plus anciens, sous-échantillonnés à 50 000 lignes (stratifié sur la cible). Contrôle : mêmes tailles avec découpage aléatoire stratifié sur tout le jeu. TabICL v2 sans aucun réglage. Intervalles de confiance bootstrap (1 000 rééchantillonnages) sur l'AUC et sur la différence appariée TabICL − XGBoost ; ECE à 15 classes ; équité : AUC et taux de positifs par sexe et tranche d'âge ; temps d'ajustement et de prédiction mesurés. Un blend 50/50 des probabilités est ajouté en information. Seldon-Mini non testé (poids gated sans jeton).",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Même modèle TabICL v2 ; échelle réduite : sous-échantillon du split train, 3 000 lignes de contexte, 1 500 de test, n_estimators=2, 4 tirages de recherche XGBoost, bootstrap à 200 rééchantillonnages. Échelle complète : une inférence par ligne de test, 8 passes ; 50 000 contexte × 30 000 test attendu en quelques minutes sur T4.",
+  "dependances": [
+   "tabicl"
+  ],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "client_id",
+     "type": "string",
+     "description": "Identifiant pseudonymisé du client, sert au découpage par client"
+    },
+    {
+     "colonne": "snapshot_date",
+     "type": "date",
+     "description": "Date d'observation ; découpage chronologique"
+    },
+    {
+     "colonne": "product",
+     "type": "string",
+     "description": "Produit visé (un modèle par produit)"
+    },
+    {
+     "colonne": "target",
+     "type": "int",
+     "description": "1 si souscription/défaut dans la fenêtre suivante, sinon 0"
+    },
+    {
+     "colonne": "age",
+     "type": "int",
+     "description": "Âge, pour l'équité"
+    },
+    {
+     "colonne": "sex",
+     "type": "string",
+     "description": "Sexe déclaré, pour l'équité uniquement (jamais variable du modèle)"
+    },
+    {
+     "colonne": "feature_*",
+     "type": "float/category",
+     "description": "Variables numériques et catégorielles disponibles à snapshot_date"
+    }
+   ],
+   "volume_conseille": "20 000 à 150 000 lignes par produit sur au moins 12 mois, au moins 500 positifs en test, 3 produits.",
+   "metriques_metier": "AUC ROC par produit sur la période ultérieure, lift dans le premier décile, ECE, temps de scoring du portefeuille.",
+   "garde_fous": "Pas de variable sensible dans les features ; vérification de l'écart d'AUC et de taux entre groupes ; aucune donnée sortant de l'environnement ; licence de tout modèle gated validée avant usage.",
+   "prescriptions": [
+    "Découpage chronologique strict : apprentissage et contexte avant la date T, validation puis test après, sans fenêtre de cible chevauchante.",
+    "Au moins 500 positifs dans le test et 2 000 dans le contexte, par produit.",
+    "Variables calculées à la date d'observation uniquement, sans fuite de l'événement cible.",
+    "Au moins 12 mois d'historique pour couvrir la saisonnalité et au moins 3 produits pour mimer un modèle par produit.",
+    "Un même client n'apparaît que d'un côté de la coupure s'il y a plusieurs lignes par client.",
+    "Anonymisation des identifiants ; exclusion des clients protégés et des champs libres.",
+    "Table de moins de 150 000 lignes ou échantillon stratifié équivalent."
+   ],
+   "preparation": "Extraire à chaque date d'observation l'état du client (caractéristiques, produits détenus, comportements) depuis les tables clients et produits, joindre la cible observée sur la fenêtre suivante, filtrer les clients éligibles, puis échantillonner de façon stratifiée sur la cible en conservant l'ordre des dates."
+  },
+  "duree_estimee_minutes": 35,
+  "analyse_materiel": "Aucun entraînement PyTorch, mais l'inférence d'un transformeur tabulaire avec 8 passes sur 50 000 lignes de contexte et 30 000 de test dépasse 20 minutes sur 2 cœurs CPU ; le GPU est justifié.",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "jingang/TabICL": {
+    "id": "jingang/TabICL",
+    "sha": "4dcd344ece2c00be9e831fdd35bed57b5ad83e19",
+    "tache": "tabular-classification",
+    "bibliotheque": "tabicl",
+    "parametres": null,
+    "licence": "bsd-3-clause",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "deburky/home-credit-credit-risk-model-stability",
+   "config": "default",
+   "splits": [
+    "train"
+   ],
+   "licence": "other",
+   "colonnes": {
+    "case_id": "Value",
+    "date_decision": "Value",
+    "MONTH": "Value",
+    "WEEK_NUM": "Value",
+    "target": "Value",
+    "maxdpdfrom6mto36m_3546853P": "Value",
+    "maxdpdlast12m_727P": "Value",
+    "maxdpdlast24m_143P": "Value",
+    "maxdpdlast3m_392P": "Value",
+    "maxdpdlast6m_474P": "Value",
+    "numinstls_657L": "Value",
+    "numinstlsallpaid_934L": "Value",
+    "pctinstlsallpaidlat10d_839L": "Value",
+    "totalsettled_863A": "Value",
+    "totaldebt_9A": "Value",
+    "currdebt_22A": "Value",
+    "credamount_770A": "Value",
+    "mobilephncnt_593L": "Value",
+    "homephncnt_628L": "Value",
+    "numactivecreds_622L": "Value",
+    "applicationcnt_361L": "Value",
+    "applications30d_658L": "Value",
+    "applicationscnt_1086L": "Value",
+    "applicationscnt_464L": "Value",
+    "applicationscnt_629L": "Value",
+    "avgdbddpdlast24m_3658932P": "Value",
+    "amtinstpaidbefduel24m_4187115A": "Value",
+    "maxdbddpdlast1m_3658939P": "Value",
+    "maxdbddpdtollast12m_3658940P": "Value",
+    "maxdbddpdtollast6m_4187119P": "Value",
+    "numinstpaidlate1d_3546852L": "Value",
+    "numberofqueries_373L": "Value",
+    "days120_123L": "Value",
+    "days180_256L": "Value",
+    "days30_165L": "Value",
+    "days90_310L": "Value",
+    "days360_512L": "Value",
+    "sex_738L": "Value",
+    "education_927M": "Value",
+    "incometype_1044T": "Value",
+    "familystate_447L": "Value",
+    "empl_employedtotal_800L": "Value",
+    "language1_981M": "Value",
+    "mainoccupationinc_384A": "Value",
+    "age": "Value",
+    "maritalst_385M": "Value",
+    "requesttype_4525192L": "Value",
+    "description_5085714M": "Value"
+   },
+   "exemple": {
+    "case_id": 40626,
+    "date_decision": "2019-12-18",
+    "MONTH": "2019-12",
+    "WEEK_NUM": 50,
+    "target": 0,
+    "maxdpdfrom6mto36m_3546853P": 0.0,
+    "maxdpdlast12m_727P": 0.0,
+    "maxdpdlast24m_143P": 0.0,
+    "maxdpdlast3m_392P": 0.0,
+    "maxdpdlast6m_474P": 0.0,
+    "numinstls_657L": 0.0,
+    "numinstlsallpaid_934L": null,
+    "pctinstlsallpaidlat10d_839L": null,
+    "totalsettled_863A": 0.0,
+    "totaldebt_9A": 0.0,
+    "currdebt_22A": 0.0,
+    "credamount_770A": 36000.0,
+    "mobilephncnt_593L": 1.0,
+    "homephncnt_628L": 0.0,
+    "numactivecreds_622L": 0.0,
+    "applicationcnt_361L": 0.0,
+    "applications30d_658L": 0.0,
+    "applicationscnt_1086L": 0.0,
+    "applicationscnt_464L": 1.0,
+    "applicationscnt_629L": 0.0,
+    "avgdbddpdlast24m_3658932P": null,
+    "amtinstpaidbefduel24m_4187115A": null,
+    "maxdbddpdlast1m_3658939P": null,
+    "maxdbddpdtollast12m_3658940P": null,
+    "maxdbddpdtollast6m_4187119P": null,
+    "numinstpaidlate1d_3546852L": null,
+    "numberofqueries_373L": 20.0,
+    "days120_123L": 8.0,
+    "days180_256L": 11.0,
+    "days30_165L": 4.0,
+    "days90_310L": 7.0,
+    "days360_512L": 20.0,
+    "sex_738L": "F",
+    "education_927M": "P97_36_170",
+    "incometype_1044T": "EMPLOYED",
+    "familystate_447L": "SINGLE",
+    "empl_employedtotal_800L": "MORE_ONE",
+    "language1_981M": "P209_127_106",
+    "mainoccupationinc_384A": 40000.0,
+    "age": 29.0,
+    "maritalst_385M": "a7fcb6e5",
+    "requesttype_4525192L": "DEDUCTION_6",
+    "description_5085714M": "a55475b1"
+   },
+   "lignes": {
+    "train": 522596
+   }
+  },
+  "paquets": {
+   "tabicl": {
+    "paquet": "tabicl",
+    "derniere_version": "2.2.0",
+    "licence": "BSD 3-Clause License\n        \n        Copyright (c) 2025, So",
+    "auteur": "Jingang Qu, David Holzmüller, Marine Le Morvan, Gaël Varoqua",
+    "source": ""
+   }
+  }
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}

@@ -1,0 +1,366 @@
+{
+ "version": 1,
+ "jour": "2026-11-26",
+ "sujet_id": "control-flow-tax-jev-routage",
+ "depot": "20261126_typed_decision_closed_options_french",
+ "fiche": {
+  "sujet_id": "control-flow-tax-jev-routage",
+  "titre": "Un décideur typé Jev pilote le routage d'agent : coût −40 à −50 %, mais sur 4 tâches de documentation",
+  "en_une_phrase": "Remplacer le routeur LLM d'un agent par Jev, modèle de décision typé, réduit le coût de 40,5 à 49,6 % sur quatre tâches de documentation. Qualité des documents non mesurée.",
+  "probleme": "Dans un agent, après chaque document produit, un modèle décide : avancer, réparer, revenir en arrière ou s'arrêter. Ce choix court relit toute la requête et tous les fichiers. Avec un LLM généraliste, ce contrôle devient une part majeure du coût.",
+  "comment_ca_marche": "Le générateur de documents (Sol, un LLM) reste inchangé. Seul le **chooser**, qui choisit l'action suivante, est remplacé par Jev, un « modèle de décision » : au lieu d'écrire du texte, il renvoie des probabilités sur des options déclarées.\n\n1. Le contrôleur donne à Jev la requête, les contrats de sortie, les fichiers actuels et l'historique.\n2. Jev choisit parmi quatre options : Specify, Tasks, Analyze (trois étapes de rédaction) ou *complete*. Il peut aussi s'abstenir, ce qui arrête l'exécution.\n3. Sol exécute l'étape choisie.\n4. Une porte d'existence vérifie par du code que les fichiers requis existent.\n5. Le cycle reprend jusqu'à *complete* ou 80 requêtes.\n\nLe contrôle est « fini » : l'agent ne peut rien faire hors de ces options.",
+  "demarche_experimentale": "Même générateur Sol partout. Sur 4 tâches de documentation, 10 paires par condition : routeur Sol d'un côté, Jev, Haiku, Luna ou Sonnet de l'autre. Coût calculé avec des tarifs de référence. Étude séparée : 100 états de service client.",
+  "resultats": [
+   {
+    "metrique": "Coût moyen de session, réduction vs routeur Sol (plus haut = mieux)",
+    "valeur": "−49,6 % [42,9 ; 56,3] sur D01 ; −40,5 à −42,9 % sur D02–D04",
+    "comparaison": "Haiku : +734,3 % de coût (80 requêtes atteintes dans les 10 runs). Luna : +3,7 %, intervalle de −75,3 à +37,7",
+    "conditions": "10 paires par cellule, générateur identique, tarifs de référence, intervalles bootstrap exploratoires",
+    "citation": "On the initial task, mean cost falls by 49.6% (95% paired-bootstrap interval: 42.9% to 56.3%) and elapsed time by 33.2% (19.6% to 46.7%)."
+   },
+   {
+    "metrique": "Remplacer seulement la porte d'existence (E1) : réduction du coût total",
+    "valeur": "1,8 % [−0,9 ; 4,4]",
+    "comparaison": "Le coût de la porte baisse de 97,6 %, mais elle ne pèse que 3,0 % du coût de base",
+    "conditions": "D01, 10 paires, le chooser reste Sol",
+    "citation": "Jev reduces existence-check cost by 97.6%, yet full-run cost falls by only 1.8% (Table 3)."
+   },
+   {
+    "metrique": "Actions acceptées sur 100 états de service client (retail)",
+    "valeur": "100/100 pour Jev et pour Sol ; coût −97,88 %, durée par requête −72,30 %",
+    "comparaison": "Jev 0,016701 USD contre Sol 0,787682 USD ; 2,519 s contre 0,698 s par requête",
+    "conditions": "États construits par les auteurs d'après τ²-bench, 17 actions possibles, relecture par une seule personne",
+    "citation": "Sol and Jev each select accepted actions on 100/100 reviewed retail states, with Jev using 97.88% less reference cost and 72.30% less mean request time."
+   }
+  ],
+  "limites": [
+   "Tâches de documentation synthétiques, dont D01 inspectée pendant le développement ; qualité des documents non évaluée (aveu des auteurs).",
+   "Tarifs de référence, pas des factures. Les 10 paires par cellule ne sont pas 10 tâches indépendantes. Les auteurs n'isolent pas la cause des gains : architecture de Jev, tarif ou entraînement.",
+   "Les calibrations de Jev ne sont pas mesurées ; son architecture et sa taille ne sont pas divulguées. Licence et accès non précisés. Auteurs de Talkdesk : lien avec TypeSafe non précisé."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "−49,6 %",
+    "libelle": "coût moyen d'une session d'agent (tâche D01) avec Jev, face au routeur Sol, à générateur identique"
+   },
+   {
+    "valeur": "42,5 %",
+    "libelle": "part du coût de référence due au routage seul, dans le workflow de base"
+   },
+   {
+    "valeur": "100/100",
+    "libelle": "actions acceptées en service client, Jev comme Sol, pour 97,88 % de coût en moins"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Le routage représente 42,5 % du coût de référence de base sur la tâche D01 et 66,5 % des tokens d'entrée.",
+    "citation": "In the matched Sol controls for D01 Jev full routing, control accounts for 42.5% of baseline reference cost and 66.5% of input tokens."
+   },
+   {
+    "affirmation": "Remplacer uniquement la porte d'existence ne fait économiser que 1,8 % du coût total, malgré −97,6 % sur le coût de la porte.",
+    "citation": "a 97.6% gate-cost reduction translates into just 1.8% lower workflow cost on D01."
+   },
+   {
+    "affirmation": "Avec Haiku comme routeur, les 10 runs D01 atteignent la limite de 80 requêtes ; le coût total augmente de 734,3 %.",
+    "citation": "Haiku reaches the 80-request limit in every D01 full-routing run"
+   },
+   {
+    "affirmation": "Jev suit la trajectoire la plus courte dans les 40 runs E2, sans régénération de document.",
+    "citation": "Jev follows this trajectory in all 40 E2 runs across D01–D04, with 10.0 requests per run and no repeated document generation."
+   },
+   {
+    "affirmation": "La qualité des documents n'est pas établie de façon indépendante.",
+    "citation": "We measure full sessions and retain request-limit outcomes, but do not independently establish artifact-quality equivalence."
+   },
+   {
+    "affirmation": "La calibration des probabilités de Jev n'est pas mesurée dans l'étude.",
+    "citation": "Jev’s returned probabilities are validated structurally; their empirical calibration is not measured in this study."
+   },
+   {
+    "affirmation": "SOARS, reranker sans entraînement, fait passer GPT-5.4 Mini de 73,9 % à 84,7 % de précision sur BrowseComp-Plus, et les appels de recherche de 23 à 14 (annonce des auteurs).",
+    "citation": "On BrowseComp-Plus, it improves GPT-5.4 Mini’s accuracy from 73.9% to 84.7% while reducing search calls from 23 to 14"
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision (System 1)",
+    "definition": "Modèle qui ne génère pas de texte mais renvoie en un seul passage des probabilités sur des options déclarées. « System 1 » désigne un rôle rapide, pas la cognition humaine."
+   },
+   {
+    "terme": "Jev",
+    "definition": "Modèle de décision de TypeSafe AI, testé ici (version jev-1.13.0). Architecture et taille non divulguées dans la source."
+   },
+   {
+    "terme": "Chooser",
+    "definition": "Composant de l'agent qui lit le contexte et choisit la prochaine action parmi un ensemble fini."
+   },
+   {
+    "terme": "Porte d'existence",
+    "definition": "Contrôle par du code qui vérifie qu'un fichier requis existe avant de continuer. Il ne juge pas la qualité du contenu."
+   },
+   {
+    "terme": "Intervalle bootstrap apparié",
+    "definition": "Intervalle de confiance obtenu en rééchantillonnant des paires de runs comparables. Ici exploratoire, avec seulement 10 paires par cellule."
+   },
+   {
+    "terme": "Reranker",
+    "definition": "Modèle qui réordonne les passages retournés par une recherche, pour placer les plus pertinents en tête."
+   },
+   {
+    "terme": "SOARS",
+    "definition": "Méthode sans entraînement qui utilise un modèle de décision comme reranker à chaque recherche d'un agent de recherche profonde."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "The Control-Flow Tax: Specialized Decision Routing for LLM Agent Workflows",
+    "url": "https://arxiv.org/abs/2611.32365",
+    "type": "primaire",
+    "date": "2026-11-24"
+   },
+   {
+    "titre": "SOARS: System One Assisted Reranking for Agentic Search",
+    "url": "https://arxiv.org/abs/2611.32917",
+    "type": "primaire",
+    "date": "2026-11-24"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-24",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un décideur typé à options fermées (SLM, probabilités calibrées, abstention) rivalise-t-il avec un encodeur fine-tuné sur 77 intentions françaises ?",
+  "hypothese": "Un SLM de 1,7 Md qui choisit parmi 8 candidats récupérés par embeddings, avec probabilités recalibrées, atteint une macro-F1 ≥ 0,85 sans entraînement (contre ≥ 0,92 attendu pour l'encodeur fine-tuné) et une ECE ≤ 0,05 ; l'abstention à 80 % de couverture relève l'exactitude d'au moins 5 points.",
+  "reference": {
+   "nom": "CamemBERT-base fine-tuné",
+   "description": "Classifieur encodeur fine-tuné sur les exemples d'entraînement, tête softmax à 77 classes.",
+   "implementation": "transformers AutoModelForSequenceClassification sur almanach/camembert-base, 5 époques, lr 3e-5, batch 32, longueur max 64, warmup 10 % ; probabilités softmax brutes puis calibration par température sur les exemples tenus à part.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Décideur typé SLM à options fermées",
+   "description": "Le modèle ne génère pas de texte : une seule passe renvoie une distribution sur des options déclarées (lettres A–H) parmi 8 candidats, recalibrée par température, avec abstention par seuil.",
+   "implementation": "Candidats : intfloat/multilingual-e5-base, plus proches voisins des exemples d'entraînement (vote pondéré, top-8 classes). Prompt avec noms d'intentions issus de mteb/banking77 ; softmax sur les logits des 8 lettres au dernier token (transformers, AutoModelForCausalLM, bfloat16 GPU / float32 CPU, lots) ; température ajustée sur 500 exemples tenus à part ; abstention si probabilité max < seuil. Aucun poids entraîné.",
+   "modeles_hf": [
+    "Qwen/Qwen3-1.7B",
+    "intfloat/multilingual-e5-base"
+   ],
+   "modeles_hf_sandbox": [
+    "Qwen/Qwen3-0.6B"
+   ],
+   "entrainement": "aucun",
+   "service_phase2": "llmaas"
+  },
+  "jeu_public": {
+   "hub_id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "utterance (texte), label (entier 0–76) ; noms des intentions via mteb/banking77",
+   "representativite": "Requêtes de clients de services financiers, 77 intentions proches, en français : même forme de problème qu'un routage à nombreuses classes sémantiquement voisines.",
+   "ecarts_donnees_reelles": "Traduction automatique de l'anglais, énoncés d'un tour, 77 classes à plat sans hiérarchie, pas d'états de dialogue ni d'historique, licence non précisée (original CC BY 4.0) ; ne mesure ni le coût de routage d'agent ni la qualité de documents.",
+   "jeux_explores": [
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "13 083 énoncés, 77 intentions, français.",
+     "decision": "retenu",
+     "raison": "Seule voie française de domaine financier pour choisir parmi des options déclarées, assez volumineuse pour une mesure."
+    },
+    {
+     "nom": "mteb/banking77",
+     "url": "https://huggingface.co/datasets/mteb/banking77",
+     "acces": "hub_libre",
+     "adequation": "Version anglaise, noms des intentions.",
+     "decision": "retenu",
+     "raison": "Fournit les libellés d'options pour le prompt (métadonnées seulement)."
+    },
+    {
+     "nom": "amityco/tau-bench-retail-train-next-action",
+     "url": "https://huggingface.co/datasets/amityco/tau-bench-retail-train-next-action",
+     "acces": "hub_libre",
+     "adequation": "82 états → action suivante.",
+     "decision": "ecarte",
+     "raison": "82 exemples, anglais, licence absente, actions avec arguments."
+    },
+    {
+     "nom": "monte-inc/tau2-banking-baselines",
+     "url": "https://huggingface.co/datasets/monte-inc/tau2-banking-baselines",
+     "acces": "hub_libre",
+     "adequation": "Résultats de simulation, 3 lignes.",
+     "decision": "ecarte",
+     "raison": "Pas d'états à router."
+    },
+    {
+     "nom": "abdelstark/sommelier-xlam-single-call-splits-fr",
+     "url": "https://huggingface.co/datasets/abdelstark/sommelier-xlam-single-call-splits-fr",
+     "acces": "hub_libre",
+     "adequation": "Choix d'outil en français, 14 936 paires.",
+     "decision": "ecarte",
+     "raison": "Domaine générique, sans état ; secondaire."
+    },
+    {
+     "nom": "mteb/MTOPIntentClassification",
+     "url": "https://huggingface.co/datasets/mteb/MTOPIntentClassification",
+     "acces": "hub_libre",
+     "adequation": "~113 intentions en français.",
+     "decision": "ecarte",
+     "raison": "Domaine hors finance, licence inconnue."
+    }
+   ]
+  },
+  "metriques": [
+   "macro_f1",
+   "accuracy",
+   "expected_calibration_error",
+   "selective_accuracy_at_80_coverage",
+   "candidate_recall_at_8",
+   "latency_ms_per_example"
+  ],
+  "metrique_principale": "macro_f1",
+  "sens": "max",
+  "protocole": "Évaluation sur le split test : sous-échantillon stratifié de 1 000 énoncés (200 en échelle réduite), identique pour tous les systèmes. Entraînement sur le split train, dont 500 exemples tenus à part (150 en réduit) pour calibrer la température et le seuil, jamais sur le test ; l'encodeur et la base de voisins utilisent le reste. Systèmes : (1) CamemBERT fine-tuné ; (2) voisins e5 seuls (plancher) ; (3) décideur typé SLM sur top-8 candidats, sans et avec recalibration par température. Courbe exactitude/couverture et ECE (15 classes) pour chaque système ; rappel des candidats top-8 rapporté séparément (plafond du décideur) ; latence médiane par énoncé (lot de 1) ; intervalle bootstrap sur macro-F1 ; les 10 classes les moins fréquentes rapportées à part. Courbe annexe de l'encodeur pour 5, 20 exemples par classe et tout le train. Conclusion prudente : traduction automatique, un tour, 77 classes à plat.",
+  "niveau_sandbox": "reduit",
+  "adaptation_sandbox": "Qwen3-0.6B remplace Qwen3-1.7B ; 200 énoncés de test, 150 de calibration, CamemBERT sur 1 000 exemples, 1 époque. Calcul GPU complet : 1 500 énoncés (test + calibration) × ~250 tokens = 375 000 tokens ÷ 700 tok/s ≈ 9 min (plus vite pour 1,7 Md) ; CamemBERT 5 époques × ~9 500 exemples ≈ 5 min ; embeddings e5 ≈ 1 min ; total ≈ 20 min < 45 min.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "string",
+     "description": "Message ou e-mail du client, anonymisé"
+    },
+    {
+     "colonne": "reason",
+     "type": "string",
+     "description": "Motif de référence"
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "string",
+     "description": "Sous-motif de référence"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception, pour le découpage temporel"
+    }
+   ],
+   "volume_conseille": "Au moins 20 000 textes étiquetés, 20 exemples par sous-motif, 500 textes de test hors période d'entraînement.",
+   "metriques_metier": "Macro-F1 sur sous-motifs, taux de routage correct à 80 % de couverture, ECE, taux d'abstention, latence et coût par décision.",
+   "garde_fous": "LLM interne seulement (pas d'API externe) ; texte anonymisé ; abstention renvoyée à un traitement humain ; mesure de la cohérence motif/sous-motif.",
+   "prescriptions": [
+    "Au moins 20 textes par classe pour les classes évaluées et 500 textes de test.",
+    "Étiquettes issues d'une annotation double avec accord inter-annotateurs (kappa) rapporté sur 300 textes.",
+    "Découpage temporel : test sur la période la plus récente.",
+    "Libellés et descriptions des classes fournis pour le prompt du décideur.",
+    "Textes anonymisés (noms, IBAN, numéros), pièces jointes exclues.",
+    "Taxonomie figée pendant la période d'évaluation."
+   ],
+   "preparation": "Extraire les messages entrants depuis les outils de relation client avec le motif et le sous-motif validés par un conseiller, filtrer les étiquettes douteuses, dédoublonner, anonymiser, puis échantillonner de façon stratifiée par sous-motif en conservant l'ordre des dates."
+  },
+  "duree_estimee_minutes": 60,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "Qwen/Qwen3-1.7B": {
+    "id": "Qwen/Qwen3-1.7B",
+    "sha": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 2031739904,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   },
+   "intfloat/multilingual-e5-base": {
+    "id": "intfloat/multilingual-e5-base",
+    "sha": "d128750597153bb5987e10b1c3493a34e5a4502a",
+    "tache": "sentence-similarity",
+    "bibliotheque": "sentence-transformers",
+    "parametres": 278044162,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "af",
+     "am",
+     "ar",
+     "as",
+     "az",
+     "be",
+     "bg",
+     "bn"
+    ]
+   },
+   "Qwen/Qwen3-0.6B": {
+    "id": "Qwen/Qwen3-0.6B",
+    "sha": "c1899de289a04d12100db370d81485cdf75e47ca",
+    "tache": "text-generation",
+    "bibliotheque": "transformers",
+    "parametres": 751632384,
+    "licence": "apache-2.0",
+    "code_distant": false,
+    "langues": []
+   }
+  },
+  "jeu": {
+   "id": "DeepPavlov/banking77_fr",
+   "config": "default",
+   "splits": [
+    "train",
+    "test"
+   ],
+   "licence": null,
+   "colonnes": {
+    "label": "Value",
+    "utterance": "Value"
+   },
+   "exemple": {
+    "label": 0,
+    "utterance": "S'il vous plaît, aidez-moi avec ma carte.  Il ne s'activera pas."
+   },
+   "lignes": {
+    "train": 10003,
+    "test": 3080
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
