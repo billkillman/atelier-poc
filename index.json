@@ -2,6 +2,100 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-26",
+   "sujet_id": "control-flow-tax-jev-routage",
+   "depot": "20261126_typed_decision_closed_options_french",
+   "titre": "Un décideur typé à options fermées (SLM, probabilités calibrées, abstention) rivalise-t-il avec un encodeur fine-tuné sur 77 intentions françaises ?",
+   "statut": "valide",
+   "niveau_sandbox": "reduit",
+   "echelle": "complete",
+   "materiel": "GPU T4 (Google Colab)",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT-base fine-tuné)",
+    "raison": ""
+   },
+   "iterations": 1,
+   "metrique_principale": "macro_f1",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "CamemBERT fine-tuné",
+     "role": "reference",
+     "valeur": 0.7742432334705421,
+     "ic95": [
+      0.7461867357590979,
+      0.7900155901583203
+     ]
+    },
+    {
+     "nom": "Voisins e5 seuls (plancher)",
+     "role": "reference",
+     "valeur": 0.852105916302398,
+     "ic95": [
+      0.8247859008292011,
+      0.8697194491893625
+     ]
+    },
+    {
+     "nom": "Décideur typé (brut)",
+     "role": "nouvelle",
+     "valeur": 0.5730149735566302,
+     "ic95": [
+      0.5346611812485761,
+      0.5927674703036416
+     ]
+    },
+    {
+     "nom": "Décideur typé (recalibré)",
+     "role": "nouvelle",
+     "valeur": 0.5730149735566302,
+     "ic95": [
+      0.5346611812485761,
+      0.5927674703036416
+     ]
+    }
+   ],
+   "n_exemples": 1000,
+   "jeu": "DeepPavlov/banking77_fr",
+   "synthese": "macro_f1 : Décideur typé (recalibré) 0,573 contre 0,852 pour Voisins e5 seuls (plancher) (1000 exemples, GPU T4 (Google Colab)).",
+   "conclusion": "À l'échelle complète (1 000 énoncés de test, tout le train, Qwen3-1,7B sur GPU), le décideur typé sans entraînement obtient une macro-F1 de 0,57 [0,53 ; 0,59]. L'encodeur fine-tuné fait 0,77 [0,75 ; 0,79] et les voisins e5 seuls 0,85 [0,82 ; 0,87]. Les intervalles sont disjoints : l'hypothèse (≥ 0,85) est réfutée. Le décideur dégrade même le classement des candidats qu'il reçoit, alors que leur rappel à 8 est de 0,97. L'ECE reste à 0,14 après recalibration (cible 0,05). L'abstention apporte environ 6 points, pour une exactitude de 0,64 à 80 % de couverture. La référence CamemBERT est probablement sous-entraînée (0,77 de macro-F1), ce qui affaiblit surtout la comparaison encodeur/voisins et la courbe annexe. Sans cette réserve, le verdict contre le décideur serait inchangé. Les résultats ne se comparent pas à la source : coût d'un routeur d'agent sur des tâches de documentation, sans mesure de justesse.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "non_comparable",
+   "en_bref": "Le petit modèle de langue utilisé comme décideur sans entraînement ne rivalise pas : il fait moins bien que l'encodeur et que les voisins dont il reçoit les candidats. Réserve : l'encodeur de référence est probablement sous-entraîné.",
+   "libelle_metrique": "macro-F1",
+   "reserves": [
+    "L'encodeur fine-tuné est probablement sous-optimal. Ses chiffres (macro-F1 0,77 ; classes rares 0,52 ; courbe à peu d'exemples) sous-estiment ce qu'un encodeur bien réglé atteindrait. Le fait que les voisins sans entraînement le dépassent est à prendre avec cette réserve. La courbe annexe ne renseigne pas sur le nombre d'exemples nécessaires."
+   ],
+   "duree_minutes": 46.8,
+   "consommation": {
+    "claude:poc_code:control-flow-tax-jev-routage": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 923.7,
+     "cout_equivalent_usd": 2.419,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:control-flow-tax-jev-routage": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 278.4,
+     "cout_equivalent_usd": 1.294,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:control-flow-tax-jev-routage": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 96.5,
+     "cout_equivalent_usd": 0.5921,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261126_typed_decision_closed_options_french",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-25",
    "sujet_id": "vlm-confiance-par-champ-extraction",
    "depot": "20261125_vlm_field_confidence_min_prob",
