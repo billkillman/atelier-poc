@@ -5,10 +5,10 @@
  "depot": "20261126_typed_decision_closed_options_french",
  "titre": "Un décideur typé à options fermées (SLM, probabilités calibrées, abstention) rivalise-t-il avec un encodeur fine-tuné sur 77 intentions françaises ?",
  "debut": "2026-11-26T03:21:47Z",
- "maj": "2026-11-26T04:07:30Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-26T04:08:38Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,72 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-26T04:07:30Z",
-   "fin": null
+   "fin": "2026-11-26T04:08:31Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-26T04:08:31Z",
+   "fin": "2026-11-26T04:08:38Z"
   }
  ],
- "progression": 0.974,
- "estimation_fin": "2026-11-26T04:10:30Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261126_typed_decision_closed_options_french",
+  "depot": "20261126_typed_decision_closed_options_french",
+  "en_bref": "Le petit modèle de langue utilisé comme décideur sans entraînement ne rivalise pas : il fait moins bien que l'encodeur et que les voisins dont il reçoit les candidats. Réserve : l'encodeur de référence est probablement sous-entraîné.",
+  "synthese": "macro_f1 : Décideur typé (recalibré) 0,573 contre 0,852 pour Voisins e5 seuls (plancher) (1000 exemples, GPU T4 (Google Colab)).",
+  "metrique_principale": "macro_f1",
+  "libelle_metrique": "macro-F1",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "CamemBERT fine-tuné",
+    "role": "reference",
+    "valeur": 0.7742432334705421,
+    "ic95": [
+     0.7461867357590979,
+     0.7900155901583203
+    ]
+   },
+   {
+    "nom": "Voisins e5 seuls (plancher)",
+    "role": "reference",
+    "valeur": 0.852105916302398,
+    "ic95": [
+     0.8247859008292011,
+     0.8697194491893625
+    ]
+   },
+   {
+    "nom": "Décideur typé (brut)",
+    "role": "nouvelle",
+    "valeur": 0.5730149735566302,
+    "ic95": [
+     0.5346611812485761,
+     0.5927674703036416
+    ]
+   },
+   {
+    "nom": "Décideur typé (recalibré)",
+    "role": "nouvelle",
+    "valeur": 0.5730149735566302,
+    "ic95": [
+     0.5346611812485761,
+     0.5927674703036416
+    ]
+   }
+  ],
+  "n_exemples": 1000,
+  "jeu": "DeepPavlov/banking77_fr",
+  "materiel": "GPU T4 (Google Colab)",
+  "echelle": "complete",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
