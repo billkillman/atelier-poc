@@ -5,10 +5,10 @@
  "depot": "20261126_typed_decision_closed_options_french",
  "titre": "Un décideur typé à options fermées (SLM, probabilités calibrées, abstention) rivalise-t-il avec un encodeur fine-tuné sur 77 intentions françaises ?",
  "debut": "2026-11-26T03:21:47Z",
- "maj": "2026-11-26T03:56:47Z",
+ "maj": "2026-11-26T04:07:30Z",
  "statut": "en_cours",
- "etape": "complete",
- "detail": "sur GPU GPU T4 (Google Colab)",
+ "etape": "revue",
+ "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -37,15 +37,15 @@
   {
    "code": "complete",
    "libelle": "Échelle complète",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-26T03:56:47Z",
-   "fin": null
+   "fin": "2026-11-26T04:07:30Z"
   },
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-26T04:07:30Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.452,
- "estimation_fin": "2026-11-26T04:59:47Z",
+ "progression": 0.974,
+ "estimation_fin": "2026-11-26T04:10:30Z",
  "resultat": null
 }
