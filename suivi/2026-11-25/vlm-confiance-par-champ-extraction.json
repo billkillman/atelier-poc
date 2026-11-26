@@ -5,26 +5,26 @@
  "depot": "20261125_vlm_field_confidence_min_prob",
  "titre": "La probabilité minimale des tokens d'un champ permet-elle de repérer les erreurs d'extraction JSON d'un VLM ouvert de 2 Md de paramètres, mieux qu'une confiance verbalisée ?",
  "debut": "2026-11-26T02:08:36Z",
- "maj": "2026-11-26T02:08:36Z",
+ "maj": "2026-11-26T03:08:20Z",
  "statut": "en_cours",
- "etape": "ecriture",
- "detail": "le modèle écrit le notebook : protocole, deux approches, évaluation",
- "iteration": 0,
+ "etape": "essai",
+ "detail": "itération 1 : correction du notebook (il ne respecte pas les règles de l'atelier (contrôle avant exécution))",
+ "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
  "etapes": [
   {
    "code": "ecriture",
    "libelle": "Écriture du notebook",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-26T02:08:36Z",
-   "fin": null
+   "fin": "2026-11-26T03:08:20Z"
   },
   {
    "code": "essai",
    "libelle": "Exécution à échelle réduite",
-   "statut": "a_venir",
-   "debut": null,
+   "statut": "en_cours",
+   "debut": "2026-11-26T03:08:20Z",
    "fin": null
   },
   {
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.0,
- "estimation_fin": "2026-11-26T04:33:36Z",
+ "progression": 0.173,
+ "estimation_fin": "2026-11-26T05:08:20Z",
  "resultat": null
 }
