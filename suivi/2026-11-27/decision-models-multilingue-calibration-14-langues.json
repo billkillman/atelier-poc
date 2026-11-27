@@ -1,0 +1,62 @@
+{
+ "version": 1,
+ "jour": "2026-11-27",
+ "sujet_id": "decision-models-multilingue-calibration-14-langues",
+ "depot": "20261127_seuil_confiance_multilingue_calibration_massive",
+ "titre": "Un seuil de confiance réglé en anglais tient-il en français, et que gagne un recalage sur 500 exemples ?",
+ "debut": "2026-11-27T02:01:45Z",
+ "maj": "2026-11-27T02:01:45Z",
+ "statut": "en_cours",
+ "etape": "ecriture",
+ "detail": "le modèle écrit le notebook : protocole, deux approches, évaluation",
+ "iteration": 0,
+ "iterations_max": 3,
+ "sous_progression": null,
+ "etapes": [
+  {
+   "code": "ecriture",
+   "libelle": "Écriture du notebook",
+   "statut": "en_cours",
+   "debut": "2026-11-27T02:01:45Z",
+   "fin": null
+  },
+  {
+   "code": "essai",
+   "libelle": "Exécution à échelle réduite",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue_prealable",
+   "libelle": "Relecture avant l'échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "complete",
+   "libelle": "Échelle complète",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "revue",
+   "libelle": "Revue de méthode",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  },
+  {
+   "code": "publication",
+   "libelle": "Publication",
+   "statut": "a_venir",
+   "debut": null,
+   "fin": null
+  }
+ ],
+ "progression": 0.0,
+ "estimation_fin": "2026-11-27T04:26:45Z",
+ "resultat": null
+}
