@@ -5,10 +5,10 @@
  "depot": "20261127_seuil_confiance_multilingue_calibration_massive",
  "titre": "Un seuil de confiance réglé en anglais tient-il en français, et que gagne un recalage sur 500 exemples ?",
  "debut": "2026-11-27T02:01:45Z",
- "maj": "2026-11-27T02:44:42Z",
- "statut": "en_cours",
- "etape": "revue",
- "detail": "revue de méthode : fuites, équité, validité statistique, fidélité",
+ "maj": "2026-11-27T02:46:25Z",
+ "statut": "valide",
+ "etape": "publication",
+ "detail": "",
  "iteration": 2,
  "iterations_max": 3,
  "sous_progression": null,
@@ -44,19 +44,63 @@
   {
    "code": "revue",
    "libelle": "Revue de méthode",
-   "statut": "en_cours",
+   "statut": "fait",
    "debut": "2026-11-27T02:44:42Z",
-   "fin": null
+   "fin": "2026-11-27T02:46:18Z"
   },
   {
    "code": "publication",
    "libelle": "Publication",
-   "statut": "a_venir",
-   "debut": null,
-   "fin": null
+   "statut": "fait",
+   "debut": "2026-11-27T02:46:18Z",
+   "fin": "2026-11-27T02:46:25Z"
   }
  ],
- "progression": 0.982,
- "estimation_fin": "2026-11-27T02:47:42Z",
- "resultat": null
+ "progression": 1.0,
+ "estimation_fin": null,
+ "resultat": {
+  "statut": "valide",
+  "url": "https://github.com/billkillman/20261127_seuil_confiance_multilingue_calibration_massive",
+  "depot": "20261127_seuil_confiance_multilingue_calibration_massive",
+  "en_bref": "Le défaut se reproduit : le seuil anglais laisse passer plus d'erreurs en français. Le recalage sur 500 exemples ne rétablit pas la cible, contrairement à la source ; seul l'encodeur français la tient, avec moins de couverture.",
+  "synthese": "held_out_selective_precision : XLM-R-en, recalé fr (500 items) 92,1 contre 95,9 pour CamemBERT-fr, recalé fr (référence) (2974 exemples, GPU T4 (Google Colab)).",
+  "metrique_principale": "held_out_selective_precision",
+  "libelle_metrique": "Précision des réponses acceptées (%)",
+  "sens": "max",
+  "approches": [
+   {
+    "nom": "CamemBERT-fr, recalé fr (référence)",
+    "role": "reference",
+    "valeur": 95.92391304347827,
+    "ic95": [
+     94.76061427280939,
+     97.05093833780161
+    ]
+   },
+   {
+    "nom": "XLM-R-en, seuil anglais transféré",
+    "role": "nouvelle",
+    "valeur": 91.35360763267741,
+    "ic95": [
+     90.00609384521633,
+     92.67707082833134
+    ]
+   },
+   {
+    "nom": "XLM-R-en, recalé fr (500 items)",
+    "role": "nouvelle",
+    "valeur": 92.0752182672935,
+    "ic95": [
+     90.64602960969044,
+     93.37016574585635
+    ]
+   }
+  ],
+  "n_exemples": 2974,
+  "jeu": "mteb/amazon_massive_intent",
+  "materiel": "GPU T4 (Google Colab)",
+  "echelle": "complete",
+  "confiance": "moyenne",
+  "tentatives": 1
+ }
 }
