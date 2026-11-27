@@ -5,10 +5,10 @@
  "depot": "20261127_seuil_confiance_multilingue_calibration_massive",
  "titre": "Un seuil de confiance réglé en anglais tient-il en français, et que gagne un recalage sur 500 exemples ?",
  "debut": "2026-11-27T02:01:45Z",
- "maj": "2026-11-27T02:12:39Z",
+ "maj": "2026-11-27T02:16:52Z",
  "statut": "en_cours",
  "etape": "essai",
- "detail": "itération 1 sur 3",
+ "detail": "itération 1 : phase publique sur le jeu public (échelle réduite, CPU)",
  "iteration": 1,
  "iterations_max": 3,
  "sous_progression": null,
@@ -56,7 +56,7 @@
    "fin": null
   }
  ],
- "progression": 0.172,
+ "progression": 0.202,
  "estimation_fin": "2026-11-27T04:12:39Z",
  "resultat": null
 }
