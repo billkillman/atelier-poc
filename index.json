@@ -2,6 +2,94 @@
  "version": 1,
  "pocs": [
   {
+   "jour": "2026-11-27",
+   "sujet_id": "decision-models-multilingue-calibration-14-langues",
+   "depot": "20261127_seuil_confiance_multilingue_calibration_massive",
+   "titre": "Un seuil de confiance réglé en anglais tient-il en français, et que gagne un recalage sur 500 exemples ?",
+   "statut": "valide",
+   "niveau_sandbox": "complet",
+   "echelle": "complete",
+   "materiel": "GPU T4 (Google Colab)",
+   "echelle_complete": {
+    "statut": "valide",
+    "materiel_requis": "gpu",
+    "raison_materiel": "entraînement PyTorch ou TensorFlow (approche référence : CamemBERT fine-tuné sur français, seuil recalé en français)",
+    "raison": ""
+   },
+   "iterations": 2,
+   "metrique_principale": "held_out_selective_precision",
+   "sens": "max",
+   "approches": [
+    {
+     "nom": "CamemBERT-fr, recalé fr (référence)",
+     "role": "reference",
+     "valeur": 95.92391304347827,
+     "ic95": [
+      94.76061427280939,
+      97.05093833780161
+     ]
+    },
+    {
+     "nom": "XLM-R-en, seuil anglais transféré",
+     "role": "nouvelle",
+     "valeur": 91.35360763267741,
+     "ic95": [
+      90.00609384521633,
+      92.67707082833134
+     ]
+    },
+    {
+     "nom": "XLM-R-en, recalé fr (500 items)",
+     "role": "nouvelle",
+     "valeur": 92.0752182672935,
+     "ic95": [
+      90.64602960969044,
+      93.37016574585635
+     ]
+    }
+   ],
+   "n_exemples": 2974,
+   "jeu": "mteb/amazon_massive_intent",
+   "synthese": "held_out_selective_precision : XLM-R-en, recalé fr (500 items) 92,1 contre 95,9 pour CamemBERT-fr, recalé fr (référence) (2974 exemples, GPU T4 (Google Colab)).",
+   "conclusion": "À l'échelle complète (MASSIVE en/fr, 2 974 items de test, GPU T4), le défaut décrit par la source se retrouve. Le seuil réglé en anglais donne 91,4 % de précision acceptée en français (IC 90,0–92,7), contre 94,5 % en anglais. La précision chute de 7,1 points, la confiance de 3,3 seulement, soit un Gap de +3,8 (IC 2,6–4,9). Le sens est conforme à la source (93,5 % en français), mais l'ampleur est plus forte, avec un XLM-R fine-tuné sur l'anglais seul. Le recalage sur 500 items français n'atteint pas la cible : 92,1 % (IC 90,6–93,4) avec 50 % de couverture, alors que la source revient à 94,9 %. L'ECE passe de 5,7 % à 3,4 %. CamemBERT recalé tient 95,9 % (IC 94,8–97,1) avec 37 % de couverture. Il n'est pas comparable à XLM-R à précision égale, et il est probablement sous-entraîné. Un seul tirage de recalage et un seul entraînement par modèle limitent la portée. L'échelle réduite (300 exemples, CPU) ne mesure rien d'exploitable et son verdict sur la couverture s'inverse à l'échelle complète.",
+   "confiance": "moyenne",
+   "reproduit_la_source": "partiellement",
+   "en_bref": "Le défaut se reproduit : le seuil anglais laisse passer plus d'erreurs en français. Le recalage sur 500 exemples ne rétablit pas la cible, contrairement à la source ; seul l'encodeur français la tient, avec moins de couverture.",
+   "libelle_metrique": "Précision des réponses acceptées (%)",
+   "reserves": [
+    "XLM-R recalé accepte davantage de réponses (50 % contre 37 %) parce qu'il tolère plus d'erreurs (92 % de précision contre 96 %). Cela ne prouve pas qu'il soit plus utile à précision égale.",
+    "Les intervalles affichés sous-estiment l'incertitude : le recalage sur 500 items est un seul tirage et chaque modèle n'a été entraîné qu'une fois. Le fait que le recalage ne rétablisse pas 95 % ici n'est pas établi comme général, mais la règle de seuil utilisée est optimiste.",
+    "La couverture de 37 % de CamemBERT à 95 % est vraisemblablement sous-estimée, et son avantage éventuel sur le modèle multilingue aussi. Cette valeur est celle d'une référence probablement peu entraînée, pas d'un encodeur français bien réglé.",
+    "La perte de 7,1 points et le Gap de +3,8 points sont ceux d'un modèle entraîné en anglais seulement. Ils ne se comparent pas aux 1,8 et +0,9 point de la source. Ils montrent le sens du défaut, pas son ampleur pour un modèle multilingue. Une partie des « erreurs » tient à des étiquettes ambiguës."
+   ],
+   "duree_minutes": 44.7,
+   "consommation": {
+    "claude:poc_code:decision-models-multilingue-calibration-14-langues": {
+     "appels": 1,
+     "echecs": 0,
+     "secondes": 653.4,
+     "cout_equivalent_usd": 1.8299,
+     "recherches_web": 0
+    },
+    "claude:poc_reparation:decision-models-multilingue-calibration-14-langues": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 570.5,
+     "cout_equivalent_usd": 2.4702,
+     "recherches_web": 0
+    },
+    "claude:poc_revue:decision-models-multilingue-calibration-14-langues": {
+     "appels": 2,
+     "echecs": 0,
+     "secondes": 158.0,
+     "cout_equivalent_usd": 0.6648,
+     "recherches_web": 0
+    }
+   },
+   "url": "https://github.com/billkillman/20261127_seuil_confiance_multilingue_calibration_massive",
+   "tentatives": 1
+  },
+  {
    "jour": "2026-11-26",
    "sujet_id": "seldon-tfm-tabulaire-ouvert",
    "depot": "20261126_tabular_foundation_temporal_xgboost",
