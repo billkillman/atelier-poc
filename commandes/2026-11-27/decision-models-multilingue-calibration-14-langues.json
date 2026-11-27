@@ -1,0 +1,407 @@
+{
+ "version": 1,
+ "jour": "2026-11-27",
+ "sujet_id": "decision-models-multilingue-calibration-14-langues",
+ "depot": "20261127_seuil_confiance_multilingue_calibration_massive",
+ "fiche": {
+  "sujet_id": "decision-models-multilingue-calibration-14-langues",
+  "titre": "Modèles de décision : un seuil réglé en anglais laisse passer plus d'erreurs en français (93,5 % au lieu de 95 %)",
+  "en_une_phrase": "Sur des benchmarks publics, 25 modèles de décision ouverts perdent en précision hors anglais plus qu'en confiance : en français, un seuil réglé pour 95 % n'en donne que 93,5 %. Recalibrer sur 500 items suffit.",
+  "probleme": "Un *modèle de décision* est un LLM fine-tuné pour ne pas rédiger de texte. Il rend une probabilité pour chacune des options d'une question fermée : quelle intention, quel outil appeler, ce message est-il dangereux ? Le système applicatif agit directement sur ce chiffre : il accepte au-dessus d'un seuil, il escalade en dessous. Ces modèles reposent sur des bases multilingues, mais le classement public qui les départage, le Decision Index, n'est qu'en anglais. Question : hors anglais, la confiance baisse-t-elle autant que la précision ? Si elle baisse moins, le seuil laisse passer des erreurs sans que rien ne le signale.",
+  "comment_ca_marche": "L'article ne propose pas de nouveau modèle. Il mesure un défaut puis teste des remèdes.\n\n1. **Questions identiques dans 14 langues.** Les auteurs posent les mêmes questions en anglais et dans 13 autres langues, dont le français. Ce sont des *items parallèles* : la difficulté est la même, seule la langue change. Au total, 25 626 items tirés de 75 benchmarks publics : inférence logique, connaissances, intentions, choix d'outil, sécurité…\n2. **Deux écarts mesurés par langue.** Pour chacun des 25 meilleurs modèles ouverts du classement, ils comparent à l'anglais la baisse de précision (part de bonnes réponses) et la baisse de confiance moyenne. La différence entre les deux s'appelle le *Gap*. Un Gap positif veut dire que le modèle devient trop sûr de lui.\n3. **Le test du seuil.** Ils fixent, par modèle, le seuil qui donne 95 % de bonnes réponses parmi celles acceptées en anglais. Ils l'appliquent tel quel aux autres langues. C'est la *prédiction sélective* : le modèle répond seul au-dessus du seuil, s'abstient en dessous.\n4. **Deux remèdes testés.** Le premier recale le seuil sur des exemples étiquetés de la langue. Le second applique le *temperature scaling* : un seul nombre par langue, qui « détend » ou « resserre » les probabilités sans changer la réponse choisie.\n5. **D'où vient la perte.** Une décomposition statistique de la variance (ANOVA) sépare l'effet de la langue, du modèle de base et de la recette d'entraînement. Puis 81 fine-tunings contrôlés sur trois bases (Gemma 4, Qwen3.8, Qwen3.5) font varier les langues, la quantité de données et la méthode d'entraînement.\n\n**Ce qui est nouveau** : les études précédentes portaient sur des encodeurs ou des modèles génératifs. Celle-ci mesure le coût opérationnel *au seuil* pour des modèles dont les probabilités pilotent directement l'application.",
+  "demarche_experimentale": "Les auteurs évaluent 25 des 27 meilleurs modèles de décision à poids ouverts du Decision Index (relevé du 2026-11-12). Tous font 26 à 57 Md de paramètres et reposent sur Gemma 4 31B, Qwen3.8 27B, Qwen3.5 27B ou un assemblage des deux familles. Le corpus compte 17 sous-catégories de tâches et 75 benchmarks, avec au plus 100 items par benchmark et par langue, soit 36 920 requêtes par modèle. Parmi les items non anglais, 64 % sont traduits par des humains ou écrits dans la langue, 15 % traduits automatiquement par les auteurs des jeux de données et 21 % traduits par LLM (GPT-6 Astra) par les auteurs de l'article. Métriques : la précision, la confiance et l'*ECE*, qui mesure l'écart moyen entre confiance et justesse (plus bas = mieux). Les intervalles de confiance sont calculés par bootstrap apparié. S'y ajoutent les trois bases testées sans entraînement et 81 fine-tunings contrôlés (74 LoRA, 7 complets) sur 24 000 items publics, avec les recouvrements avec le test retirés.",
+  "resultats": [
+   {
+    "metrique": "Précision perdue par rapport à l'anglais (points, plus bas = mieux)",
+    "valeur": "−1,8 en français ; −3,5 en moyenne ; −7,8 en tamoul",
+    "comparaison": "Mêmes items en anglais",
+    "conditions": "Moyenne des 25 modèles, items parallèles ; perte non nulle dans les 13 langues",
+    "citation": "Outside English, every model loses accuracy in every language on parallel items (Table 1), averaging −3.5 points (95% paired item-bootstrap CI [−4.0,−3.0])."
+   },
+   {
+    "metrique": "Gap : baisse de confiance moins baisse de précision (points, 0 = idéal)",
+    "valeur": "+0,9 en français ; +1,6 en moyenne ; +3,5 en swahili",
+    "comparaison": "Confiance −1,8 contre précision −3,5 en moyenne",
+    "conditions": "325 paires modèle-langue ; Gap positif dans 301 d'entre elles",
+    "citation": "Across all 325 pairs, confidence drops only 1.8 points against the 3.5-point accuracy loss, yielding a mean Gap of +1.6 points (95% CI [+1.2,+2.2])."
+   },
+   {
+    "metrique": "Précision des réponses acceptées au seuil anglais (plus haut = mieux)",
+    "valeur": "93,5 % en français ; 92,6 % en moyenne ; 90,0 % en tamoul",
+    "comparaison": "95 % visés en anglais",
+    "conditions": "Seuil le plus bas donnant 95 % en anglais, environ 85 % de réponses acceptées",
+    "citation": "| French | − - 1.8 | − - 0.9 | +0.9 | 23 | − - 2.1 | 93.5 |"
+   },
+   {
+    "metrique": "Précision au seuil recalé sur la langue (sur des items non vus)",
+    "valeur": "93,7 % / 94,7 % / 94,9 %",
+    "comparaison": "50 / 200 / 500 exemples étiquetés",
+    "conditions": "Moyenne des 25 modèles ; la part de réponses acceptées tombe de 85 % à 73 % (80,4 % en français)",
+    "citation": "it needs labeled target data (50, 200, and 500 items yield 93.7%, 94.7%, and 94.9% held-out accuracy), and restoring 95% precision slashes coverage from 85% in English to 73% overall and 60% in Tamil."
+   },
+   {
+    "metrique": "ECE après temperature scaling par langue (plus bas = mieux)",
+    "valeur": "2,9 %",
+    "comparaison": "4,1 % sans correction",
+    "conditions": "500 items par langue ; précision inchangée ; aucune température unique n'aide les deux modèles Qwen3.5",
+    "citation": "per-language temperature scaling on 500 items cuts pooled ECE from 4.1% to 2.9%"
+   },
+   {
+    "metrique": "Précision : traduction LLM contre traduction humaine, mêmes items",
+    "valeur": "XNLI : 87,1 % contre 81,2 % ; Belebele : 97,7 % contre 94,1 %",
+    "comparaison": "Anglais : 91,2 % (XNLI) et 98,8 % (Belebele)",
+    "conditions": "Traduction LLM meilleure dans les 23 paires benchmark-langue, dont 12 significatives ; français XNLI 88,1 contre 83,4 (non significatif)",
+    "citation": "Belebele rises from 94.1% to 97.7% (English 98.8%), and XNLI from 81.2% to 87.1% (English 91.2%)."
+   }
+  ],
+  "limites": [
+   "Les auteurs le reconnaissent : au plus 100 items par benchmark et par langue, et une provenance des traductions mêlée à la langue et à la tâche. Le contrôle humain/LLM ne porte que sur 2 benchmarks et un seul traducteur.",
+   "Les auteurs le reconnaissent : seulement 25 modèles de 26 à 57 Md de paramètres, issus de 3 familles de base et d'un seul classement. Des modèles plus petits ou propriétaires peuvent se comporter autrement.",
+   "Il n'y a ni données internes, ni e-mails réels, ni taxonomie de ~300 classes en arbre, ni comparaison à un encodeur fine-tuné.",
+   "Les traductions LLM n'ont pas été relues par des locuteurs natifs, et les auteurs le disent."
+  ],
+  "chiffres_cles": [
+   {
+    "valeur": "93,5 %",
+    "libelle": "Précision en français au seuil réglé pour 95 % en anglais (moyenne de 25 modèles)"
+   },
+   {
+    "valeur": "−1,8 pt",
+    "libelle": "Précision perdue en français par rapport à l'anglais, mêmes questions"
+   },
+   {
+    "valeur": "500",
+    "libelle": "Exemples étiquetés par langue pour revenir à 94,9 % de précision"
+   }
+  ],
+  "affirmations_cles": [
+   {
+    "affirmation": "Les 25 modèles de décision perdent en précision dans les 13 langues hors anglais, de 1,6 point (malais) à 7,8 points (tamoul).",
+    "citation": "Accuracy drops below English in all 325 model–language pairs (1.6 points in Malay to 7.8 in Tamil)."
+   },
+   {
+    "affirmation": "La confiance baisse environ deux fois moins que la précision : un seuil réglé pour 95 % en anglais ne donne que 90 % en tamoul.",
+    "citation": "Every model loses accuracy in every language, from about 2 points in high-resource languages to 8 in Tamil, while confidence falls only half as much: a threshold set for 95% accuracy in English yields 90% in Tamil."
+   },
+   {
+    "affirmation": "En français, la précision baisse de 1,8 point, la confiance de 0,9 point, et le seuil anglais donne 93,5 % de bonnes réponses parmi celles acceptées.",
+    "citation": "| French | − - 1.8 | − - 0.9 | +0.9 | 23 | − - 2.1 | 93.5 |"
+   },
+   {
+    "affirmation": "La langue (60 %) et le modèle de base (34 %) expliquent presque toute la variance de la perte de précision ; le rang au classement n'en prédit qu'une partie (ρ = 0,67).",
+    "citation": "Language (60%) and base model (34%) explain almost all accuracy-loss variance: all eight Qwen3.8 models lose 13.6–17.8 points in Tamil versus 2.9–5.7 for the other 17, while board rank predicts only moderately (ρ=0.67)."
+   },
+   {
+    "affirmation": "Un temperature scaling par langue sur 500 items fait passer l'ECE de 4,1 % à 2,9 % sans changer la précision.",
+    "citation": "Using the same 500 items for per-language temperature scaling (Appendix Table 13) lowers pooled per-language ECE (computed over all held-out items of a language rather than macro-averaged across sub-categories) from 4.1% to 2.9% without changing accuracy."
+   },
+   {
+    "affirmation": "Les jeux de test traduits par LLM sont plus faciles que les traductions humaines et sous-estiment l'écart avec l'anglais.",
+    "citation": "Finally, the same test items are answered more accurately in all 23 benchmark–language pairs we compare when an LLM rather than a person translated them, so LLM-translated test sets understate the gap."
+   },
+   {
+    "affirmation": "Ni plus de données ni le fine-tuning complet ne referment la perte : avec Qwen3.8, aucun mélange de données ne fait descendre la perte en tamoul sous environ 12 points.",
+    "citation": "What remains follows the base: no data mix brought Qwen3.8 below a Tamil loss of about 12 points, against 4 for untuned Gemma 4."
+   }
+  ],
+  "glossaire": [
+   {
+    "terme": "Modèle de décision",
+    "definition": "LLM fine-tuné pour répondre à une question fermée par une probabilité pour chaque option, au lieu de générer du texte."
+   },
+   {
+    "terme": "Calibration",
+    "definition": "Accord entre la confiance affichée et la justesse réelle : 90 % de confiance devraient correspondre à 90 % de bonnes réponses."
+   },
+   {
+    "terme": "ECE",
+    "definition": "Expected Calibration Error : écart moyen entre confiance et précision, calculé par tranches de confiance. Plus bas = mieux calibré."
+   },
+   {
+    "terme": "Temperature scaling",
+    "definition": "Recalibrage par un seul nombre, qui adoucit ou accentue les probabilités sans changer la réponse choisie. Il se règle sur quelques centaines d'exemples étiquetés."
+   },
+   {
+    "terme": "Prédiction sélective",
+    "definition": "Le modèle répond seul au-dessus d'un seuil de confiance et s'abstient ou escalade en dessous. La couverture est la part des réponses acceptées."
+   },
+   {
+    "terme": "Items parallèles",
+    "definition": "Les mêmes questions traduites dans plusieurs langues, pour comparer les langues à difficulté égale."
+   },
+   {
+    "terme": "AUROC",
+    "definition": "Capacité de la confiance à séparer bonnes et mauvaises réponses : 100 = séparation parfaite, 50 = hasard."
+   },
+   {
+    "terme": "LoRA",
+    "definition": "Fine-tuning léger qui n'entraîne que de petites matrices ajoutées au modèle, au lieu de tous ses poids."
+   }
+  ],
+  "sources": [
+   {
+    "titre": "Lost in Translation, Not in Confidence: Benchmarking and Calibrating Multilingual Decision Models (arXiv)",
+    "url": "https://arxiv.org/abs/2611.33307",
+    "type": "primaire",
+    "date": "2026-11-24"
+   },
+   {
+    "titre": "Decision Index : kit de reproduction du benchmark des modèles de décision (GitHub)",
+    "url": "https://github.com/apolinario/decision-index",
+    "type": "primaire",
+    "date": "2026-10-20"
+   }
+  ],
+  "date_publication": {
+   "date": "2026-11-24",
+   "source": "arxiv.org"
+  }
+ },
+ "plan": {
+  "titre": "Un seuil de confiance réglé en anglais tient-il en français, et que gagne un recalage sur 500 exemples ?",
+  "hypothese": "Sur items parallèles MASSIVE en/fr, un classifieur fine-tuné en anglais dont le seuil à 95 % de précision est appliqué tel quel au français délivre moins de 94,5 % de précision sur les réponses acceptées (confiance en baisse moins que la précision, Gap > 0). Un recalage (température + seuil) sur 500 items français ramène la précision acceptée à ≥ 94 % avec une couverture ≥ 60 %, et un encodeur français fine-tuné sur le train fr et recalé de la même façon atteint une couverture à 95 % supérieure ou égale d'au moins 5 points.",
+  "reference": {
+   "nom": "CamemBERT fine-tuné sur français, seuil recalé en français",
+   "description": "Classifieur CamemBERT-base fine-tuné sur le train français de MASSIVE (60 intentions). Température et seuil visant 95 % de précision sont réglés sur 500 items de validation français, puis évalués sur le test français.",
+   "implementation": "transformers AutoModelForSequenceClassification, almanach/camembert-base, 3 époques, lr 5e-5, batch 32, max_length 64 ; confiance = probabilité softmax maximale ; température par minimisation de la NLL sur 500 items de validation ; seuil = plus petit seuil donnant ≥ 95 % de précision sur ces 500 items.",
+   "modeles_hf": [
+    "almanach/camembert-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "nouvelle": {
+   "nom": "Encodeur multilingue réglé en anglais, seuil transféré puis recalé",
+   "description": "Classifieur XLM-R fine-tuné sur l'anglais uniquement ; son seuil à 95 % de précision, réglé sur l'anglais, est appliqué sans changement aux mêmes items en français (transfert interlingue), puis remplacé par un recalage par langue (température + seuil) sur 500 items français. Reproduit le défaut décrit (précision perdue > confiance perdue) et ses remèdes à échelle d'encodeur.",
+   "implementation": "transformers, FacebookAI/xlm-roberta-base fine-tuné 3 époques sur le train en (lr 3e-5, batch 32, max_length 64). Mesures sur test en et fr (items alignés par id) : perte de précision, perte de confiance, Gap, précision/couverture au seuil anglais, ECE avant/après temperature scaling, précision/couverture après recalage sur 50, 200 et 500 items fr de validation.",
+   "modeles_hf": [
+    "FacebookAI/xlm-roberta-base"
+   ],
+   "modeles_hf_sandbox": [],
+   "entrainement": "pytorch_tensorflow",
+   "service_phase2": "aucun"
+  },
+  "jeu_public": {
+   "hub_id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "split_evaluation": "test",
+   "split_entrainement": "train",
+   "colonnes_utiles": "id, text, label, label_text, lang ; scénario = préfixe de label_text avant « _ » (niveau 1 de l'arbre)",
+   "representativite": "Seul jeu chargeable avec items parallèles en/fr, intentions étiquetées proches (60 classes, arbre scénario/intention) et effectifs suffisants pour recaler sur 500 items puis tester sur plus de 1 000.",
+   "ecarts_donnees_reelles": "Requêtes courtes d'assistant vocal (domotique, agenda), non des e-mails ni du domaine financier ; 60 classes et non ~300 ; français traduit, pas spontané ; classes équilibrées ; encodeurs de 110-270 M de paramètres et non des modèles de décision de 26-57 Md ; en/fr plus proches que les langues à faibles ressources, donc écarts attendus modestes.",
+   "jeux_explores": [
+    {
+     "nom": "mteb/amazon_massive_intent",
+     "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent",
+     "acces": "hub_libre",
+     "adequation": "Intentions parallèles en/fr, 60 classes proches en arbre, test fr de 2 974 items.",
+     "decision": "retenu",
+     "raison": "Seul jeu vérifié combinant parallélisme, étiquettes d'intention, hiérarchie et taille suffisante ; licence apache-2.0."
+    },
+    {
+     "nom": "facebook/xnli",
+     "url": "https://huggingface.co/datasets/facebook/xnli",
+     "acces": "hub_libre",
+     "adequation": "NLI à 3 classes, test humain de 5 010 items parallèles.",
+     "decision": "ecarte",
+     "raison": "Tâche à paires de phrases éloignée du routage, licence non indiquée (CC BY-NC d'origine) ; 3 classes seulement."
+    },
+    {
+     "nom": "facebook/belebele",
+     "url": "https://huggingface.co/datasets/facebook/belebele",
+     "acces": "hub_libre",
+     "adequation": "QCM de lecture parallèle, ~900 items par langue.",
+     "decision": "ecarte",
+     "raison": "Un seul split de 900 items : insuffisant pour 500 de recalage plus un vrai test ; pas de classification."
+    },
+    {
+     "nom": "CohereLabs/Global-MMLU-Lite",
+     "url": "https://huggingface.co/datasets/CohereLabs/Global-MMLU-Lite",
+     "acces": "hub_libre",
+     "adequation": "QCM parallèles avec métadonnées culturelles, test de 400 items.",
+     "decision": "ecarte",
+     "raison": "Trop petit (400 test) et QCM de connaissances hors routage."
+    },
+    {
+     "nom": "textdetox/multilingual_toxicity_dataset",
+     "url": "https://huggingface.co/datasets/textdetox/multilingual_toxicity_dataset",
+     "acces": "hub_libre",
+     "adequation": "Toxicité binaire fr/en, 5 000 items par langue.",
+     "decision": "ecarte",
+     "raison": "fr et en non parallèles (écart confondu avec la difficulté), licence openrail++."
+    },
+    {
+     "nom": "DeepPavlov/banking77_fr",
+     "url": "https://huggingface.co/datasets/DeepPavlov/banking77_fr",
+     "acces": "hub_libre",
+     "adequation": "77 intentions de clients en français, 3 080 test.",
+     "decision": "ecarte",
+     "raison": "Alignement item par item avec l'anglais non démontré (ordres différents), licence non précisée ; reste utile en validation complémentaire du domaine."
+    },
+    {
+     "nom": "juletxara/xnli_mt",
+     "url": "https://huggingface.co/datasets/juletxara/xnli_mt",
+     "acces": "hub_libre",
+     "adequation": "XNLI traduit par machine.",
+     "decision": "ecarte",
+     "raison": "Script de chargement, non chargeable en parquet."
+    },
+    {
+     "nom": "AmazonScience/massive",
+     "url": "https://huggingface.co/datasets/AmazonScience/massive",
+     "acces": "hub_libre",
+     "adequation": "MASSIVE d'origine avec slots.",
+     "decision": "ecarte",
+     "raison": "Dépôt à script de chargement ; mteb/amazon_massive_intent en est la version parquet."
+    }
+   ]
+  },
+  "metriques": [
+   "held_out_selective_precision",
+   "coverage_at_target_precision",
+   "expected_calibration_error",
+   "accuracy_drop_vs_english",
+   "confidence_drop_vs_english",
+   "calibration_gap",
+   "precision_at_english_threshold",
+   "scenario_accuracy",
+   "macro_f1"
+  ],
+  "metrique_principale": "held_out_selective_precision",
+  "sens": "max",
+  "protocole": "Chargement des configs fr et en de mteb/amazon_massive_intent ; l'alignement fr/en est vérifié par id (items sans correspondant écartés). Entraînement : CamemBERT sur le split train fr, XLM-R sur le split train en, 3 époques. Calibration : 500 items tirés du split validation (fr, et en pour le seuil anglais), pour température et seuil visant 95 % ; budgets de recalage 50/200/500 pour la courbe. Évaluation : split test fr et en sur les mêmes ids (~2 974 items). Comparaison : (a) XLM-R-en seuil anglais appliqué au fr, (b) XLM-R-en recalé sur fr, (c) CamemBERT-fr recalé sur fr. Intervalles de confiance par bootstrap apparié sur les items (1 000 rééchantillons) ; ECE sur 15 intervalles. Échelle réduite : 300 items d'entraînement par langue, 1 époque, 100 items de validation et 200 de test.",
+  "niveau_sandbox": "complet",
+  "adaptation_sandbox": "Mêmes modèles (≤ 270 M) à l'échelle réduite avec peu d'exemples ; sur T4, coût : 11 514 exemples × ~25 tokens × 3 époques × 2 modèles ≈ 1,7 M tokens d'entraînement, quelques minutes en fp16, plus l'inférence sur ~3 000 items × 2 langues, bien en dessous des 45 min.",
+  "dependances": [],
+  "phase2": {
+   "donnees": [
+    {
+     "colonne": "text",
+     "type": "str",
+     "description": "Corps du message ou de l'e-mail, anonymisé"
+    },
+    {
+     "colonne": "reason",
+     "type": "str",
+     "description": "Motif de niveau 1 (étiquette validée)"
+    },
+    {
+     "colonne": "sub_reason",
+     "type": "str",
+     "description": "Sous-motif de niveau 2 (étiquette validée)"
+    },
+    {
+     "colonne": "received_at",
+     "type": "datetime",
+     "description": "Date de réception, pour le découpage temporel"
+    },
+    {
+     "colonne": "language",
+     "type": "str",
+     "description": "Langue du texte (fr, en…)"
+    },
+    {
+     "colonne": "text_en",
+     "type": "str",
+     "description": "Traduction anglaise optionnelle (humaine de préférence) pour mesurer le transfert en/fr ; peut être vide"
+    }
+   ],
+   "volume_conseille": "≥ 1 500 textes étiquetés par langue évaluée (500 pour recaler, 1 000 pour tester), et ≥ 5 000 pour entraîner ; ≥ 10 exemples par sous-motif dans le test",
+   "metriques_metier": "Précision des routages acceptés automatiquement, taux d'acceptation (couverture) à 95 % de précision visée, ECE, taux d'escalade vers un humain",
+   "garde_fous": "Ne jamais régler le seuil sur le jeu de test ; recaler à chaque changement de taxonomie ou de période ; ne pas publier d'extraits de textes clients ; surveiller la précision par sous-motif rare",
+   "prescriptions": [
+    "Étiquettes validées par au moins deux annotateurs sur un échantillon, avec accord inter-annotateurs (kappa) documenté",
+    "Découpage temporel : recalage sur la période la plus ancienne, test sur la plus récente, sans recouvrement ni doublons de fils d'e-mails",
+    "Au moins 500 textes de recalage et 1 000 de test, disjoints, tirés de la même période et du même canal",
+    "Couvrir toutes les classes proches de la taxonomie ; signaler à part les classes de moins de 10 exemples",
+    "Textes anonymisés (noms, IBAN, numéros de carte, adresses) avant extraction",
+    "Exclure les textes générés automatiquement, les accusés de réception et les e-mails à pièce jointe seule",
+    "Si une traduction anglaise est utilisée, préférer une traduction humaine à une traduction par LLM, qui surestime la facilité"
+   ],
+   "preparation": "Extraire des messages et e-mails récents déjà routés et dont l'étiquette a été confirmée par un conseiller ou un annotateur. Dédoublonner par fil de conversation, anonymiser, puis échantillonner par sous-motif avec un plafond par classe pour garder des classes rares. Découper par date en recalage, test et entraînement."
+  },
+  "duree_estimee_minutes": 90,
+  "analyse_materiel": "",
+  "type_exemples": "courts"
+ },
+ "faits": {
+  "modeles": {
+   "almanach/camembert-base": {
+    "id": "almanach/camembert-base",
+    "sha": "a75967561c78f2aa81cc41045378d3b4ee25af9e",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 111246085,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "fr"
+    ]
+   },
+   "FacebookAI/xlm-roberta-base": {
+    "id": "FacebookAI/xlm-roberta-base",
+    "sha": "e73636d4f797dec63c3081bb6ed5c7b0bb3f2089",
+    "tache": "fill-mask",
+    "bibliotheque": "transformers",
+    "parametres": 278885778,
+    "licence": "mit",
+    "code_distant": false,
+    "langues": [
+     "af",
+     "am",
+     "ar",
+     "as",
+     "az",
+     "be",
+     "bg",
+     "bn"
+    ]
+   }
+  },
+  "jeu": {
+   "id": "mteb/amazon_massive_intent",
+   "config": "fr",
+   "splits": [
+    "train",
+    "test",
+    "validation"
+   ],
+   "licence": "apache-2.0",
+   "colonnes": {
+    "id": "Value",
+    "label": "Value",
+    "label_text": "Value",
+    "text": "Value",
+    "lang": "Value"
+   },
+   "exemple": {
+    "id": "1",
+    "label": "alarm_set",
+    "label_text": "alarm_set",
+    "text": "réveille-moi à neuf heures du matin le vendredi",
+    "lang": "fr"
+   },
+   "lignes": {
+    "train": 11514,
+    "test": 2974,
+    "validation": 2033
+   }
+  },
+  "paquets": {}
+ },
+ "moteurs": {
+  "poc_code": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_reparation": {
+   "sdk": "claude",
+   "modele": "claude-opus-5-5"
+  },
+  "poc_revue": {
+   "sdk": "claude",
+   "modele": "claude-sonnet-5-5"
+  }
+ }
+}
